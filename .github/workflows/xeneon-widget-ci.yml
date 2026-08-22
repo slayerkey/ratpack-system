@@ -1,0 +1,138 @@
+name: XENEON Widget CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'widgets/**'
+      - 'tools/xeneon/**'
+      - 'platforms/icue-xeneon.md'
+      - '.github/workflows/xeneon-widget-ci.yml'
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: Widget slug under widgets/
+        required: true
+        default: now-playing
+
+permissions:
+  contents: read
+
+jobs:
+  validate-package:
+    name: Official CLI validate and package
+    runs-on: windows-latest
+    env:
+      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Generate shipping widget from canonical source
+        shell: pwsh
+        run: python tools/xeneon/inline.py "$env:WIDGET_SLUG"
+
+      - name: Show iCUE Widget CLI version
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 --version
+
+      - name: Validate widget with official CLI
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 validate "widgets/$env:WIDGET_SLUG"
+
+      - name: Package widget with official CLI
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 package "widgets/$env:WIDGET_SLUG"
+
+      - name: Collect package and build metadata
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $pkg = Get-ChildItem -Path widgets -Filter *.icuewidget -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $pkg) { throw 'icuewidget package did not produce an archive under widgets/' }
+          Copy-Item $pkg.FullName "artifacts/$env:WIDGET_SLUG.icuewidget"
+          $manifest = Get-Content "widgets/$env:WIDGET_SLUG/manifest.json" -Raw | ConvertFrom-Json
+          $info = [ordered]@{
+            slug = $env:WIDGET_SLUG
+            package_source = $pkg.Name
+            package_artifact = "$env:WIDGET_SLUG.icuewidget"
+            name = $manifest.name
+            version = $manifest.version
+            id = $manifest.id
+            author = $manifest.author
+            cli = 'icuewidget-cli@0.4.47'
+            generator = 'tools/xeneon/inline.py'
+            runner = 'windows-latest'
+          }
+          $info | ConvertTo-Json | Set-Content artifacts/build-info.json -Encoding UTF8
+          Get-ChildItem artifacts
+
+      - name: Upload official package
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-package
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  streamspell:
+    name: StreamSpell packaged preview
+    needs: validate-package
+    runs-on: ubuntu-latest
+    env:
+      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      STREAMSPELL_URL: http://127.0.0.1:8090/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Download official package
+        uses: actions/download-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-package
+          path: artifacts/package
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start StreamSpell community builder locally
+        run: |
+          git clone --depth 1 https://github.com/streamspell/xeneon-edge-widget-builder.git /tmp/xeneon-edge-widget-builder
+          cd /tmp/xeneon-edge-widget-builder
+          npm install
+          nohup npm run dev > /tmp/streamspell-server.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8090/ > /dev/null; then
+              echo 'StreamSpell local builder is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/streamspell-server.log
+          exit 1
+
+      - name: Verify packaged widget with StreamSpell
+        run: node tools/xeneon/streamspell.mjs "artifacts/package/${WIDGET_SLUG}.icuewidget" "artifacts/streamspell"
+
+      - name: Upload StreamSpell evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-streamspell
+          path: artifacts/streamspell/
+          if-no-files-found: warn
+          retention-days: 30

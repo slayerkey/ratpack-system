@@ -14,7 +14,7 @@ ChatGPT is the preferred development and orchestration environment.
 
 GitHub Actions is the preferred remote build and test computer when a clean or platform specific runner is required.
 
-Local applications and physical hardware are final validation boundaries, not the normal place to discover ordinary code, packaging, or art failures.
+Local applications and physical hardware are final validation boundaries only when the product genuinely depends on them. They are not the normal place to discover ordinary code, packaging, layout, or art failures.
 
 ## Canonical repository
 
@@ -80,6 +80,8 @@ REJECTED
 
 The current product roster still uses a smaller legacy `status` vocabulary. During migration, preserve compatibility while introducing `workflow_state` using `standards/product-state.md`.
 
+`READY_FOR_HARDWARE_QA` is a capability state, not a universal requirement. Products without owned or necessary hardware may move directly to `READY_TO_SHIP` after their documented automated release gate passes.
+
 ## Source of truth rules
 
 Product names, price, status, type, keywords, and required variants come from canonical product metadata.
@@ -100,17 +102,29 @@ Use direct execution when the tool runs in the ChatGPT environment.
 
 Use GitHub Actions when dependency installation, Windows, a browser, a vendor CLI, or a clean runner is required.
 
-Use the local PC only for host application state, authenticated browser state that cannot be delegated safely, or final hardware validation.
+Use the local PC only for host application state, authenticated browser state that cannot be delegated safely, or genuinely required host or hardware validation.
 
 ## Final local boundaries currently known
 
-Physical Stream Deck behavior and import validation.
+Physical Stream Deck behavior and final import validation remain useful for products that target actual Stream Deck hardware.
 
-Physical XENEON Edge touch, rendering, and iCUE host validation.
+XENEON Edge widgets do not require owned physical hardware for release candidate status. The canonical gate is source and structure QA, all eight deterministic browser fixtures, official iCUE CLI validation and packaging on Windows CI, and StreamSpell packaged-widget validation across all eight XENEON presets. A real device or iCUE host smoke test is optional extra confidence when available.
 
-Maker Console authenticated submission under the current Playwright design.
+Maker Console staging and upload are automated through the canonical Playwright driver. The signed in Maker Console browser profile remains local and is never copied into GitHub or CI. GitHub generates and validates the exact SHIP_KIT consumed by that local browser bridge.
 
-Host application runtime validation for products that integrate with applications such as Premiere Pro, Resolve, or AutoCAD.
+Host application runtime validation remains required for products whose core function integrates with applications such as Premiere Pro, Resolve, or AutoCAD.
+
+## Proven remote execution
+
+Stream Deck plugin build, Elgato CLI validation, packaging, logs, and artifacts have been proven through GitHub Actions.
+
+XENEON official CLI Windows CI was proven on 2026-08-22 with `icuewidget-cli@0.4.47`: validation passed and a real `.icuewidget` package was created on a clean Windows runner.
+
+The packaged XENEON artifact was then independently opened by StreamSpell's `xeneon-edge-widget-builder` in GitHub Actions and rendered through all eight official XENEON viewport presets with zero console errors.
+
+Rat Art for XENEON is versioned and runs through GitHub Actions using deterministic browser captures plus the repository compositor. Image generation is explicitly disabled for Rat Art.
+
+Rat Ship for XENEON rebuilds the canonical widget, validates and packages it with the CORSAIR CLI, reruns Rat Art, creates the Maker Console SHIP_KIT, and preflights the Playwright browser driver in GitHub Actions. Only the authenticated browser session remains local.
 
 ## Critical migration blockers
 
@@ -118,11 +132,9 @@ The local `ratpack-projects` and `_shared` content must be preserved before rest
 
 Brand art must fail if its required brand font cannot be resolved. Silent fallback is not acceptable.
 
-XENEON art must require real captured widget shots before rendering. Missing shots must fail the pipeline rather than produce blank marketing art.
+XENEON art must require real deterministic widget captures before rendering. Missing captures must fail the pipeline rather than produce blank marketing art.
 
-Widget shipping support must be implemented explicitly before Maker Console automation is trusted for widgets.
-
-The iCUE Widget CLI Windows CI bootstrap still needs a clean runner proof.
+Never move Maker Console browser profile data, cookies, passwords, or session tokens into GitHub Actions merely to eliminate the final authenticated browser boundary.
 
 ## Read next by task
 
