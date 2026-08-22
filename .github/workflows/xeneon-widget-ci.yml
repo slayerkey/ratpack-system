@@ -33,6 +33,10 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Generate shipping widget from canonical source
+        shell: pwsh
+        run: python tools/xeneon/inline.py "$env:WIDGET_SLUG"
+
       - name: Show iCUE Widget CLI version
         shell: pwsh
         run: npx --yes icuewidget-cli@0.4.47 --version
@@ -64,6 +68,7 @@ jobs:
             id = $manifest.id
             author = $manifest.author
             cli = 'icuewidget-cli@0.4.47'
+            generator = 'tools/xeneon/inline.py'
             runner = 'windows-latest'
           }
           $info | ConvertTo-Json | Set-Content artifacts/build-info.json -Encoding UTF8
