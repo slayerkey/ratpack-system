@@ -106,7 +106,8 @@ jobs:
 
       - name: Install Playwright
         run: |
-          npm install --no-save playwright@1.55.0
+          npm install --no-save playwright@1.62.1
+          npm audit --audit-level=high
           npx playwright install --with-deps chromium
 
       - name: Start StreamSpell community builder locally
