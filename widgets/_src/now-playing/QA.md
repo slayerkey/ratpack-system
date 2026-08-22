@@ -72,6 +72,28 @@ PASS: StreamSpell recorded zero console errors.
 
 PASS: eight StreamSpell screenshots plus `streamspell-result.json` were preserved as the GitHub Actions artifact `xeneon-now-playing-streamspell`.
 
+## Rat Art candidate
+
+PASS: five marketplace images were rendered at 1920 by 960 from deterministic real widget captures.
+
+PASS: the 288 by 288 search icon was rendered from the shipped music glyph.
+
+PASS: the hero uses the calibrated straight XENEON Edge device plate and real widget capture.
+
+PASS: exact Inter font resolution succeeded with no silent fallback.
+
+PASS: all required captures were present before rendering.
+
+PASS: the palette comparison holds the artist constant across Artist, Neon, Ember, and Ocean.
+
+PASS: visual review for hierarchy, title legibility, device dominance, crop quality, text bounds, and marketplace polish.
+
+PASS: artwork does not imply album art, progress, seek, or playback state.
+
+Candidate hashes and promotion rules are recorded in `ART_REVIEW.md`. Paste-ready listing copy is recorded in `MARKETPLACE.md`.
+
+The artwork remains an isolated candidate until owner approval. It has not been promoted into a live marketing location.
+
 ## Deliberate API limits
 
 The product uses only `songName`, `artist`, `triggerPreviousTrack()`, `triggerPlayPause()`, and `triggerNextTrack()` from the Media provider.
