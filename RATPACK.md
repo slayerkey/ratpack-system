@@ -110,7 +110,7 @@ Physical Stream Deck behavior and final import validation remain useful for prod
 
 XENEON Edge widgets do not require owned physical hardware for release candidate status. The canonical gate is source and structure QA, all eight deterministic browser fixtures, official iCUE CLI validation and packaging on Windows CI, and StreamSpell packaged-widget validation across all eight XENEON presets. A real device or iCUE host smoke test is optional extra confidence when available.
 
-Maker Console authenticated submission remains a local or browser-account boundary under the current workflow.
+Maker Console staging and upload are automated through the canonical Playwright driver. The signed in Maker Console browser profile remains local and is never copied into GitHub or CI. GitHub generates and validates the exact SHIP_KIT consumed by that local browser bridge.
 
 Host application runtime validation remains required for products whose core function integrates with applications such as Premiere Pro, Resolve, or AutoCAD.
 
@@ -122,6 +122,10 @@ XENEON official CLI Windows CI was proven on 2026-08-22 with `icuewidget-cli@0.4
 
 The packaged XENEON artifact was then independently opened by StreamSpell's `xeneon-edge-widget-builder` in GitHub Actions and rendered through all eight official XENEON viewport presets with zero console errors.
 
+Rat Art for XENEON is versioned and runs through GitHub Actions using deterministic browser captures plus the repository compositor. Image generation is explicitly disabled for Rat Art.
+
+Rat Ship for XENEON rebuilds the canonical widget, validates and packages it with the CORSAIR CLI, reruns Rat Art, creates the Maker Console SHIP_KIT, and preflights the Playwright browser driver in GitHub Actions. Only the authenticated browser session remains local.
+
 ## Critical migration blockers
 
 The local `ratpack-projects` and `_shared` content must be preserved before restructuring.
@@ -130,7 +134,7 @@ Brand art must fail if its required brand font cannot be resolved. Silent fallba
 
 XENEON art must require real deterministic widget captures before rendering. Missing captures must fail the pipeline rather than produce blank marketing art.
 
-Widget shipping support must be implemented explicitly before Maker Console automation is trusted for widgets.
+Never move Maker Console browser profile data, cookies, passwords, or session tokens into GitHub Actions merely to eliminate the final authenticated browser boundary.
 
 ## Read next by task
 
