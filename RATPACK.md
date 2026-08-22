@@ -20,6 +20,8 @@ Local applications and physical hardware are final validation boundaries, not th
 
 `ratpack-system` is the hub for shared skills, standards, platform references, workflow contracts, schemas, CI contracts, reusable QA, adapters, product registry, and product source as migration progresses.
 
+The current migrated product roster lives at `products/index.json`. Read it for fresh chat roster discovery and current legacy product status.
+
 During migration, the existing local `ratpack-projects` and `_shared` directories remain compatibility dependencies until their consumers are moved into versioned paths here and the clean environment tests pass.
 
 ## Natural task language
@@ -76,7 +78,7 @@ BLOCKED
 
 REJECTED
 
-The current product registry may still use a smaller legacy `status` vocabulary. During migration, preserve compatibility while introducing `workflow_state` using `standards/product-state.md`.
+The current product roster still uses a smaller legacy `status` vocabulary. During migration, preserve compatibility while introducing `workflow_state` using `standards/product-state.md`.
 
 ## Source of truth rules
 
@@ -123,6 +125,8 @@ Widget shipping support must be implemented explicitly before Maker Console auto
 The iCUE Widget CLI Windows CI bootstrap still needs a clean runner proof.
 
 ## Read next by task
+
+Roster and product state: `products/index.json`
 
 Validation: `skills/rat-validate/SKILL.md`
 
