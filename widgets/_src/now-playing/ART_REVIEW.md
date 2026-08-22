@@ -1,63 +1,54 @@
 # Now Playing Panel Rat Art review
 
-Status: `CANDIDATE_NEEDS_RERENDER`
+Status: `APPROVED`
 
 Version: `1.0.0`
 
-Price from `docs/BUILD_HANDOFF_XENEON_2026-08-16.md` section 2.2: `$9.99`
+Price: `$9.99`
 
-This is an isolated Rat Art candidate. It has not been promoted into a live marketplace marketing location.
+The corrected deterministic Rat Art candidate is approved for shipping.
 
-## Current invalidation
+## Final correction
 
-The previous candidate was visually rejected after review because the lowercase `g` descender in the large Now Playing title was clipped inside the real widget capture.
+The rejected pre-fix candidate clipped the lowercase `g` descender in the large track title because `#trackTitle` used `line-height: 0.91` inside an intentional clipping viewport.
 
-Root cause was product CSS, not the marketplace compositor: `#trackTitle` used `line-height: 0.91` inside an intentional clipping viewport. The canonical source now uses a descender-safe `line-height: 1.04`.
+The canonical widget source now uses descender-safe `line-height: 1.04`. The shipping HTML is regenerated from canonical source before validation, package, capture, art, and shipping.
 
-The XENEON CI path now regenerates the shipping `index.html` from canonical source with `tools/xeneon/inline.py` before official CORSAIR validation and packaging. The corrected package passed official validation, packaging, and StreamSpell packaged preview.
+The corrected real widget capture was reviewed and the `g` descender is fully visible.
 
-The hashes below describe the rejected pre-fix candidate only. They must not be promoted. Rat Art must rerender from the corrected package and produce a new review set and new hashes.
+A thin fragmented-looking detail remains along the top XENEON device bezel in the marketplace composite. Review confirmed that detail belongs to the approved device plate rather than the widget capture and it is accepted as nonblocking for this release.
 
-## Rejected pre-fix art set
+## Approved marketplace media
 
-All customer facing gallery images were 1920 by 960.
+The final Rat Ship workflow reproduced the corrected deterministic art and copied the exact approved files into the Maker Console SHIP_KIT.
 
-| File | Size | SHA256 |
-| --- | --- | --- |
-| `1-hero.png` | 1920×960 | `ce639083a13d32fa14f87291b39a4e1bd4d67d5d6565c6dc5c651ffbdfd19833` |
-| `2-showcase.png` | 1920×960 | `0e7cbab13b1a565c0a5e199a3d44710bee561dcc8ace247222d71a609a4b2219` |
-| `3-features.png` | 1920×960 | `b142a77f588c3692038ee7cb0bc1e6c5aaa530306be7823abdf265b5a473184f` |
-| `4-settings.png` | 1920×960 | `07f25463c72421ff1904cde2569b991fd91b359e652caa924a8b0bea51568708` |
-| `5-sizes.png` | 1920×960 | `67290e9213b2c61c9399f3fc56c7b99aa1d41c7712f20844c7ffc18480d36786` |
-| `icon-288x288.png` | 288×288 | `8f64bdbcbd3f19705f1593304ede1cef3de5f5e23224e8bfe1b809ab633b14e1` |
-| `contact-sheet.jpg` | 1600×1320 | `10fab6309093291a56888a14f1e394119ba34f8ad8159a6c7c68361bde4ca236` |
+| Ship kit file | Marketplace role | Size | SHA256 |
+| --- | --- | --- | --- |
+| `01_search_icon.png` | Search icon | 288×288 | `b2243212dd56158120e70a3e900eead205dc137214b2db87af2ca398ecc8a875` |
+| `02_cover.png` | Cover | 1920×960 | `3734209838fe1070f700dde0cc2ed011771e8da83f2daa8190c2391b131095d4` |
+| `03_gallery_01.png` | Gallery 1 | 1920×960 | `5daf43337f7f775acd4508b98c7ceac1ba6386d733e8bad2f6294e482e2a24f8` |
+| `04_gallery_02.png` | Gallery 2 | 1920×960 | `b7f57ee90d577b0621abab2e1509daaf21fea86d860f962beb5f01aa3e57dc5e` |
+| `05_gallery_03.png` | Gallery 3 | 1920×960 | `23c3d22c16012b83f4dc5b59e2a7da925beefa2e324c7f637661867f734db793` |
+| `06_gallery_04.png` | Gallery 4 | 1920×960 | `9f104801ea4d3dbd116be1f9fd90bed61920c1c36c34e6a36f289903f32e42c3` |
 
-## Provenance requirement for rerender
+Final official widget package SHA256: `07a5d7325fb72affceaaa61beb43eac57670953467d3bacb54cfbc4e983bc8a1`.
 
-The replacement artwork must use the corrected packaged Now Playing widget and deterministic iCUE Media provider fixtures with fictional track and artist names.
+Final Rat Ship GitHub Actions run: `32600062724`.
 
-The hero must composite the real corrected widget capture into the approved calibrated straight XENEON Edge device plate from the Rat Art v2 system.
+Final Rat Ship artifact: `rat-ship-now-playing`, artifact ID `9482646380`, artifact digest `sha256:bd31b9bd2cca2d39b3a24299b0560d77c3b1085e396ae7c1a532704ff279f2bd`.
 
-No generated album art, progress bar, seek state, playback state, or third party music branding may be used.
+## Provenance
 
-The palette comparison must hold the fictional artist constant so Artist, Neon, Ember, and Ocean are compared without changing two variables at once.
+All customer facing widget imagery comes from deterministic Playwright captures of the canonical Now Playing widget with fictional track and artist fixtures.
 
-## Preflight for replacement candidate
+The marketplace compositor uses the approved calibrated XENEON Edge device plate and repository Rat Art tooling.
 
-Required real corrected widget captures must exist before rendering.
+Image generation is disabled for Rat Art. No DALL-E, ImageGen, image API, or other generative image provider is part of the production art path.
 
-Gallery images must be 1920 by 960 and search icon 288 by 288.
+No generated album art, progress bar, seek state, fabricated playback state, or third party music branding is present.
 
-Exact brand font resolution must succeed with no silent fallback.
+## Shipping approval
 
-Calibrated XENEON device mapping must be used.
+The exact files above are approved for the Now Playing Panel 1.0.0 Maker Console submission kit.
 
-Unsupported Media provider capabilities must not be advertised.
-
-No third party branding may be present.
-
-Typography review must explicitly inspect descenders in `g`, `y`, `p`, `q`, and `j` when they appear in clipping or marquee viewports.
-
-## Promotion rule
-
-Do not promote any pre-fix candidate file listed above. Promotion is blocked until Rat Art rerenders from the corrected package, the replacement contact sheet is approved, and the new exact hashes are recorded here.
+Any future change to widget source, art tooling, device mapping, price, package, or marketplace media invalidates these hashes and requires the relevant RatPack gate to rerun.
