@@ -1,27 +1,25 @@
-# RatPack System Bootstrap
+# RatPack System
 
-This is a migration bootstrap, not the finished product factory.
+Canonical hub for Packrat product development.
 
-Its purpose is to make RatPack knowledge portable across ChatGPT, Claude Code, Codex, GitHub Actions, and local hardware testing without keeping Claude specific files as the source of truth.
-
-## Intended repository split
-
-`ratpack-system` is the canonical home for shared skills, standards, platform knowledge, test contracts, schemas, and reusable workflow rules.
-
-`ratpack-projects` remains the canonical home for product source, product registry, product research, generated packages, and product specific assets.
-
-The existing local `_shared` repository is load bearing today. Do not move or rename it until its imports are replaced deliberately and tests prove the new layout.
+This repository is the shared source of truth for RatPack skills, platform knowledge, standards, QA contracts, schemas, CI, and cross tool adapters. Product source and large generated media will be consolidated here deliberately as migration proofs pass.
 
 ## Start here
 
 Read `RATPACK.md` first.
 
-Then read the matching skill under `skills/` and platform file under `platforms/`.
+Then read the matching skill under `skills/` and the matching platform contract under `platforms/`.
 
-The full export audit that produced this bootstrap is summarized in `docs/MIGRATION_AUDIT.md`.
+## Operating model
 
-## What this bootstrap does not contain
+ChatGPT is the preferred development and orchestration environment.
 
-It does not contain credentials, browser login state, font binaries, installed applications, proprietary binaries, the full icon source library, or the 1 GB product factory.
+GitHub is the canonical filesystem and state store.
 
-It does not claim that every old command has been fully migrated. Old Claude and Agent definitions are retained under `legacy/` so behavior can be compared before anything is retired.
+GitHub Actions is the remote build and test computer.
+
+Local applications and physical hardware are final validation boundaries, not the normal development environment.
+
+## Migration status
+
+The initial system context is now canonical here. The larger local `ratpack-projects` factory and `_shared` tooling are being absorbed only after clean environment tests prove each dependency can move safely.
