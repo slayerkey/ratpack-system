@@ -16,7 +16,17 @@ Keep authored widget source outside the final package directory when package too
 
 The current factory uses `_src/<slug>` as authored source and an inline step to produce the shipping folder.
 
+The canonical generator is `tools/xeneon/inline.py`. CI must regenerate the shipping `widgets/<slug>/index.html` from canonical source before official validation and packaging. Do not depend on a stale checked-in build artifact.
+
 The inline step is not cosmetic. Current host behavior can fail on external script loading from local widget paths, so the shipping artifact is intentionally flattened.
+
+## Typography safety
+
+Text that lives inside a clipping or marquee viewport must reserve real glyph room, including descenders and overshoot. Do not use compressed line heights that visibly crop letters such as `g`, `y`, `p`, `q`, or `j`.
+
+For large display titles inside `overflow: hidden`, use a descender-safe line height of at least `1.0` unless explicit tested padding provides equivalent ink clearance. Visual QA fixtures should include descender-heavy sample text so this class of defect is caught before Rat Art captures are generated.
+
+Marketing art must inherit the real corrected widget render. Never patch clipped product typography in the marketplace image itself.
 
 ## Automated path
 
