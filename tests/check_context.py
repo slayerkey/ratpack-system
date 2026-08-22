@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import re
 import sys
 
@@ -7,6 +8,7 @@ errors = []
 
 required = [
     "RATPACK.md",
+    "products/index.json",
     "skills/rat/SKILL.md",
     "skills/rat-validate/SKILL.md",
     "skills/rat-build/SKILL.md",
@@ -21,6 +23,34 @@ required = [
 for rel in required:
     if not (ROOT / rel).is_file():
         errors.append(f"missing required file: {rel}")
+
+product_index = ROOT / "products/index.json"
+if product_index.is_file():
+    try:
+        payload = json.loads(product_index.read_text(encoding="utf-8"))
+        products = payload.get("products")
+        if not isinstance(products, list):
+            errors.append("products/index.json: products must be a list")
+        else:
+            ids = []
+            allowed_types = {"profile", "plugin", "widget", "icons", "idea"}
+            for i, product in enumerate(products):
+                if not isinstance(product, dict):
+                    errors.append(f"products/index.json: product {i} is not an object")
+                    continue
+                for field in ("id", "name", "type", "status"):
+                    if field not in product:
+                        errors.append(f"products/index.json: product {i} missing {field}")
+                if "id" in product:
+                    ids.append(product["id"])
+                if product.get("type") not in allowed_types:
+                    errors.append(f"products/index.json: unsupported type {product.get('type')!r} for {product.get('id')}")
+            if len(ids) != len(set(ids)):
+                errors.append("products/index.json: duplicate product ids")
+            if len(products) != 88:
+                errors.append(f"products/index.json: expected migrated snapshot of 88 products, found {len(products)}")
+    except Exception as exc:
+        errors.append(f"products/index.json could not be parsed: {exc}")
 
 for f in ROOT.rglob("*"):
     if not f.is_file():
@@ -52,3 +82,4 @@ if errors:
 print("PASS")
 print(f"root={ROOT}")
 print(f"files={sum(1 for p in ROOT.rglob('*') if p.is_file())}")
+print("products=88")
