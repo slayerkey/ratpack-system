@@ -2,6 +2,14 @@
 
 The canonical skill is `skills/icue-widget-builder/SKILL.md`.
 
+## Canonical PackRat identity
+
+Every PackRat XENEON/iCUE widget manifest must use the exact author string `PackRat 🐀`.
+
+Do not use `Packrat 🐀`, `Packrat`, or other capitalization variants for new widget manifests.
+
+The reverse domain product namespace remains `com.packrat.<product>` unless an existing published identifier must be preserved.
+
 ## Product structure
 
 Keep authored widget source outside the final package directory when package tooling archives the package folder wholesale.
