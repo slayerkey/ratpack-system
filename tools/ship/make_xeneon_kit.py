@@ -3,6 +3,7 @@ import argparse, json, shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+PLAYWRIGHT_VERSION = "1.62.1"
 
 def fail(msg):
     raise SystemExit(f"RAT SHIP FAIL: {msg}")
@@ -83,12 +84,14 @@ Canonical Rat Ship kit.
         "name": "ratpack-maker-console-bridge",
         "private": True,
         "type": "module",
-        "devDependencies": {"playwright": "1.55.0"}
+        "devDependencies": {"playwright": PLAYWRIGHT_VERSION}
     }, indent=2) + "\n", encoding="utf-8")
     (out / "SUBMIT_NOW.ps1").write_text(f'''$ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {{ throw "Node.js is required" }}
 npm install
+npm audit --audit-level=high
+if ($LASTEXITCODE -ne 0) {{ throw "Dependency security audit failed" }}
 npx playwright install chromium
 $Profile = Join-Path $env:LOCALAPPDATA "PackRat\\maker-console-profile"
 node .\\maker_console.mjs {slug} "--kit=$PSScriptRoot" "--profile=$Profile" --submit
@@ -97,6 +100,8 @@ if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}
     (out / "STAGE_ONLY.ps1").write_text(f'''$ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 npm install
+npm audit --audit-level=high
+if ($LASTEXITCODE -ne 0) {{ throw "Dependency security audit failed" }}
 npx playwright install chromium
 $Profile = Join-Path $env:LOCALAPPDATA "PackRat\\maker-console-profile"
 node .\\maker_console.mjs {slug} "--kit=$PSScriptRoot" "--profile=$Profile"
