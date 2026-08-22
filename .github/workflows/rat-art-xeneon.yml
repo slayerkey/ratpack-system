@@ -42,7 +42,8 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check Pillow==12.3.0
-          npm install --no-save playwright@1.55.0
+          npm install --no-save playwright@1.62.1
+          npm audit --audit-level=high
           npx playwright install chromium
 
       - name: Build shipping widget from canonical source

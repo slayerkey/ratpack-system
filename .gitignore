@@ -1,4 +1,5 @@
 .playwright-profile/
 node_modules/
 artifacts/
+out/
 *.log
