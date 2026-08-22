@@ -1,17 +1,27 @@
 ---
 name: rat-art
-description: Research, stage, render, and visually review Packrat marketplace artwork using deterministic compositors and immutable live marketing folders.
+description: Research, stage, render, and visually review PackRat marketplace artwork using deterministic repository tooling only. Never use ImageGen or any image-generation provider for Rat Art.
 ---
 
 # Rat Art
 
-Read the product, validation evidence, registry entry, brand standards, art reproducibility contract, and applicable platform reference.
+Rat Art is a repository pipeline, not chat image generation.
+
+## Non-negotiable execution rule
+
+When the user invokes `/rat-art`, asks to use Rat Art, or asks to regenerate marketplace art through the Rat Art pipeline, **do not call ChatGPT image generation, ImageGen, DALL-E, an image API, or any other generative image provider**.
+
+Run the canonical deterministic repository tooling instead. For XENEON widgets the executable path is `tools/art/rat_art.py` plus `tools/art/capture_xeneon.mjs`, normally through `.github/workflows/rat-art-xeneon.yml` so the candidate is produced by GitHub Actions.
+
+If the deterministic pipeline is missing a required asset or capture, fail and fix or migrate that dependency. Never substitute generated artwork.
+
+Read the product, validation evidence, product metadata, brand standards, art reproducibility contract, and applicable platform reference.
 
 ## Safety model
 
 Treat live product `marketing/` folders and submitted ship kits as immutable while creating a candidate.
 
-Create an isolated review job for candidate sources, rendered output, provenance, deterministic QA, and visual review.
+Create an isolated review job or CI artifact for candidate sources, rendered output, provenance, deterministic QA, and visual review.
 
 Do not promote candidate files into live marketing during this skill. Promotion is a separate approved operation.
 
@@ -19,9 +29,9 @@ Do not promote candidate files into live marketing during this skill. Promotion 
 
 Use first party contextual screenshots where the current product style calls for context. Preserve source provenance and reject low resolution or unsuitable source images.
 
-Keep Packrat text, device plates, icons, key faces, badges, and layouts deterministic.
+Keep PackRat text, device plates, icons, key faces, badges, and layouts deterministic.
 
-Do not use generated images for product keys, text, device representations, or marketplace screenshots. Current canonical migration follows the deterministic researched screenshot model until an explicit policy change is approved.
+Do not use generated images for product keys, text, device representations, marketplace screenshots, or contextual plates.
 
 ## XENEON and iCUE widget products
 
@@ -29,7 +39,9 @@ Do not substitute a contextual background for the real widget.
 
 First build the widget and run deterministic browser captures at the required native sizes. Art preflight must fail if those captures are absent.
 
-Composite the real capture into the approved XENEON device plate using the existing calibrated mapping.
+Composite the real capture into the approved XENEON device plate using the calibrated mapping.
+
+The capture gate must test glyph safety for clipped descenders and other text-bound failures before the marketplace art is rendered.
 
 ## Required preflight
 
