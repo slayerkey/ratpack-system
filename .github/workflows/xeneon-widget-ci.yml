@@ -83,6 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      STREAMSPELL_URL: http://127.0.0.1:8090/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,6 +103,22 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
+
+      - name: Start StreamSpell community builder locally
+        run: |
+          git clone --depth 1 https://github.com/streamspell/xeneon-edge-widget-builder.git /tmp/xeneon-edge-widget-builder
+          cd /tmp/xeneon-edge-widget-builder
+          npm install
+          nohup npm run dev > /tmp/streamspell-server.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8090/ > /dev/null; then
+              echo 'StreamSpell local builder is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/streamspell-server.log
+          exit 1
 
       - name: Verify packaged widget with StreamSpell
         run: node tools/xeneon/streamspell.mjs "artifacts/package/${WIDGET_SLUG}.icuewidget" "artifacts/streamspell"
