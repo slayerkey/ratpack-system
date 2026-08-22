@@ -52,6 +52,26 @@ PASS: unavailable provider state is distinct from idle and disables transport co
 
 PASS: runtime visible copy uses the asynchronous `tr()` path rather than hardcoded English-only replacement logic.
 
+## Clean GitHub runner verification
+
+PASS: `icuewidget-cli@0.4.47` executed on a clean GitHub Windows runner.
+
+PASS: official `icuewidget validate widgets/now-playing` returned `Widget is valid` for Now Playing Panel 1.0.0.
+
+PASS: official `icuewidget package widgets/now-playing` created `now-playing-panel.icuewidget`.
+
+PASS: the official package was preserved as the GitHub Actions artifact `xeneon-now-playing-package`.
+
+PASS: the exact official package was then opened by a locally hosted checkout of StreamSpell's `xeneon-edge-widget-builder` on a clean Ubuntu runner.
+
+PASS: StreamSpell reported `Validation passed` and identified `Now Playing Panel 1.0.0` with four packaged files.
+
+PASS: StreamSpell exposed and rendered all eight XENEON presets: S horizontal, S vertical, M horizontal, M vertical, L horizontal, L vertical, XL horizontal, and XL vertical.
+
+PASS: StreamSpell recorded zero console errors.
+
+PASS: eight StreamSpell screenshots plus `streamspell-result.json` were preserved as the GitHub Actions artifact `xeneon-now-playing-streamspell`.
+
 ## Deliberate API limits
 
 The product uses only `songName`, `artist`, `triggerPreviousTrack()`, `triggerPlayPause()`, and `triggerNextTrack()` from the Media provider.
@@ -60,14 +80,14 @@ It does not claim or synthesize album art, progress, seek position, playback sta
 
 The center control therefore uses a combined play/pause glyph instead of pretending the provider exposes current playback state.
 
-## Remaining gates
+## Release boundary
 
-BLOCKED IN CURRENT CHATGPT RUNTIME: `icuewidget validate widgets/now-playing` because the iCUE Widget CLI is not installed in this Linux execution environment.
+PackRat does not currently own a physical XENEON Edge. Physical hardware is therefore not a required release gate for this product.
 
-BLOCKED IN CURRENT CHATGPT RUNTIME: `icuewidget package widgets/now-playing` for the same reason.
+Media behavior is tested against deterministic iCUE provider fixtures. The official CLI proves the shipping structure is accepted and packageable. StreamSpell independently proves the produced `.icuewidget` can be extracted, validated, and rendered through all eight XENEON viewport presets.
 
-LOCAL FINAL TEST ONLY: import the vendor-created `.icuewidget` into iCUE, verify the real Media provider, touch behavior, fonts, and rendering on the physical XENEON Edge.
+A real iCUE Media provider or physical XENEON smoke test may be added later if compatible hardware becomes available, but lack of hardware alone does not block this release candidate.
 
 ## Migration note
 
-See `NEEDS.md` for the shared runtime and harness migration that still belongs in the canonical RatPack system. No edit to historical `_shared`, `_build`, or registry files was made for this product.
+See `NEEDS.md` for the remaining shared runtime migration. The reusable StreamSpell packaged-widget harness and XENEON GitHub Actions workflow have now been restored in the canonical RatPack hub. No edit to historical `_shared`, `_build`, or registry files was made for this product.
