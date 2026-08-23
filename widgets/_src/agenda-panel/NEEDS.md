@@ -4,7 +4,9 @@
 
 The August 16 handoff says to port the working Calendar Sync ICS parser from `plugins/calendar/src/`, with the reusable implementation previously audited under `plugins/_calendar/src/` using `ical.js` 2.2.1. Those legacy plugin trees are not present in the current canonical `ratpack-system` repository or any currently exposed branch.
 
-This product therefore preserves the audited behavior contract locally: RRULE and RDATE expansion, EXDATE removal, RECURRENCE-ID overrides, cancellation handling, exclusive all-day DTEND semantics, timezone-aware wall-clock conversion, bounded expansion, and dedupe by UID plus occurrence start. The owner should migrate the exact legacy parser into canonical GitHub and compare fixture-for-fixture before final release. Do not silently replace a proven legacy edge case with weaker behavior.
+This product therefore preserves the audited behavior contract locally: RRULE and RDATE expansion, EXDATE removal, RECURRENCE-ID overrides, cancellation handling, exclusive all-day DTEND semantics, timezone-aware wall-clock conversion, bounded expansion, and dedupe by UID plus occurrence start. It now also resolves embedded VTIMEZONE STANDARD and DAYLIGHT rules for non-IANA TZIDs and carries regression fixtures for both sides of DST.
+
+The owner should still migrate the exact legacy parser into canonical GitHub and compare fixture-for-fixture before final release. Do not claim the old source was ported until the source itself is available and compared.
 
 ## Calendar Sync Pro raw ICS bridge
 
@@ -26,11 +28,13 @@ Required bridge behavior:
 
 The current Calendar Sync Pro implementation was previously audited as having no localhost bridge. That companion change is outside this product's allowed write boundary and is a release dependency for providers whose ICS endpoint is not CORS-readable.
 
-## Generic XENEON browser fixture and Rat Art capture
+## Shared Rat Art capture
 
-Current canonical `tools/art/capture_xeneon.mjs` and parts of `tools/art/rat_art.py` are still Now Playing specific. Calendar Panel must not edit shared tooling under this product boundary. Before Rat Art can be considered clean, the owner should generalize the XENEON capture fixture contract so each widget can provide product-specific deterministic fixture setup and capture selectors without copying shared scripts.
+The generic XENEON build and packaged verification path already exists through `tools/xeneon/inline.py` and `tools/xeneon/streamspell.mjs`. Calendar Panel also carries its own deterministic parser and eight-slot browser QA under `qa/`.
 
-Required Calendar Panel deterministic fixture cases:
+The remaining shared-tool gap is marketplace capture and composition. Current canonical `tools/art/capture_xeneon.mjs` and parts of `tools/art/rat_art.py` still contain Now Playing-specific fixtures and copy. Calendar Panel must not edit shared tooling under this product boundary. Before Rat Art can be considered clean, the owner should generalize the XENEON art fixture contract so each widget can provide product-specific deterministic setup and capture selectors without copying the shared compositor.
+
+Required Calendar Panel art/QA fixture cases include:
 
 - weekly recurring event
 - EXDATE removed occurrence
@@ -40,6 +44,7 @@ Required Calendar Panel deterministic fixture cases:
 - multi-day all-day event
 - explicit UTC event
 - IANA TZID event
+- embedded VTIMEZONE with non-IANA TZID
 - floating local event
 - DST transition day
 - overlapping timed events
