@@ -1,10 +1,11 @@
 # Calendar Panel QA
 
-Status: RELEASE CANDIDATE
+Status: RELEASE READY
 
 Product: Calendar Panel
 Slug: `agenda-panel`
 Branch: `product/agenda-panel`
+Pull request: `#15`
 Version: `1.0.0`
 Author: `PackRat 🐀`
 
@@ -28,15 +29,13 @@ Author: `PackRat 🐀`
 
 The supplied Calendar Sync Pro archive was inspected directly. Its TypeScript source imports the shared `_calendar` implementation rather than containing that sibling TypeScript tree, but its built plugin contains the compiled shared calendar behavior and its dependency tree contains the exact ical.js 2.2.1 runtime used by production Calendar Sync.
 
-Calendar Panel now ships that exact ical.js 2.2.1 runtime as its primary parser. The source is stored deterministically as a gzip plus base64 payload split across `ical-pack-01.js` through `ical-pack-08.js`; `ical-loader.js` restores the exact browser source locally before parsing. `agenda-ical.js` ports the recovered Calendar Sync behavior for VTIMEZONE registration, recurrence masters and exceptions, occurrence detail resolution, safety bounds, UID plus occurrence-start dedupe, IANA timezone fallback, and cancellation handling.
+Calendar Panel ships that exact ical.js 2.2.1 runtime as its primary parser. The source is stored deterministically as a gzip plus base64 payload split across `ical-pack-01.js` through `ical-pack-08.js`; `ical-loader.js` restores the exact browser source locally before parsing. `agenda-ical.js` ports the recovered Calendar Sync behavior for VTIMEZONE registration, recurrence masters and exceptions, occurrence detail resolution, safety bounds, UID plus occurrence-start dedupe, IANA timezone fallback, and cancellation handling.
 
 The product-local parser in `agenda-core.js` plus `agenda-recur.js` remains only as a resilience fallback if the exact ICAL runtime cannot initialize.
 
-## Automated checks completed
+## Product-local automated checks
 
 PASS: canonical `tools/xeneon/inline.py agenda-panel` generated self contained shipping HTML.
-
-PASS: canonical inline freshness check reports the generated shipping HTML is current in the execution workspace.
 
 PASS: exact Calendar Sync ICAL regression fixtures cover exclusive all day DTEND, recurrence COUNT, EXDATE, moved RECURRENCE ID exceptions, RDATE at a different clock time, cancellation, IANA timezone conversion, and embedded non IANA VTIMEZONE rules.
 
@@ -58,20 +57,39 @@ PASS: current `manifest.json` contains the required Widget API 1.4.0 manifest fi
 
 PASS: marketplace language claim is English only until all dynamic runtime copy is localized.
 
-## Official vendor gates
+## Canonical GitHub vendor and shipping gates
 
-The pull request trigger in the current canonical `xeneon-widget-ci.yml` resolves the changed XENEON slug from the PR diff using `tools/xeneon/resolve_slug.py`. Opening the Calendar Panel PR therefore runs the same generic pipeline as manual dispatch without requiring manual input.
+PASS: `XENEON Widget CI` resolved `agenda-panel` from PR #15.
 
-The official CI must complete these final gates on the exact PR head:
+PASS: canonical shipping HTML generation on the Windows runner.
 
-* CORSAIR `icuewidget-cli@0.4.47 validate`.
-* CORSAIR `.icuewidget` package creation.
-* Generic `tools/xeneon/streamspell.mjs` packaged verification across all eight XENEON presets.
+PASS: official CORSAIR `icuewidget-cli@0.4.47 validate`.
 
-## Remaining shared or companion work
+PASS: official CORSAIR `.icuewidget` package creation.
 
-See `NEEDS.md`.
+PASS: generic `tools/xeneon/streamspell.mjs` verified that exact official package across all eight XENEON presets.
 
-The Calendar Sync Pro loopback ICS transport is required for providers whose secret feed blocks direct `file://` browser CORS. Direct-CORS-compatible feeds work without the companion.
+PASS: deterministic Rat Art captured the real widget at all eight native slots and rendered the complete marketplace image set from product-local `rat-art.mjs` and `rat-art.json`.
 
-Rat Art marketplace capture remains an owner-level shared-tool task because the current shared capture/composition path still contains Now Playing specific assumptions.
+PASS: Rat Ship rebuilt and revalidated the canonical widget, captured real product art, rendered the search icon, built the Maker Console `SHIP_KIT`, passed the Playwright driver preflight, and passed final ship invariants.
+
+PASS: RatPack Context CI.
+
+Latest fully green workflow head used for these gates: `9c9934f4a10c3bfc8fb99031ab343c2be25ed660`.
+
+Latest inspected official package SHA256: `a80e987fbe763b8c9854718351bd3cd324d16cb5abec0b15cf01dd0a453a84a5`.
+
+## Release artifacts
+
+The canonical workflows produced:
+
+* Official `agenda-panel.icuewidget`.
+* StreamSpell evidence for all eight presets.
+* Eight native widget captures.
+* Five 1920x960 deterministic marketplace images plus contact sheet and Rat Art report.
+* Search icon.
+* Maker Console `SHIP_KIT` with package, marketplace images, paste-ready metadata, description, release notes, checklist, and local stage/submit helpers.
+
+## Compatibility note
+
+See `NEEDS.md` for the provider-dependent Calendar Sync Pro loopback bridge contract. Calendar Panel itself is release ready. Direct-CORS-compatible ICS feeds work without the companion; providers that block browser CORS require the companion transport.
