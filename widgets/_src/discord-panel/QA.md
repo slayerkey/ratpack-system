@@ -68,6 +68,8 @@ PASS: no en dash or em dash characters in product source or shipping files.
 
 PASS: no Discord client secret or bot token is embedded in product JavaScript.
 
+Checkpoint note: the self-contained shipping `index.html` was generated and tested locally from the exact authored source, but it is intentionally not committed while the Client ID remains a placeholder. This keeps `widgets/discord-panel/` unpackageable at the blocker checkpoint rather than allowing an incomplete widget to be mistaken for a release candidate. After the real Client ID is inserted, the canonical `tools/xeneon/inline.py discord-panel` build must create the committed shipping `index.html` before CORSAIR validation and packaging.
+
 ## Deterministic browser QA
 
 Fixture: 12 voice members, including speaking, self-muted, self-deafened, long names, and descender-heavy text.
