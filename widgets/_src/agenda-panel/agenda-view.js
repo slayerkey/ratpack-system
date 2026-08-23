@@ -16,7 +16,11 @@ function renderCompact(days, onlyDay) {
     header.className = "compactDayHeader";
     header.textContent = formatDayLong(day);
     section.appendChild(header);
-    events.slice(0, targetDays.length > 1 ? 4 : 7).forEach(function (event) {
+    var slot = document.body.getAttribute("data-slot") || "s-h";
+    var limit = targetDays.length > 1 ? 4 : 7;
+    if (slot === "s-h") limit = 4;
+    else if (slot === "s-v") limit = 4;
+    events.slice(0, limit).forEach(function (event) {
       shown++;
       var button = document.createElement("button");
       button.type = "button";
@@ -67,6 +71,19 @@ function openDaySummary(day) {
   setText("detailDescription", events.map(function (event) {
     var when = event.allDay ? "ALL DAY" : formatRange(event);
     return when + "  " + event.title + (event.location ? "\n" + event.location : "");
+  }).join("\n\n"));
+}
+
+function openAllDaySummary(events) {
+  STATE.selected = null;
+  var overlay = document.getElementById("detailOverlay");
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  setText("detailTitle", "All day events");
+  setText("detailTime", events.length + (events.length === 1 ? " event" : " events"));
+  setText("detailLocation", "");
+  setText("detailDescription", events.map(function (event) {
+    return formatDayShort(allDayStartDate(event)) + "  " + event.title + (event.location ? "\n" + event.location : "");
   }).join("\n\n"));
 }
 
