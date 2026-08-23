@@ -1,13 +1,13 @@
 const fs=require('fs'), vm=require('vm'), assert=require('assert');
-const path=require('path'); const base=path.resolve(__dirname,'..')+path.sep; const code=['agenda-core.js','agenda-recur.js','agenda-data.js'].map(f=>fs.readFileSync(base+f,'utf8')).join('\n');
+const path=require('path'); const base=path.resolve(__dirname,'..')+path.sep; const code=['ical.es5.min.js','agenda-core.js','agenda-recur.js','agenda-ical.js','agenda-data.js'].map(f=>fs.readFileSync(base+f,'utf8')).join('\n');
 const sandbox={console, Date, Intl, Math, JSON, Number, String, Array, Object, RegExp, Promise, setTimeout, clearTimeout, URL, globalThis:null,
   document:{readyState:'loading',addEventListener(){},documentElement:{clientWidth:840,clientHeight:696,style:{setProperty(){}}}},
   window:{innerWidth:840,innerHeight:696,addEventListener(){}}, localStorage:{getItem(){return null},setItem(){}}, fetch(){return Promise.resolve(null)}};
 sandbox.globalThis=sandbox; vm.createContext(sandbox); vm.runInContext(code,sandbox);
 function ics(body){return `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PackRat Test//EN\r\n${body}\r\nEND:VCALENDAR\r\n`;}
+const now=new Date(); const Y=now.getFullYear();
 function ymd(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')}
 function dt(d,h,m){return ymd(d)+'T'+String(h).padStart(2,'0')+String(m).padStart(2,'0')+'00'}
-const now=new Date();
 const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
 const tomorrow=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
 const day2=new Date(today.getFullYear(),today.getMonth(),today.getDate()+2);
@@ -46,6 +46,23 @@ const spring=sandbox.parseDateValue({name:'DTSTART',params:{TZID:'Eastern Standa
 const fall=sandbox.parseDateValue({name:'DTSTART',params:{TZID:'Eastern Standard Time'},value:'20261102T090000'},vtAliases);
 assert(spring&&spring.date.toISOString()==='2026-03-09T13:00:00.000Z','embedded daylight offset applied');
 assert(fall&&fall.date.toISOString()==='2026-11-02T14:00:00.000Z','embedded standard offset applied');
-const recurTemplate={startValue:{parts:{y:2026,m:3,d:2,h:9,min:0,s:0},zone:vtAliases['Eastern Standard Time']}};
-assert(sandbox.wallPartsToOccurrenceDate(recurTemplate,{y:2026,m:3,d:9}).toISOString()==='2026-03-09T13:00:00.000Z','recurring event keeps embedded timezone wall time');
 console.log('embedded VTIMEZONE fixture pass');
+
+const icalEmbedded=sandbox.parseCalendarIcal(vtRaw,0,{nowMs:Date.UTC(2026,2,8,12,0,0),backMs:86400000,aheadMs:3*86400000});
+const icalSpring=icalEmbedded.find(e=>e.uid==='embedded-spring');
+assert(icalSpring&&icalSpring.start.toISOString()==='2026-03-09T13:00:00.000Z','ICAL primary parser uses embedded daylight timezone');
+console.log('ICAL embedded VTIMEZONE parser pass');
+
+const cancelDay=new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
+const cancelRaw=ics([
+'BEGIN:VEVENT','UID:cancelled-series','SUMMARY:Recurring','DTSTART:'+dt(today,16,0),'DTEND:'+dt(today,17,0),'RRULE:FREQ=DAILY;COUNT=3','END:VEVENT',
+'BEGIN:VEVENT','UID:cancelled-series','RECURRENCE-ID:'+dt(cancelDay,16,0),'DTSTART:'+dt(cancelDay,16,0),'DTEND:'+dt(cancelDay,17,0),'STATUS:CANCELLED','SUMMARY:Cancelled','END:VEVENT'
+].join('\r\n'));
+const cancelled=sandbox.parseCalendar(cancelRaw,0);
+assert(cancelled.filter(e=>e.uid==='cancelled-series').length===2,'cancelled recurrence exception removed');
+assert(!cancelled.some(e=>e.title==='Cancelled'),'cancelled recurrence never displayed');
+console.log('cancelled recurrence pass');
+sandbox.calendarUrl1='webcal://calendar.example/private.ics'; sandbox.calendarUrl2=''; sandbox.calendarUrl3='';
+assert.deepStrictEqual(Array.from(sandbox.getUrls()),['webcal://calendar.example/private.ics'],'webcal source accepted');
+let fetched=''; sandbox.fetch=(url)=>{fetched=String(url); return Promise.resolve({ok:true,text:()=>Promise.resolve('BEGIN:VCALENDAR\r\nEND:VCALENDAR')});};
+(async()=>{ const loaded=await sandbox.loadCalendarText('webcal://calendar.example/private.ics',0); assert(loaded&&loaded.via==='direct','webcal loads directly'); assert(fetched==='https://calendar.example/private.ics','webcal normalized to HTTPS'); console.log('webcal source acceptance pass'); })().catch((error)=>{ console.error(error); process.exitCode=1; });
