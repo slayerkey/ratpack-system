@@ -33,10 +33,28 @@ const expectedPresets = [
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1800, height: 1250 } });
 const consoleErrors = [];
+const sandboxNetworkBlocks = [];
 
 page.on("console", (msg) => {
   if (msg.type() !== "error") return;
   const text = msg.text();
+
+  // StreamSpell deliberately injects connect-src 'none' into its sandboxed iframe.
+  // Network widgets therefore cannot reach their providers in this independent
+  // package preview unless the builder proxy is enabled. The proxy intentionally
+  // does not forward arbitrary custom request headers, so it is not a faithful
+  // provider test for widgets such as Helldivers. Classify only these builder-
+  // induced outbound-network blocks as expected evidence. Product/provider
+  // behavior belongs in deterministic fixtures; every other console error still
+  // fails this packaged-widget gate.
+  if (
+    /violates the following Content Security Policy directive:\s*["']connect-src 'none'/i.test(text)
+    || /Fetch API cannot load https?:\/\/\S+\. Refused to connect because it violates the document's Content Security Policy/i.test(text)
+  ) {
+    sandboxNetworkBlocks.push(text.slice(0, 320));
+    return;
+  }
+
   if (/CORS|Failed to load resource|net::ERR|Access to fetch/i.test(text)) return;
   consoleErrors.push(text.slice(0, 240));
 });
@@ -48,6 +66,7 @@ const result = {
   validation: null,
   presets: [],
   consoleErrors,
+  sandboxNetworkBlocks,
 };
 
 try {
