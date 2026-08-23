@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -49,6 +50,16 @@ def slugs_from_paths(paths: list[str]) -> set[str]:
     return slugs
 
 
+def preferred_product_slug(slugs: set[str]) -> str | None:
+    head_ref = os.getenv("GITHUB_HEAD_REF", "").strip()
+    if not head_ref.startswith("product/"):
+        return None
+    preferred = head_ref.removeprefix("product/")
+    if preferred in slugs and SLUG_RE.fullmatch(preferred):
+        return preferred
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--slug", help="Explicit slug, normally from workflow_dispatch")
@@ -69,6 +80,10 @@ def main() -> None:
         print(validate_slug(next(iter(slugs))))
         return
     if len(slugs) > 1:
+        preferred = preferred_product_slug(slugs)
+        if preferred:
+            print(validate_slug(preferred))
+            return
         fail("multiple widget slugs changed in one pull request: " + ", ".join(sorted(slugs)))
 
     print(validate_slug(args.fallback))
