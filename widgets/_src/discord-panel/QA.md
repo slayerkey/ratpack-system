@@ -14,21 +14,45 @@ Version: `0.1.0`
 
 Price target from the product handoff: `$12.99`
 
-Current state: blocked on Discord application access and safe authorization. Not a release candidate.
+Discord Application ID: `1540927508302536724`
 
-## Transport probe evidence
+Registered redirect supplied by the owner: `http://127.0.0.1`
 
-PASS from the supplied local probe: Discord desktop on port 6463 accepted a WebSocket upgrade with `Origin: null` and returned HTTP 101. The placeholder Client ID then closed with code 4000 and `Invalid Client ID`, which is expected for the placeholder.
+Current state: product UI and RPC implementation built, blocked on one real desktop end to end probe plus Discord partner approval. Not a release candidate yet.
 
-This proves the `Origin: null` transport gate on that Discord installation. The real Client ID still needs a second local probe after the Discord application is created.
+## Transport evidence
+
+PASS from the original supplied probe: Discord desktop on port 6463 accepted a WebSocket upgrade with `Origin: null` and returned HTTP 101. The placeholder Client ID then closed with code 4000 and `Invalid Client ID`, which was expected.
+
+The real Application ID is now integrated. The product local `probe.html` tests ports 6463 through 6472 with that real ID from an actual `file://` page, so the next run proves both application lookup and the `Origin: null` RPC Origin configuration.
+
+## Authentication implementation
+
+The temporary authorization blocker has been replaced with a no-secret Public Client PKCE attempt.
+
+PASS by implementation review: fresh 32 byte verifier generated with `crypto.getRandomValues`.
+
+PASS by implementation review: S256 challenge derived with `crypto.subtle.digest`.
+
+PASS by implementation review: RPC `AUTHORIZE` sends the real client ID, `response_type: code`, exact redirect URI, only `rpc.voice.read` and `rpc.voice.write`, and the PKCE challenge.
+
+PASS by implementation review: human authorization gets a two minute RPC timeout rather than the five second data request timeout.
+
+PASS by implementation review: authorization code exchange posts form encoded data to Discord with client ID and code verifier and never sends a Client Secret.
+
+PASS by implementation review: token exchange is bounded by a 12 second abort timeout.
+
+PASS by implementation review: access token is held in memory only for the widget session and reused only for reconnects inside that session.
+
+PASS by implementation review: RPC `AUTHENTICATE` verifies that both voice scopes were actually granted before controls are enabled.
+
+FAIL CLOSED: if Public Client configuration, PKCE compatibility, partner access, or browser CORS prevents token exchange, the panel enters a deliberate token exchange blocked state instead of weakening security.
+
+The product local `probe.html` runs this exact end to end path and finishes by calling authenticated `GET_VOICE_SETTINGS`. A green end to end result is required before packaging.
 
 ## Product behavior implemented
 
 PASS: sequential Discord RPC port discovery from 6463 through 6472.
-
-PASS: narrow `AUTHORIZE` request uses only `rpc.voice.read` and `rpc.voice.write`.
-
-PASS: `AUTHENTICATE` path exists for a valid externally supplied access token. No access token is persisted.
 
 PASS: current selected voice channel retrieval through `GET_SELECTED_VOICE_CHANNEL`.
 
@@ -48,13 +72,13 @@ PASS: recent speaking activity is session memory only and is never persisted.
 
 PASS: actual Discord avatars are supported when the RPC payload contains an avatar hash, with initials as a reliable fallback.
 
-PASS: setup, disconnected, authorization, exchange-required, voice, and not-in-voice idle states all render deliberately. No state intentionally produces a blank panel.
+PASS: setup, disconnected, authorization, authorization failure, token exchange failure, voice, and not-in-voice idle states all render deliberately. No state intentionally produces a blank panel.
 
-## Static checks completed in ChatGPT execution environment
+## Static checks completed before the real app integration
 
 PASS: JavaScript syntax through `node --check`.
 
-PASS: generated shipping HTML contains local CSS and JavaScript inline and no module script.
+PASS: self-contained generated QA HTML contained local CSS and JavaScript inline and no module script.
 
 PASS: uppercase `<!DOCTYPE html>`.
 
@@ -62,15 +86,15 @@ PASS: manifest JSON parses and uses `PackRat 🐀`, `com.packrat.discordpanel`, 
 
 PASS: translation JSON parses.
 
-PASS: 49 settings and runtime translation keys are present in English, German, Spanish, and French.
+PASS: settings and runtime translation coverage existed in English, German, Spanish, and French.
 
 PASS: no en dash or em dash characters in product source or shipping files.
 
-PASS: no Discord client secret or bot token is embedded in product JavaScript.
+PASS: no Discord Client Secret or bot token is embedded in product JavaScript.
 
-Checkpoint note: the self-contained shipping `index.html` was generated and tested locally from the exact authored source, but it is intentionally not committed while the Client ID remains a placeholder. This keeps `widgets/discord-panel/` unpackageable at the blocker checkpoint rather than allowing an incomplete widget to be mistaken for a release candidate. After the real Client ID is inserted, the canonical `tools/xeneon/inline.py discord-panel` build must create the committed shipping `index.html` before CORSAIR validation and packaging.
+The real Client ID and PKCE patch only change the live authentication path and related copy. The complete static suite must run again after the live end to end probe passes and before the generated shipping `index.html` is committed.
 
-## Deterministic browser QA
+## Deterministic browser QA completed before the live auth patch
 
 Fixture: 12 voice members, including speaking, self-muted, self-deafened, long names, and descender-heavy text.
 
@@ -105,30 +129,26 @@ Touch target measurements:
 
 Recent activity is intentionally hidden on S, M, and L and visible on both XL compositions. XL roster rendering uses two columns.
 
-## Discord release blockers
+## Remaining external release gates
 
-BLOCKER: replace `__DISCORD_CLIENT_ID__` with the real Discord application Client ID.
+BLOCKER: run `probe.html` from disk on the owner's Windows PC with Discord desktop running. It must report both transport pass and end to end pass.
 
-BLOCKER: run the real Client ID local WebSocket probe and confirm the application accepts the widget's `Origin: null` connection.
+BLOCKER: Discord currently documents `rpc.voice.read` and `rpc.voice.write` as approved-partner scopes. Marketplace submission must wait for Discord approval even if the owner/tester flow works.
 
-BLOCKER: Discord's current documentation labels WebSocket RPC deprecated and says it is only available to old participants of the private beta. A newly created application may therefore be unable to use this transport even though the localhost server accepted the placeholder probe.
-
-BLOCKER: `rpc.voice.read` and `rpc.voice.write` are currently documented as approved-partner scopes.
-
-BLOCKER: the documented RPC `AUTHORIZE` command returns an OAuth authorization code, and Discord's documented standard authorization-code token exchange requires a client secret. A client secret must never ship inside a widget. The current product deliberately stops at an `exchange-required` state after a successful `AUTHORIZE` response rather than leaking a secret or pretending authentication is solved.
-
-Potential safe architecture if Discord approves legacy RPC: a PackRat-controlled authorization broker can keep the Discord client secret server-side, exchange the one-time code, and return the short-lived access token to the widget. That would add a hosted dependency and must be explicitly designed and reviewed before implementation.
+BLOCKER IF PROBE FAILS: if the real application cannot use WebSocket RPC, legacy RPC rejects PKCE, or Discord's token endpoint cannot be read from the widget's `Origin: null`, stop and redesign rather than embedding a Client Secret.
 
 ## CORSAIR and package gates
 
-NOT RUN: official `icuewidget-cli@0.4.47` validation. The package download timed out in the current execution environment.
+The final shipping `widgets/discord-panel/index.html` is intentionally not committed until the end to end Discord probe passes. This prevents an incomplete integration from looking packageable.
 
-NOT RUN: official `.icuewidget` packaging because official validation is not yet available here.
+After that pass, run the canonical inline build, structural QA, full eight-layout deterministic browser suite, official CORSAIR CLI validation and package, StreamSpell packaged verification, deterministic Rat Art, and Rat Ship.
 
-NOT RUN: StreamSpell packaged widget verification because there is no official package yet.
+The shared XENEON CI, Rat Art, and Rat Ship tooling still contains Now Playing specific assumptions. Product boundary rules prohibit changing shared files in this branch. The required generalization is recorded in `NEEDS.md`.
 
-The canonical shared XENEON GitHub workflows currently contain Now Playing specific slug, fixture, art, and Rat Ship assumptions. Product boundary rules prohibit changing those shared files in this branch. The required generalization is recorded in `NEEDS.md`.
+## Boundary audit
+
+A compare against `main` shows every file changed by this branch is inside either `widgets/_src/discord-panel/` or `widgets/discord-panel/`. No `_shared`, shared inline tool, workflow, registry, or unrelated product file was modified.
 
 ## Release conclusion
 
-The product UI and deterministic interaction layer are substantially built and pass the eight-layout browser gate. The product must not be sold or submitted yet. The only honest next step is to create the Discord application, obtain its Client ID and partner/RPC access, then prove a safe authentication architecture before the official CORSAIR packaging and independent packaged-widget gates are run.
+The product has reached the genuine manual boundary. The next useful evidence is the result of one local `file://` end to end probe using the real Discord application. If it passes, the remaining work is normal XENEON release engineering plus Discord partner approval. If it fails, the log tells us whether the blocker is RPC Origin/application access, PKCE authorization, token exchange CORS, or voice scope approval.
