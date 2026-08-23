@@ -35,9 +35,15 @@ function Get-GitText {
 
 function Invoke-GhCommand {
     param([string[]]$GhArgs)
-    & gh @GhArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh $($GhArgs -join ' ') failed with exit code $LASTEXITCODE"
+    Push-Location $RepoRoot
+    try {
+        & gh @GhArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh $($GhArgs -join ' ') failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        Pop-Location
     }
 }
 
@@ -147,26 +153,32 @@ function Show-Help {
 function Get-NewShipRun {
     param([string]$WidgetSlug)
     Assert-GitHubAuth
-    $started = (Get-Date).ToUniversalTime().AddSeconds(-10)
-    Write-Host "Triggering Rat Ship for '$WidgetSlug' on GitHub Actions..." -ForegroundColor Cyan
-    Invoke-GhCommand -GhArgs @("workflow", "run", "rat-ship-xeneon.yml", "--ref", "main", "-f", "slug=$WidgetSlug")
+    Push-Location $RepoRoot
+    try {
+        $started = (Get-Date).ToUniversalTime().AddSeconds(-10)
+        Write-Host "Triggering Rat Ship for '$WidgetSlug' on GitHub Actions..." -ForegroundColor Cyan
+        Invoke-GhCommand -GhArgs @("workflow", "run", "rat-ship-xeneon.yml", "--ref", "main", "-f", "slug=$WidgetSlug")
 
-    for ($i = 0; $i -lt 30; $i++) {
-        Start-Sleep -Seconds 2
-        $json = & gh run list --workflow rat-ship-xeneon.yml --branch main --event workflow_dispatch --limit 10 --json databaseId,createdAt,status,conclusion 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Could not list GitHub Actions runs: $($json -join ' ')"
+        for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Seconds 2
+            $json = & gh run list --workflow rat-ship-xeneon.yml --branch main --event workflow_dispatch --limit 10 --json databaseId,createdAt,status,conclusion 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not list GitHub Actions runs: $($json -join ' ')"
+            }
+            $runs = $json | ConvertFrom-Json
+            $run = $runs |
+                Where-Object { ([DateTime]::Parse($_.createdAt)).ToUniversalTime() -ge $started } |
+                Sort-Object { [DateTime]::Parse($_.createdAt) } -Descending |
+                Select-Object -First 1
+            if ($run) {
+                return [string]$run.databaseId
+            }
         }
-        $runs = $json | ConvertFrom-Json
-        $run = $runs |
-            Where-Object { ([DateTime]::Parse($_.createdAt)).ToUniversalTime() -ge $started } |
-            Sort-Object { [DateTime]::Parse($_.createdAt) } -Descending |
-            Select-Object -First 1
-        if ($run) {
-            return [string]$run.databaseId
-        }
+        throw "GitHub accepted the workflow request, but RatPack could not find the new run. Check GitHub Actions."
     }
-    throw "GitHub accepted the workflow request, but RatPack could not find the new run. Check GitHub Actions."
+    finally {
+        Pop-Location
+    }
 }
 
 function Download-ShipKit {
