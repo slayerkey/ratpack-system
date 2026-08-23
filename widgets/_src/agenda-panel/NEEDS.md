@@ -2,13 +2,11 @@
 
 ## Calendar Sync parser provenance
 
-The original handoff required porting the working Calendar Sync parser instead of rewriting it. The uploaded Calendar Sync Pro source confirmed that its TypeScript layer imports the real parser from the missing sibling `plugins/_calendar/src/` tree.
+The original handoff required porting the working Calendar Sync parser instead of inventing a weaker calendar engine. The supplied Calendar Sync Pro project confirmed that its TypeScript layer imports the real parser from the missing sibling `plugins/_calendar/src/` tree.
 
-The upload also supplied the exact `ical.js` 2.2.1 dependency used by Calendar Sync Pro and a built `plugin.js` containing the compiled shared parser behavior. That production artifact was used as behavioral evidence for VTIMEZONE handling, recurring master and exception behavior, occurrence resolution, safety bounds, dedupe strategy, timezone fallback, cancellation behavior, and `webcal://` normalization.
+The upload also supplied the exact ical.js 2.2.1 dependency and a built `plugin.js` containing the compiled shared parser behavior. Calendar Panel now ships that exact ical.js runtime as its primary parser using a deterministic product-local gzip plus base64 representation. `agenda-ical.js` ports the recovered production behavior for VTIMEZONE registration, recurring masters and exceptions, occurrence detail resolution, safety bounds, dedupe strategy, timezone fallback, cancellation handling, and `webcal://` normalization.
 
-The currently committed Calendar Panel runtime remains product local in `agenda-core.js` and `agenda-recur.js`. It has regression coverage for the recovered behaviors, including embedded non IANA VTIMEZONE rules and recurring events across DST. An exact ICAL based comparison implementation was also exercised successfully in the execution workspace, but the branch does not claim the exact third party runtime is currently shipped.
-
-If the original `_calendar` TypeScript source is later migrated into canonical GitHub, compare it fixture for fixture and prefer the proven shared source when the product boundary permits it.
+The original `_calendar` TypeScript wrapper remains absent from canonical GitHub. If it is later migrated, compare it fixture for fixture for provenance and maintenance consolidation. Its absence is no longer a release blocker for Calendar Panel because the exact production parser dependency and compiled behavior are now present and tested.
 
 ## Calendar Sync Pro raw ICS bridge
 
@@ -30,14 +28,16 @@ Required bridge behavior:
 6. Reject non HTTP and non HTTPS upstream URLs after `webcal://` normalization.
 7. Do not parse or normalize calendar data. The widget owns parsing so there is one calendar behavior model.
 
-The supplied Calendar Sync Pro source has no localhost bridge. It fetches ICS inside the Stream Deck Node process, where browser CORS does not apply. Adding the loopback transport to the companion is outside this widget's allowed write boundary and remains a release dependency for CORS blocked providers.
+The supplied Calendar Sync Pro source has no localhost bridge. It fetches ICS inside the Stream Deck Node process, where browser CORS does not apply. Adding the loopback transport to the companion is outside this widget's allowed write boundary. Providers that allow direct browser CORS work without it; providers that block direct access require the companion.
 
 ## Shared Rat Art capture
 
-The generic XENEON build and packaged verification path already exists through `tools/xeneon/inline.py` and `tools/xeneon/streamspell.mjs`. Calendar Panel carries its own deterministic parser and eight slot browser QA under `qa/`.
+The generic XENEON build and packaged verification path exists through `tools/xeneon/inline.py`, the official CORSAIR CLI workflow, and `tools/xeneon/streamspell.mjs`. The current pull request workflow resolves the product slug from the PR diff, so Calendar Panel can use the generic vendor pipeline without a manual workflow dispatch.
 
-The remaining shared tool gap is marketplace capture and composition. Current canonical `tools/art/capture_xeneon.mjs` and parts of `tools/art/rat_art.py` still contain Now Playing specific fixtures and copy. Calendar Panel must not edit shared tooling under this product boundary. Before Rat Art can be considered clean, the owner pass should generalize the XENEON art fixture contract so each widget can provide product specific deterministic setup and capture selectors without copying the shared compositor.
+Calendar Panel also carries deterministic product-local parser, state, lifecycle, interaction, and eight-slot browser QA under `qa/`.
+
+The remaining shared-tool gap is marketplace capture and composition. Current canonical `tools/art/capture_xeneon.mjs` and parts of `tools/art/rat_art.py` still contain Now Playing specific fixtures and copy. Calendar Panel must not edit shared tooling under this product boundary. The owner pass should generalize the XENEON art fixture contract so each widget can provide deterministic product-specific setup and capture selectors without copying the shared compositor.
 
 ## Network host policy
 
-The product has user supplied ICS hosts, so a static host allowlist cannot enumerate every valid calendar feed. The canonical structure policy still needs an owner level rule for user configured URL properties. The only product known host is loopback `127.0.0.1` for the optional companion bridge.
+The current Widget API manifest does not define a `network_hosts` field. Calendar Panel therefore does not invent one in the product manifest. User-supplied calendar hosts are handled as configured ICS URLs, with loopback `127.0.0.1` used only for the optional companion bridge fallback.
