@@ -321,6 +321,34 @@ function zonedPartsToDate(parts, zone) {
   return new Date(guess);
 }
 
+function parseUtcOffset(value) {
+  var match = String(value || "").trim().match(/^([+-])(\d{2})(\d{2})(?::?(\d{2}))?$/);
+  if (!match) return null;
+  var seconds = Number(match[2]) * 3600 + Number(match[3]) * 60 + Number(match[4] || 0);
+  return (match[1] === "-" ? -1 : 1) * seconds * 1000;
+}
+
+function buildVtimezone(component, id) {
+  var rules = [];
+  component.children.forEach(function (child) {
+    if (child.name !== "STANDARD" && child.name !== "DAYLIGHT") return;
+    var start = prop(child, "DTSTART");
+    var startParts = start ? parseRawParts(start.value) : null;
+    var offsetTo = parseUtcOffset(propText(child, "TZOFFSETTO", ""));
+    var offsetFrom = parseUtcOffset(propText(child, "TZOFFSETFROM", ""));
+    if (!startParts || offsetTo === null) return;
+    rules.push({
+      kind: child.name,
+      startParts: startParts,
+      offsetTo: offsetTo,
+      offsetFrom: offsetFrom,
+      rrule: propText(child, "RRULE", ""),
+      rdates: props(child, "RDATE").map(function (item) { return item.value; })
+    });
+  });
+  return rules.length ? { type: "vtimezone", id: id, rules: rules } : null;
+}
+
 function collectTimezoneAliases(root) {
   var aliases = {};
   function walk(component) {
@@ -328,12 +356,69 @@ function collectTimezoneAliases(root) {
       var id = propText(component, "TZID", "");
       var location = propText(component, "X-LIC-LOCATION", "");
       if (id && location && validIanaZone(location)) aliases[id] = location;
-      if (id && validIanaZone(id)) aliases[id] = id;
+      else if (id && validIanaZone(id)) aliases[id] = id;
+      else if (id) {
+        var embedded = buildVtimezone(component, id);
+        if (embedded) aliases[id] = embedded;
+      }
     }
     component.children.forEach(walk);
   }
   walk(root);
   return aliases;
+}
+
+function wallPartsNumber(parts) {
+  return Date.UTC(parts.y, parts.m - 1, parts.d, parts.h || 0, parts.min || 0, parts.s || 0);
+}
+
+function transitionDatesForRule(rule, year) {
+  var out = [];
+  function push(parts) {
+    if (!parts) return;
+    out.push({ parts: parts, offsetTo: rule.offsetTo, offsetFrom: rule.offsetFrom });
+  }
+  if (rule.rrule && typeof parseRrule === "function" && typeof recurrenceDateMatches === "function") {
+    var parsed = parseRrule(rule.rrule);
+    for (var y = year - 2; y <= year + 1; y++) {
+      var cursor = { y: y, m: 1, d: 1, h: rule.startParts.h || 0, min: rule.startParts.min || 0, s: rule.startParts.s || 0 };
+      var end = { y: y + 1, m: 1, d: 1 };
+      while (comparePlain(cursor, end) < 0) {
+        if (recurrenceDateMatches(rule.startParts, cursor, parsed)) push(cloneParts(cursor));
+        cursor = addPlainDays(cursor, 1);
+      }
+    }
+  } else if (rule.startParts.y >= year - 2 && rule.startParts.y <= year + 1) {
+    push(cloneParts(rule.startParts));
+  }
+  rule.rdates.forEach(function (rawList) {
+    String(rawList || "").split(",").forEach(function (raw) {
+      var p = parseRawParts(raw);
+      if (p && p.y >= year - 2 && p.y <= year + 1) push(p);
+    });
+  });
+  return out;
+}
+
+function vtimezonePartsToDate(parts, zone) {
+  if (!zone || !zone.rules || !zone.rules.length) return null;
+  var candidates = [];
+  zone.rules.forEach(function (rule) { candidates = candidates.concat(transitionDatesForRule(rule, parts.y)); });
+  candidates.sort(function (a, b) { return wallPartsNumber(a.parts) - wallPartsNumber(b.parts); });
+  var target = wallPartsNumber(parts);
+  var chosen = null;
+  for (var i = 0; i < candidates.length; i++) {
+    if (wallPartsNumber(candidates[i].parts) <= target) chosen = candidates[i];
+    else break;
+  }
+  var offset = chosen ? chosen.offsetTo : null;
+  if (offset === null || offset === undefined) {
+    for (var j = 0; j < zone.rules.length; j++) {
+      if (zone.rules[j].offsetFrom !== null && zone.rules[j].offsetFrom !== undefined) { offset = zone.rules[j].offsetFrom; break; }
+    }
+  }
+  if (offset === null || offset === undefined) return null;
+  return new Date(target - offset);
 }
 
 function parseDateValue(item, aliases) {
@@ -350,8 +435,13 @@ function parseDateValue(item, aliases) {
   var tzid = item.params.TZID || "";
   if (tzid) {
     var zone = aliases[tzid] || tzid;
-    var zoned = zonedPartsToDate(parts, zone);
-    if (zoned) return { allDay: false, date: zoned, parts: parts, zone: zone, raw: item.value };
+    if (zone && typeof zone === "object" && zone.type === "vtimezone") {
+      var embeddedDate = vtimezonePartsToDate(parts, zone);
+      if (embeddedDate) return { allDay: false, date: embeddedDate, parts: parts, zone: zone, raw: item.value };
+    } else {
+      var zoned = zonedPartsToDate(parts, zone);
+      if (zoned) return { allDay: false, date: zoned, parts: parts, zone: zone, raw: item.value };
+    }
   }
   return { allDay: false, date: new Date(parts.y, parts.m - 1, parts.d, parts.h, parts.min, parts.s), parts: parts, zone: "floating", raw: item.value };
 }
