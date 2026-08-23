@@ -4,7 +4,7 @@
   "type": "widget",
   "price_usd": 14.99,
   "version": "1.0.0",
-  "marketplace_category": ["Games"],
+  "marketplace_category": ["Gaming"],
   "marketplace_dashboard_sizes": ["Extra large", "Large", "Medium", "Small"],
   "marketplace_language": ["English"],
   "marketplace_auto_publish": true,
