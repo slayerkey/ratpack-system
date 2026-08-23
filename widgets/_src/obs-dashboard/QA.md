@@ -16,95 +16,87 @@ Version: `1.0.0`
 
 Price target: `$12.99`
 
-## Mandatory transport spike
+## Mandatory real transport spike
 
 PASS from the user supplied machine level spike performed before product code was written.
 
-The spike used a real Chromium page loaded from a `file://` origin against `ws://127.0.0.1:4455`. OBS accepted the WebSocket upgrade with the widget origin behavior, returned its obs-websocket v5 Hello frame, negotiated RPC version 1 capability, reported obs-websocket 5.7.4, and indicated that authentication was required.
+A real Chromium page loaded from a `file://` origin connected to `ws://127.0.0.1:4455`. OBS accepted the WebSocket upgrade, returned its obs websocket v5 Hello frame, negotiated RPC version 1 capability, reported obs websocket 5.7.4, and required authentication.
 
-The ChatGPT execution environment cannot route to the user's localhost, so this exact live transport result is preserved as supplied evidence rather than being falsely rerun from an isolated runner.
+This proves the real desktop transport path that cannot be reproduced from an isolated cloud runner against the user's localhost.
 
 ## Protocol implementation
 
-PASS: obs-websocket v5 Hello, Identify, Identified, Event, Request and RequestResponse message flow.
+PASS: obs websocket v5 Hello, Identify, Identified, Event, Request and RequestResponse flow.
 
-PASS: optional password authentication using the documented two stage SHA-256 and Base64 challenge flow.
+PASS: password authentication using the documented two stage SHA 256 and Base64 challenge flow.
 
-PASS: Web Crypto is preferred when available, with a deterministic pure JavaScript SHA-256 fallback so authentication does not depend on secure context behavior.
+PASS: Web Crypto when available with a deterministic pure JavaScript SHA 256 fallback.
 
 PASS: authentication computation cross checked against an independent Python `hashlib` implementation.
 
-PASS: event subscriptions are limited to Scenes and Outputs.
+PASS: event subscriptions limited to Scenes and Outputs.
 
-PASS: initial data requests use `GetStreamStatus`, `GetRecordStatus`, `GetStats` and `GetSceneList`, with `GetCurrentProgramScene` only as a fallback if the scene list response lacks a current scene.
+PASS: initial requests use `GetStreamStatus`, `GetRecordStatus`, `GetStats` and `GetSceneList`, with `GetCurrentProgramScene` only as fallback.
 
-PASS: `SetCurrentProgramScene`, `StartStream` and `StopStream` are the only control requests used.
+PASS: controls use only `SetCurrentProgramScene`, `StartStream` and `StopStream`.
 
-PASS: current bitrate is derived from consecutive `outputBytes` samples rather than inventing a nonexistent bitrate field.
+PASS: bitrate is derived from consecutive `outputBytes` samples rather than a fabricated field.
 
-PASS: dropped frame percentage uses `GetStreamStatus.outputSkippedFrames / outputTotalFrames`.
+PASS: dropped frame percentage uses stream output skipped frames over total frames.
 
-PASS: encoder lag uses `GetStats.outputSkippedFrames / outputTotalFrames` and is labeled encoder lag, not encoder utilization or encoder load.
+PASS: encoder lag uses output thread skipped frames over total frames and is not mislabeled as encoder utilization.
 
-PASS: recording disk space uses `GetStats.availableDiskSpace`.
+PASS: recording disk space uses `availableDiskSpace`.
 
-PASS: no OBS password, authentication secret, salt or challenge is written to localStorage. Only sanitized last known dashboard state is cached per widget instance.
+PASS: OBS password and authentication material are never stored in localStorage. Only sanitized last known dashboard state is cached per widget instance.
 
-## Source and structure checks completed in ChatGPT execution environment
+## Source and structure checks
 
-PASS: source uses uppercase `<!DOCTYPE html>`.
+PASS: uppercase `<!DOCTYPE html>`.
 
-PASS: head void elements are self closed and the non script head parses as well formed XML.
+PASS: XML safe head structure.
 
-PASS: `<title>` uses `tr('Stream Dashboard')`.
+PASS: documented `textfield` and `color` property types only.
 
-PASS: settings use documented `textfield` and `color` property types only.
+PASS: Connection contains port and password only. Appearance is last.
 
-PASS: Connection group contains only port and password. Appearance is last.
+PASS: no property name collides with an element ID.
 
-PASS: property names do not collide with element IDs.
+PASS: complete runtime and settings translation coverage in English, German, Spanish and French.
 
-PASS: translation coverage is complete for all settings and runtime translation keys in English, German, Spanish and French.
+PASS: JavaScript syntax check.
 
-PASS: JavaScript syntax via `node --check`.
+PASS: manifest, translation and submission JSON parsing.
 
-PASS: manifest, submission metadata and translation JSON parse cleanly.
+PASS: authored CSS and JavaScript inline into one generated shipping `index.html`.
 
-PASS: authored CSS and JavaScript inline into one generated shipping `index.html` with no external stylesheet or script dependency.
+PASS: no remote scripts, remote stylesheets, fetch, XHR or EventSource.
 
-PASS: the generated shipping document preserves an XML safe head.
-
-PASS: the only network endpoint in product code is the user configurable local WebSocket at `ws://127.0.0.1:<port>`.
-
-PASS: no remote scripts, remote stylesheets, fetch, XHR, EventSource or external WebSocket host is used.
-
-PASS: no em dash or en dash appears in product source, package copy or metadata.
+PASS: the only product network destination is the user configurable local WebSocket at `ws://127.0.0.1:<port>`.
 
 ## Deterministic Chromium fixture QA
 
-The generated self contained shipping document was loaded into headless Chromium with a deterministic obs-websocket fixture injected before widget startup.
+PASS: S horizontal 840 by 344.
 
-PASS: S horizontal, 840x344.
+PASS: S vertical 696 by 416.
 
-PASS: S vertical, 696x416.
+PASS: M horizontal 840 by 696.
 
-PASS: M horizontal, 840x696.
+PASS: M vertical 696 by 840.
 
-PASS: M vertical, 696x840.
+PASS: L horizontal 1688 by 696.
 
-PASS: L horizontal, 1688x696.
+PASS: L vertical 696 by 1688.
 
-PASS: L vertical, 696x1688.
+PASS: XL horizontal 2536 by 696.
 
-PASS: XL horizontal, 2536x696.
-
-PASS: XL vertical, 696x2536.
+PASS: XL vertical 696 by 2536.
 
 PASS: zero document overflow at all eight sizes.
 
 PASS: all visible interactive targets remain at least 56 by 56 pixels.
 
-PASS: Small layouts deliberately show the current scene plus the next two scenes rather than shrinking a full scene list.
+PASS: Small layouts show the current scene plus the next two scenes rather than shrinking a full list.
 
 PASS: Medium layouts use a horizontal touch scroll scene rail.
 
@@ -112,50 +104,96 @@ PASS: Large layouts use the three zone board composition.
 
 PASS: XL horizontal uses a two column scene rail and increased information density.
 
-PASS: scene switching updates the program scene through `SetCurrentProgramScene` behavior.
+PASS: scene switching behavior.
 
-PASS: stream state requires two taps within the confirmation window before StartStream or StopStream is sent.
+PASS: two tap stream confirmation behavior.
 
-PASS: disconnected state renders `OBS NOT CONNECTED` and a setup hint instead of a blank panel.
+PASS: disconnected presentation.
 
-PASS: authentication failure renders `OBS AUTH FAILED` with a password specific hint.
+PASS: authentication failure presentation.
 
-PASS: no page runtime errors in deterministic connected, disconnected or authentication failure fixtures.
+PASS: zero runtime errors in deterministic connected, disconnected and authentication failure fixtures.
+
+## Packaged network smoke
+
+PASS on the exact official CORSAIR package produced by CI.
+
+The package was extracted and its packaged `index.html` was loaded from `file://` in Chromium. A real WebSocket server listened on `127.0.0.1:4455` and implemented the required OBS websocket v5 message flow.
+
+PASS: WebSocket request reached `ws://127.0.0.1:4455` with request origin `null`.
+
+PASS: nonempty password challenge authentication succeeded.
+
+PASS: Identify completed and the widget reached connected state.
+
+PASS: `GetStreamStatus`, `GetRecordStatus`, `GetStats` and `GetSceneList` all reached the network server.
+
+PASS: repeated stream polling produced a nonzero bitrate through real byte delta calculation.
+
+PASS: touching BRB sent `SetCurrentProgramScene` with `sceneName: BRB` over the socket and the returned scene event updated the widget.
+
+PASS: first stream control tap sent no `StopStream` request.
+
+PASS: second confirmation tap sent `StopStream` over the socket and the returned stream event changed the widget to standby.
+
+PASS: zero browser runtime errors.
+
+Evidence artifact: `xeneon-obs-dashboard-network-smoke` from XENEON Widget CI run 68 on commit `4fbdbfbddb32b2a3724b296d88cb587bcf0995f6`.
 
 ## Shared owner pass
 
 PASS: XENEON pull request workflows resolve the changed widget slug rather than defaulting to Now Playing.
 
-PASS: deterministic Rat Art capture accepts a product owned fixture and still preserves the existing Now Playing fixture path.
+PASS: deterministic Rat Art accepts product owned fixtures while preserving the existing Now Playing path.
 
-PASS: non Now Playing Rat Art composition reads product owned `art.json` metadata instead of hardcoded Now Playing marketing copy.
+PASS: non Now Playing Rat Art reads product owned `art.json` metadata.
 
-PASS: Rat Ship invariants read `widgets/_src/<slug>/submission.json` and the matching manifest instead of hardcoded Now Playing name and price values.
+PASS: Rat Ship invariants read each product's submission metadata and matching manifest rather than hardcoded Now Playing values.
 
-The historical `_shared/` runtime migration remains intentionally deferred because it is not required by the product and should only happen as a repository wide migration with parity testing.
+PASS: StreamSpell distinguishes its preview only loopback WebSocket CSP restriction from genuine console errors.
+
+PASS: optional product owned packaged network smoke tests can run after official packaging without making the shared pipeline product specific.
+
+The historical `_shared/` runtime migration remains intentionally deferred. It is not required for this product and should only happen as a repository wide migration with parity testing.
 
 The legacy `registry.json` host reconciliation for `127.0.0.1` remains intentionally untouched because the original product boundary forbids registry edits.
 
 ## Remote release gates
 
-PENDING: official CORSAIR `icuewidget-cli@0.4.47` validation and packaging for this slug.
+PASS: official CORSAIR `icuewidget-cli@0.4.47` validation.
 
-PENDING: StreamSpell validation of the exact official `.icuewidget` package across all eight presets.
+PASS: official `.icuewidget` package creation.
 
-PENDING: deterministic Rat Art Action output from real widget captures.
+PASS: StreamSpell validation of the exact official package.
 
-PENDING: Rat Ship Action output with the official package, search icon, marketplace art and Maker Console kit.
+PASS: all eight StreamSpell XENEON presets rendered.
 
-A direct attempt to acquire `icuewidget-cli@0.4.47` inside the isolated ChatGPT container timed out, so this report does not misrepresent vendor validation as completed.
+PASS: zero genuine StreamSpell console errors.
+
+PASS: StreamSpell records its `connect-src 'none'` localhost limitation separately rather than misclassifying it as a product error.
+
+PASS: deterministic Rat Art from real widget captures.
+
+PASS: Rat Ship package, search icon, marketplace art and Maker Console ship kit.
+
+PASS: Maker Console Playwright kit preflight.
+
+PASS: RatPack Context CI.
+
+The final automated evidence set before this documentation update was green on commit `4fbdbfbddb32b2a3724b296d88cb587bcf0995f6`.
 
 ## Deliberate product limits
 
-The widget does not claim encoder utilization because obs-websocket does not expose a generic encoder utilization percentage through the selected requests.
+The widget does not claim encoder utilization because obs websocket does not expose a generic encoder utilization percentage through the selected requests.
 
-The widget does not claim a direct bitrate field. It calculates bitrate from byte deltas.
+The widget does not claim a direct bitrate field. It calculates bitrate from output byte deltas.
 
-The widget does not add recording start or stop controls, replay buffer controls, source controls, audio mixing, Studio Mode preview switching or other OBS features that are outside the approved v1.
+The widget does not add recording start or stop controls, replay buffer controls, source controls, audio mixing, Studio Mode preview switching or other OBS features outside the approved v1.
 
-## Final manual confidence check
+## Hardware boundary
 
-The remaining product specific host check is a real authenticated OBS session from the user's machine: complete Identify with the configured password, receive initial state, switch a harmless test scene, and confirm that the two tap stream control reaches OBS. The earlier mandatory transport spike already proves that the `file://` WebSocket route itself is viable.
+A physical XENEON Edge is not required for release candidate status under the canonical RatPack XENEON release gate.
+
+The remaining uncertainty is limited to behavior unique to the real iCUE widget host and physical XENEON Edge hardware. CORSAIR's current installation flow requires a compatible recognized device before a widget can be placed on a device screen, so there is no supported virtual Edge host available for this final layer.
+
+A future real iCUE or XENEON Edge smoke test is optional extra confidence, not a blocker for this release candidate.
