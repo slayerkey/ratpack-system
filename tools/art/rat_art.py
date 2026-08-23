@@ -143,36 +143,53 @@ def header(canvas: Image.Image, title: str, subtitle: str | None = None) -> int:
     return 176
 
 
-def footer(canvas: Image.Image, right_text: str = "CORSAIR XENEON EDGE") -> None:
-    top = 824
+def packrat_signature(canvas: Image.Image, y: int = 892) -> None:
     draw = ImageDraw.Draw(canvas)
-    draw.line((0, top, W, top), fill=(*ACCENT, 110), width=1)
-    draw.line((0, H - 1, W, H - 1), fill=(*ACCENT, 80), width=1)
-    left_font = resolve_font(31, True)
-    right_font = fit_font(draw, right_text, 600, 30, 20)
-    draw.text((74, 892), "iCUE WIDGET", font=left_font, fill=(*WHITE, 255), anchor="lm")
-    draw.text((W - 74, 892), right_text, font=right_font, fill=(*ACCENT, 255), anchor="rm")
-    badge = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
-    badge_draw = ImageDraw.Draw(badge)
-    badge_draw.rounded_rectangle(
-        (2, 2, 97, 97),
-        radius=17,
-        fill=(5, 9, 12, 245),
-        outline=(*ACCENT, 255),
-        width=3,
-    )
+    label = "PACKRAT"
+    font = resolve_font(23, True)
+    text_box = draw.textbbox((0, 0), label, font=font)
+    text_width = text_box[2] - text_box[0]
+    icon_size = 42
+    gap = 13
+    total_width = icon_size + gap + text_width
+    x = (W - total_width) // 2
+
     if RAT.exists():
         rat = Image.open(RAT).convert("RGBA")
         box = rat.getbbox()
         if box:
             rat = rat.crop(box)
-        scale = min(64 / rat.width, 64 / rat.height)
+        scale = min(icon_size / rat.width, icon_size / rat.height)
         rat = rat.resize(
             (max(1, int(rat.width * scale)), max(1, int(rat.height * scale))),
             Image.Resampling.LANCZOS,
         )
-        badge.alpha_composite(rat, ((100 - rat.width) // 2, (100 - rat.height) // 2))
-    canvas.alpha_composite(badge, (W // 2 - 50, 844))
+        glow = Image.new("RGBA", (72, 72), (0, 0, 0, 0))
+        glow_draw = ImageDraw.Draw(glow)
+        glow_draw.ellipse((10, 10, 62, 62), fill=(*ACCENT, 24))
+        canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(12)), (x - 15, y - 36))
+        canvas.alpha_composite(rat, (x + (icon_size - rat.width) // 2, y - rat.height // 2))
+    else:
+        draw.ellipse((x + 9, y - 12, x + 33, y + 12), fill=(*ACCENT, 180))
+
+    draw.text((x + icon_size + gap, y), label, font=font, fill=(*MUTED, 235), anchor="lm")
+
+
+def footer(
+    canvas: Image.Image,
+    platform_labels: bool = False,
+    right_text: str = "CORSAIR XENEON EDGE",
+) -> None:
+    top = 824
+    draw = ImageDraw.Draw(canvas)
+    draw.line((0, top, W, top), fill=(*ACCENT, 82), width=1)
+    draw.line((0, H - 1, W, H - 1), fill=(*ACCENT, 46), width=1)
+    if platform_labels:
+        left_font = resolve_font(31, True)
+        right_font = fit_font(draw, right_text, 600, 30, 20)
+        draw.text((74, 892), "iCUE WIDGET", font=left_font, fill=(*WHITE, 255), anchor="lm")
+        draw.text((W - 74, 892), right_text, font=right_font, fill=(*ACCENT, 255), anchor="rm")
+    packrat_signature(canvas, 892)
 
 
 def render_device(shot_path: Path, max_box=(1740, 580)) -> Image.Image:
@@ -240,7 +257,7 @@ def hero(shots: Path, out: Path, name: str, section: dict[str, Any]) -> None:
     header(canvas, name, subtitle)
     panel = render_device(shots / "XL_H.png", (1760, 575))
     canvas.alpha_composite(panel, ((W - panel.width) // 2, 220 + max(0, (590 - panel.height) // 2)))
-    footer(canvas)
+    footer(canvas, platform_labels=True)
     canvas.convert("RGB").save(out / "1-hero.png", quality=96)
 
 
