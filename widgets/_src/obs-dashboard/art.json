@@ -1,0 +1,18 @@
+{
+  "hero_title": "Stream Dashboard",
+  "hero_subtitle": "Your stream health, scenes and recording state at a glance.",
+  "showcase_title": "Know your stream without alt tabbing.",
+  "showcase_subtitle": "Live bitrate, dropped frames, encoder lag and scenes on the Edge.",
+  "features_title": "The health checks that matter.",
+  "features_subtitle": "Built from the OBS data that obs-websocket actually exposes.",
+  "features": [
+    ["Bitrate history", "A rolling 60 second trace calculated from real OBS output bytes."],
+    ["Dropped frames", "Stream output frame loss stays visible before viewers tell you."],
+    ["Encoder lag", "Output thread skipped frames are tracked without inventing utilization."],
+    ["Scene control", "Switch program scenes by touch and protect stream start or stop behind confirmation."]
+  ],
+  "settings_title": "Connect once in iCUE.",
+  "settings_subtitle": "Set the OBS WebSocket port and password, then personalize the board.",
+  "sizes_title": "Built for every XENEON slot.",
+  "sizes_subtitle": "Eight tuned layouts across S, M, L and XL in both orientations."
+}
