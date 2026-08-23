@@ -14,6 +14,7 @@ async function refreshCalendars(force) {
   if (!force && STATE.status === "loading") return;
   STATE.status = "loading";
   renderStatus();
+  if (typeof calendarParserReady === "function") await calendarParserReady();
 
   var results = await Promise.all(urls.map(function (url, sourceIndex) {
     return loadCalendarText(url, sourceIndex).then(function (loaded) {
