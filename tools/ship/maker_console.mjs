@@ -43,7 +43,11 @@ if (CHECK_KIT) {
 const LOG = join(KIT,'log');
 mkdirSync(LOG,{recursive:true});
 const STATE = join(LOG,'state.json');
-const state = RESUME && existsSync(STATE) ? JSON.parse(readFileSync(STATE,'utf8')) : {done:[],uploaded:[]};
+const state = RESUME && existsSync(STATE) ? JSON.parse(readFileSync(STATE,'utf8')) : {done:[],uploaded:[],detailsSelections:[],detailsProof:[]};
+state.done ||= [];
+state.uploaded ||= [];
+state.detailsSelections ||= [];
+state.detailsProof ||= [];
 const save = () => writeFileSync(STATE, JSON.stringify(state,null,2));
 const done = id => state.done.includes(id);
 const mark = id => { if(!done(id)) state.done.push(id); save(); };
@@ -161,33 +165,105 @@ async function enterExistingEditor(page){
   }
   return false;
 }
-async function ensureSizeSelected(page,size){
-  const chip=page.getByRole('button',{name:new RegExp(`^${size}$`,'i')}).first();
-  if(!await visible(chip)) throw new Error(`dashboard size not offered: ${size}`);
-  const attrs=await chip.evaluate(el=>({
-    pressed:el.getAttribute('aria-pressed'),
-    selected:el.getAttribute('aria-selected'),
-    checked:el.getAttribute('aria-checked'),
-    state:el.getAttribute('data-state'),
-    selectedData:el.getAttribute('data-selected'),
-    cls:el.className||''
-  })).catch(()=>({}));
-  const selected = attrs.pressed==='true' || attrs.selected==='true' || attrs.checked==='true' || attrs.selectedData==='true' || /^(on|checked|active|selected)$/i.test(attrs.state||'') || /\b(selected|active|checked)\b/i.test(String(attrs.cls||''));
-  if(!selected) await chip.click();
+async function namedControl(page,name){
+  const esc=String(name).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re=new RegExp(`^${esc}$`,'i');
+  for(const role of ['checkbox','radio','switch','button']){
+    const control=page.getByRole(role,{name:re}).first();
+    if(await visible(control)) return control;
+  }
+  return null;
+}
+async function selectionSnapshot(control){
+  return await control.evaluate(el=>{
+    const nested=el.matches('input[type="checkbox"],input[type="radio"]')?el:el.querySelector('input[type="checkbox"],input[type="radio"]');
+    return {
+      tag:el.tagName,
+      type:el.getAttribute('type'),
+      checked:nested&&'checked' in nested?Boolean(nested.checked):null,
+      pressed:el.getAttribute('aria-pressed'),
+      selected:el.getAttribute('aria-selected'),
+      ariaChecked:el.getAttribute('aria-checked'),
+      state:el.getAttribute('data-state'),
+      selectedData:el.getAttribute('data-selected'),
+      cls:String(el.className||''),
+      html:el.outerHTML
+    };
+  }).catch(()=>({}));
+}
+function semanticSelection(snapshot){
+  if(snapshot.checked===true)return true;
+  if(snapshot.checked===false)return false;
+  for(const value of [snapshot.pressed,snapshot.selected,snapshot.ariaChecked,snapshot.selectedData]){
+    if(value==='true')return true;
+    if(value==='false')return false;
+  }
+  if(/^(on|checked|selected)$/i.test(snapshot.state||''))return true;
+  if(/^(off|unchecked|unselected)$/i.test(snapshot.state||''))return false;
+  const tokens=String(snapshot.cls||'').split(/\s+/).filter(Boolean).filter(token=>!token.includes(':'));
+  if(tokens.some(token=>/^(selected|checked|is-selected|is-checked)$/i.test(token)))return true;
+  return null;
+}
+async function ensureNamedSelected(page,name,stateKey,label){
+  if(state.detailsSelections.includes(stateKey)){
+    console.log(`${label}: ${name} (already recorded)`);
+    return;
+  }
+  const control=await namedControl(page,name);
+  if(!control)throw new Error(`${label.toLowerCase()} not offered: ${name}`);
+  const before=await selectionSnapshot(control);
+  const beforeState=semanticSelection(before);
+  if(beforeState===true){
+    state.detailsSelections.push(stateKey);
+    state.detailsProof.push({key:stateKey,name,label,before,after:before,method:'already-selected'});
+    save();
+    console.log(`${label}: ${name}`);
+    return;
+  }
+  await control.click();
+  await page.waitForTimeout(450);
+  const after=await selectionSnapshot(control);
+  const afterState=semanticSelection(after);
+  if(afterState===false)throw new Error(`${label.toLowerCase()} did not stay selected: ${name}`);
+  if(afterState===null && JSON.stringify(before)===JSON.stringify(after)){
+    throw new Error(`${label.toLowerCase()} selection produced no detectable state change: ${name}`);
+  }
+  state.detailsSelections.push(stateKey);
+  state.detailsProof.push({key:stateKey,name,label,before,after,method:afterState===true?'semantic':'visual-state-change'});
+  save();
+  console.log(`${label}: ${name}`);
 }
 async function configureDetails(page){
   page=await livePage(context,page);
-  for(const size of prod.marketplace_dashboard_sizes) await ensureSizeSelected(page,size);
+  for(const size of prod.marketplace_dashboard_sizes){
+    await ensureNamedSelected(page,size,`size:${String(size).toLowerCase()}`,'Dashboard size');
+  }
+  if(prod.marketplace_recommended_orientation){
+    await ensureNamedSelected(page,prod.marketplace_recommended_orientation,`orientation:${String(prod.marketplace_recommended_orientation).toLowerCase()}`,'Recommended orientation');
+  }
   const boxes=await listboxes(page);
   const miss=[...await pickByContent(page,boxes,'Category',prod.marketplace_category),...await pickByContent(page,boxes,'Language',prod.marketplace_language)];
   if(miss.length)throw new Error(`Maker Console no longer offers: ${miss.join(', ')}`);
   if(prod.price_usd>0){
-    await page.getByRole('button',{name:/^paid$/i}).first().click();
-    const price=page.locator('input[type="number"],input[inputmode="decimal"]').or(page.locator('input:not([type=checkbox]):not([type=file]):not([readonly]):visible')).first();
+    const paid=page.getByRole('radio',{name:/^paid$/i}).or(page.getByRole('button',{name:/^paid$/i})).first();
+    await paid.waitFor({state:'visible',timeout:10000});
+    const paidBefore=semanticSelection(await selectionSnapshot(paid));
+    if(paidBefore!==true)await paid.click();
+    await page.waitForTimeout(350);
+    const paidAfter=semanticSelection(await selectionSnapshot(paid));
+    if(paidAfter===false)throw new Error('paid pricing did not stay selected');
+    const price=page.getByLabel(/price/i).or(page.locator('input[type="number"],input[inputmode="decimal"]')).or(page.locator('input:not([type=checkbox]):not([type=file]):not([readonly]):visible')).first();
+    await price.waitFor({state:'visible',timeout:10000});
     await price.fill(String(prod.price_usd));
     const back=Number(await price.inputValue());
     if(back!==Number(prod.price_usd))throw new Error(`price mismatch ${back}`);
-  } else await page.getByRole('button',{name:/^free$/i}).first().click();
+    console.log(`Price: $${Number(prod.price_usd).toFixed(2)}`);
+  } else {
+    const free=page.getByRole('radio',{name:/^free$/i}).or(page.getByRole('button',{name:/^free$/i})).first();
+    await free.click();
+  }
+  writeFileSync(join(LOG,'details-selection-proof.json'),JSON.stringify({selections:state.detailsSelections,proof:state.detailsProof},null,2));
+  await snap(page,'details-before-continue');
   await click(page,/^continue$/i);
 }
 async function singleFileInputs(page){ return page.locator('input[type="file"]:not([multiple])'); }
@@ -236,7 +312,7 @@ if(editing){
   await enterExistingEditor(page);
   page=await livePage(context,page);
   if(await editorLooksLikeDetails(page)){
-    await step(page,'4-details','Set category, dashboard sizes, language and price',async()=>{await configureDetails(page);});
+    await step(page,'4-details','Set category, dashboard sizes, orientation, language and price',async()=>{await configureDetails(page);});
   } else if(await editorLooksLikeMedia(page)){
     mark('4-details');
   } else {
@@ -249,7 +325,7 @@ if(editing){
   await step(page,'1-create','Create Widget draft',async()=>{await click(page,/create product|new product|add product/i);const choice=page.getByRole('radio',{name:/^widget$/i}).or(page.getByText(/^widget$/i)).or(page.getByRole('button',{name:/^widget$/i})).first();await choice.click();await click(page,/^(next|continue)$/i);});
   await step(page,'2-file','Upload .icuewidget',async()=>{page=await livePage(context,page);const input=page.locator('input[type="file"]').first();await input.setInputFiles(join(KIT,packages[0]));await click(page,/^(next|continue)$/i,180000);});
   await step(page,'3-copy','Verify name and set description',async()=>{page=await livePage(context,page);const ro=page.locator('input[readonly][maxlength]').first();await ro.waitFor({state:'visible',timeout:10000});const name=(await ro.inputValue()).trim();if(name!==prod.name)throw new Error(`manifest name mismatch: ${name}`);const desc=page.locator('#description').or(page.locator('div[role="textbox"]')).or(page.locator('[contenteditable="true"]')).first();await proseMirror(page,desc,readFileSync(join(KIT,'PASTE_description.txt'),'utf8').trim());await click(page,/^create product$/i);page=await livePage(context,page);});
-  await step(page,'4-details','Set category, dashboard sizes, language and price',async()=>{await configureDetails(page);});
+  await step(page,'4-details','Set category, dashboard sizes, orientation, language and price',async()=>{await configureDetails(page);});
 }
 
 await step(page,'5-media','Upload icon and cover',async()=>{await setIconAndCover(page);});
@@ -272,6 +348,20 @@ await step(page,'8-autopublish','Enable auto publish',async()=>{const cb=page.ge
 page=await livePage(context,page);await snap(page,'final');
 if(!SUBMIT){console.log(`STAGED: ${prod.name}. Nothing submitted. Re-run with --resume --submit after review.`);await context.close();process.exit(0);}
 if(state.uploaded.length!==media.slice(2).length)throw new Error('gallery is incomplete, refusing submit');
-const summary=await page.locator('body').innerText();if(!summary.includes(prod.name)||!summary.includes(prod.version))throw new Error('summary name/version mismatch, refusing submit');
+const summary=await page.locator('body').innerText();
+if(!summary.includes(prod.name)||!summary.includes(prod.version))throw new Error('summary name/version mismatch, refusing submit');
+if(prod.price_usd>0){
+  const expected=Number(prod.price_usd).toFixed(2);
+  if(/\bfree\b/i.test(summary)&&!summary.includes(expected))throw new Error('summary shows Free for a paid product, refusing submit');
+  if(!summary.includes(expected)&&!/\bpaid\b/i.test(summary))throw new Error(`summary does not prove paid pricing at $${expected}, refusing submit`);
+}
+if(/dashboard sizes?/i.test(summary)){
+  for(const size of prod.marketplace_dashboard_sizes){
+    if(!summary.toLowerCase().includes(String(size).toLowerCase()))throw new Error(`summary is missing dashboard size ${size}, refusing submit`);
+  }
+}
+if(prod.marketplace_recommended_orientation&&/recommended orientation/i.test(summary)&&!summary.toLowerCase().includes(String(prod.marketplace_recommended_orientation).toLowerCase())){
+  throw new Error(`summary is missing recommended orientation ${prod.marketplace_recommended_orientation}, refusing submit`);
+}
 const cb=page.getByRole('checkbox',{name:/automatically publish/i}).or(page.getByRole('switch',{name:/automatically publish/i})).first();const ap=await cb.isChecked().catch(async()=>await cb.getAttribute('aria-checked')==='true');if(!ap)throw new Error('auto publish is off, refusing submit');
 const btn=page.getByRole('button',{name:/^submit$/i}).first();await btn.waitFor({state:'visible',timeout:15000});await btn.click();await page.waitForTimeout(8000);await snap(page,'after-submit');console.log(`SUBMITTED: ${prod.name} | ${page.url()}`);await context.close();
