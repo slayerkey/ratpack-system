@@ -140,8 +140,65 @@ async function translateStatic() {
   document.getElementById("detailClose").setAttribute("aria-label", map["Close details"]);
 }
 
+var BOOTED = false;
+var LAST_ICUE_PROPERTIES = null;
+
+function readIcuePropertySnapshot() {
+  return {
+    calendarUrl1: String(getIcueProperty("calendarUrl1", "") || ""),
+    calendarUrl2: String(getIcueProperty("calendarUrl2", "") || ""),
+    calendarUrl3: String(getIcueProperty("calendarUrl3", "") || ""),
+    refreshMinutes: Number(getIcueProperty("refreshMinutes", 15)) || 15,
+    use24Hour: getIcueProperty("use24Hour", false) === true,
+    textColor: String(getIcueProperty("textColor", "#F4F6F8") || "#F4F6F8"),
+    accentColor: String(getIcueProperty("accentColor", "#2BE86A") || "#2BE86A"),
+    backgroundColor: String(getIcueProperty("backgroundColor", "#07090D") || "#07090D")
+  };
+}
+
+function calendarPropertiesChanged(previous, current) {
+  if (!previous) return true;
+  return previous.calendarUrl1 !== current.calendarUrl1 ||
+    previous.calendarUrl2 !== current.calendarUrl2 ||
+    previous.calendarUrl3 !== current.calendarUrl3;
+}
+
+function onIcueInitialized() {
+  if (!BOOTED) boot();
+  else {
+    LAST_ICUE_PROPERTIES = readIcuePropertySnapshot();
+    applySlot();
+    refreshCalendars(true);
+  }
+}
+
+function onIcueDataUpdated() {
+  if (!BOOTED) { boot(); return; }
+  var previous = LAST_ICUE_PROPERTIES;
+  var current = readIcuePropertySnapshot();
+  LAST_ICUE_PROPERTIES = current;
+  applySlot();
+  translateStatic();
+  if (calendarPropertiesChanged(previous, current)) refreshCalendars(true);
+  else {
+    render();
+    if (!previous || previous.refreshMinutes !== current.refreshMinutes) scheduleRefresh();
+  }
+}
+
+function installIcueEvents() {
+  try {
+    globalThis.icueEvents = {
+      onICUEInitialized: onIcueInitialized,
+      onDataUpdated: onIcueDataUpdated
+    };
+  } catch (error) {}
+}
+
 function boot() {
-  try { globalThis.icueEvents = globalThis.icueEvents || function () {}; } catch (error) {}
+  if (BOOTED) return;
+  BOOTED = true;
+  LAST_ICUE_PROPERTIES = readIcuePropertySnapshot();
   var cached = cacheRead();
   if (cached && cached.events.length) {
     STATE.events = cached.events;
@@ -159,5 +216,10 @@ function boot() {
   minuteTick();
 }
 
+installIcueEvents();
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
 else boot();
+
+try {
+  if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) onIcueInitialized();
+} catch (error) {}
