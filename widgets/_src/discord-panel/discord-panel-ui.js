@@ -5,8 +5,10 @@
  * A Discord client secret must never be embedded in this widget.
  */
 
-var DISCORD_CLIENT_ID = "__DISCORD_CLIENT_ID__";
+var DISCORD_CLIENT_ID = "1540927508302536724";
 var DISCORD_SCOPES = ["rpc.voice.read", "rpc.voice.write"];
+var DISCORD_REDIRECT_URI = "http://127.0.0.1";
+var DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
 var DISCORD_PORT_FIRST = 6463;
 var DISCORD_PORT_LAST = 6472;
 var REQUEST_TIMEOUT_MS = 5000;
@@ -118,38 +120,34 @@ async function loadTranslations() {
     "Muted",
     "Deafened",
     "Listening",
+    "Close details",
     "Account",
     "Voice channel members",
-    "Voice controls",
-    "Close details",
-    "spoke now",
-    "spoke recently",
-    "Yes",
-    "No",
-    "Unknown"
+    "Unknown member",
+    "No username available",
+    "Disconnected",
+    "Connected",
+    "Authorization failed",
+    "Try connecting again.",
+    "Discord token exchange blocked",
+    "Public Client PKCE could not complete from this widget.",
+    "Retry",
+    "Voice",
+    "Show Recent Activity",
+    "Recent speaking activity stays in memory only for this widget session.",
+    "Appearance",
+    "Text Color",
+    "Accent Color",
+    "Background Color"
   ];
   var values = await Promise.all(keys.map(function (key) { return t(key); }));
-  keys.forEach(function (key, index) { copy[key] = values[index]; });
-  setText("eyebrow", getCopy("VOICE CHANNEL"));
-  setText("activityTitle", getCopy("RECENT ACTIVITY"));
-  setText("activityEmpty", getCopy("No recent speakers yet"));
-  setText("authorizeButton", getCopy("Connect Discord"));
-  document.getElementById("stage").setAttribute("aria-label", getCopy("Discord Voice Panel"));
-  document.getElementById("roster").setAttribute("aria-label", getCopy("Voice channel members"));
-  document.getElementById("voiceControls").setAttribute("aria-label", getCopy("Voice controls"));
-  document.getElementById("activityPanel").setAttribute("aria-label", getCopy("Recent activity"));
-  document.getElementById("accountChip").setAttribute("aria-label", getCopy("Account"));
-  document.getElementById("detailClose").setAttribute("aria-label", getCopy("Close details"));
+  for (var index = 0; index < keys.length; index += 1) copy[keys[index]] = values[index];
+  document.getElementById("stage").setAttribute("aria-label", copy["Discord Voice Panel"] || "Discord Voice Panel");
+  document.getElementById("roster").setAttribute("aria-label", copy["Voice channel members"] || "Voice channel members");
+  document.getElementById("activityPanel").setAttribute("aria-label", copy["Recent activity"] || "Recent activity");
+  document.getElementById("accountChip").setAttribute("aria-label", copy["Account"] || "Account");
+  document.getElementById("detailClose").setAttribute("aria-label", copy["Close details"] || "Close details");
   render();
-}
-
-function getCopy(key) {
-  return copy[key] || key;
-}
-
-function setText(id, value) {
-  var element = document.getElementById(id);
-  if (element && value !== null && value !== undefined) element.textContent = String(value);
 }
 
 function nearestSlot() {
@@ -159,9 +157,9 @@ function nearestSlot() {
   var score = Infinity;
   for (var index = 0; index < SLOT_SPECS.length; index += 1) {
     var spec = SLOT_SPECS[index];
-    var candidate = Math.abs(Math.log(width / spec.w)) + Math.abs(Math.log(height / spec.h));
-    if (candidate < score) {
-      score = candidate;
+    var next = Math.abs(Math.log(width / spec.w)) + Math.abs(Math.log(height / spec.h));
+    if (next < score) {
+      score = next;
       best = spec;
     }
   }
@@ -172,299 +170,261 @@ function applySlot() {
   document.body.setAttribute("data-slot", nearestSlot());
 }
 
-function setState(next) {
-  model.state = next;
-  document.body.setAttribute("data-state", next);
+function setState(nextState) {
+  model.state = nextState;
+  document.body.setAttribute("data-state", nextState);
   render();
 }
 
-function currentUserId(entry) {
-  return entry && entry.user && entry.user.id ? String(entry.user.id) : "";
-}
-
-function displayName(entry) {
-  if (!entry) return getCopy("Unknown");
-  if (entry.nick) return String(entry.nick);
-  if (entry.user && entry.user.global_name) return String(entry.user.global_name);
-  if (entry.user && entry.user.username) return String(entry.user.username);
-  return getCopy("Unknown");
-}
-
-function fullUsername(entry) {
-  if (!entry || !entry.user) return "";
-  var username = String(entry.user.username || "");
-  var discriminator = String(entry.user.discriminator || "");
-  if (discriminator && discriminator !== "0") return username + "#" + discriminator;
-  return username;
-}
-
-function initials(entry) {
-  var name = displayName(entry).trim();
-  if (!name) return "?";
-  var parts = name.split(/\s+/).filter(Boolean);
+function initials(value) {
+  var parts = String(value || "?").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function avatarUrl(entry) {
-  if (!entry || !entry.user || !entry.user.id || !entry.user.avatar) return "";
-  return "https://cdn.discordapp.com/avatars/" + encodeURIComponent(String(entry.user.id)) + "/" + encodeURIComponent(String(entry.user.avatar)) + ".png?size=96";
+function currentUserId(raw) {
+  if (!raw) return "";
+  if (raw.user && raw.user.id) return String(raw.user.id);
+  if (raw.user_id) return String(raw.user_id);
+  return "";
 }
 
-function stateOf(entry) {
-  var voice = entry && entry.voice_state ? entry.voice_state : {};
+function displayName(raw) {
+  if (!raw) return copy["Unknown member"] || "Unknown member";
+  if (raw.nick) return String(raw.nick);
+  if (raw.user && raw.user.global_name) return String(raw.user.global_name);
+  if (raw.user && raw.user.username) return String(raw.user.username);
+  return copy["Unknown member"] || "Unknown member";
+}
+
+function username(raw) {
+  if (!raw || !raw.user || !raw.user.username) return copy["No username available"] || "No username available";
+  if (raw.user.discriminator && raw.user.discriminator !== "0") return raw.user.username + "#" + raw.user.discriminator;
+  return "@" + raw.user.username;
+}
+
+function stateOf(raw) {
+  var state = raw && raw.voice_state ? raw.voice_state : raw || {};
   return {
-    mute: Boolean(voice.mute || voice.self_mute),
-    deaf: Boolean(voice.deaf || voice.self_deaf),
-    suppress: Boolean(voice.suppress)
+    mute: Boolean(state.mute || state.self_mute),
+    deaf: Boolean(state.deaf || state.self_deaf)
   };
 }
 
-function iconSvg(kind) {
-  if (kind === "mic") return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11v1a7 7 0 0 0 14 0v-1M12 19v3M9 22h6" /></svg>';
-  if (kind === "headphones") return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v2M4 13h3v7H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 1-2zM20 13h-3v7h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-1-2z" /></svg>';
-  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2l2-3 3 7 3-9 3 5h3" /></svg>';
+function normalizeMember(raw, order) {
+  var entry = raw || {};
+  var user = entry.user || (entry.voice_state && entry.voice_state.user) || {};
+  var voice = entry.voice_state || entry;
+  return {
+    user: user,
+    user_id: user.id || entry.user_id || voice.user_id || "",
+    nick: entry.nick || voice.nick || user.global_name || user.username || "",
+    voice_state: voice,
+    speaking: Boolean(entry.speaking),
+    speakerHoldUntil: Number(entry.speakerHoldUntil) || 0,
+    _order: Number(order) || 0
+  };
 }
 
-function createAvatar(entry, className) {
-  var wrapper = document.createElement("div");
-  wrapper.className = className || "avatar-wrap";
-  var url = avatarUrl(entry);
-  if (url) {
-    var image = document.createElement("img");
-    image.className = "avatar";
-    image.alt = "";
-    image.loading = "lazy";
-    image.referrerPolicy = "no-referrer";
-    image.src = url;
-    image.addEventListener("error", function () {
-      var fallback = document.createElement("div");
-      fallback.className = "avatar-fallback";
-      fallback.textContent = initials(entry);
-      image.replaceWith(fallback);
-    }, { once: true });
-    wrapper.appendChild(image);
-  } else {
-    var fallback = document.createElement("div");
-    fallback.className = "avatar-fallback";
-    fallback.textContent = initials(entry);
-    wrapper.appendChild(fallback);
-  }
-  return wrapper;
-}
-
-function priority(entry) {
-  var now = Date.now();
-  if (entry.speaking) return 2;
-  if (entry.speakerHoldUntil && entry.speakerHoldUntil > now) return 2;
+function speakerPriority(raw) {
+  if (raw.speaking) return 2;
+  if (raw.speakerHoldUntil > Date.now()) return 1;
   return 0;
 }
 
 function sortedMembers() {
   return model.members.slice().sort(function (left, right) {
-    var difference = priority(right) - priority(left);
-    if (difference) return difference;
-    return (left._order || 0) - (right._order || 0);
+    var delta = speakerPriority(right) - speakerPriority(left);
+    if (delta) return delta;
+    return left._order - right._order;
   });
 }
 
-function statusText(entry) {
-  var voice = stateOf(entry);
-  if (entry.speaking) return getCopy("Speaking");
-  if (voice.deaf) return getCopy("Deafened");
-  if (voice.mute) return getCopy("Muted");
-  return getCopy("Listening");
+function avatarUrl(raw) {
+  if (!raw || !raw.user || !raw.user.id || !raw.user.avatar) return "";
+  return "https://cdn.discordapp.com/avatars/" + encodeURIComponent(raw.user.id) + "/" + encodeURIComponent(raw.user.avatar) + ".png?size=128";
+}
+
+function avatarNode(raw, className) {
+  var node = document.createElement("div");
+  node.className = className || "avatar";
+  node.textContent = initials(displayName(raw));
+  var src = avatarUrl(raw);
+  if (!src) return node;
+  var image = document.createElement("img");
+  image.alt = "";
+  image.decoding = "async";
+  image.src = src;
+  image.addEventListener("load", function () {
+    node.textContent = "";
+    node.appendChild(image);
+  }, { once: true });
+  return node;
+}
+
+function statusIcon(kind) {
+  var span = document.createElement("span");
+  span.className = "state-icon " + kind;
+  span.setAttribute("aria-hidden", "true");
+  if (kind === "mute") span.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 5l14 14M9.5 9.5V6a2.5 2.5 0 0 1 5 0v6c0 .4-.1.8-.2 1.1M5 11v1a7 7 0 0 0 11.2 5.6M12 19v3M9 22h6" /></svg>';
+  else span.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 13v-2a8 8 0 0 1 13.7-5.6M20 13h-3v7h2a2 2 0 0 0 2-2v-3a2 2 0 0 0-1-2zM4 13h3v7H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 1-2zM3 3l18 18" /></svg>';
+  return span;
+}
+
+function openMemberDetail(userId) {
+  model.detailUserId = String(userId || "");
+  renderMemberDetail();
+}
+
+function closeMemberDetail() {
+  model.detailUserId = null;
+  renderMemberDetail();
+}
+
+function renderMemberDetail() {
+  var sheet = document.getElementById("memberDetail");
+  var member = model.detailUserId ? findMember(model.detailUserId) : null;
+  if (!member) {
+    sheet.classList.remove("open");
+    sheet.setAttribute("aria-hidden", "true");
+    return;
+  }
+  sheet.classList.add("open");
+  sheet.setAttribute("aria-hidden", "false");
+  var avatar = document.getElementById("detailAvatar");
+  avatar.replaceChildren(avatarNode(member, "detail-avatar-inner"));
+  document.getElementById("detailDisplayName").textContent = displayName(member);
+  document.getElementById("detailUsername").textContent = username(member);
+  var states = [];
+  var voice = stateOf(member);
+  if (member.speaking) states.push(copy["Speaking"] || "Speaking");
+  if (voice.mute) states.push(copy["Muted"] || "Muted");
+  if (voice.deaf) states.push(copy["Deafened"] || "Deafened");
+  if (!states.length) states.push(copy["Listening"] || "Listening");
+  document.getElementById("detailStates").textContent = states.join("  •  ");
 }
 
 function renderRoster() {
   var roster = document.getElementById("roster");
   roster.replaceChildren();
-  var members = sortedMembers();
-  members.forEach(function (entry) {
+  sortedMembers().forEach(function (member) {
     var row = document.createElement("button");
+    row.className = "member-row interactive" + (member.speaking ? " speaking" : "");
     row.type = "button";
-    row.className = "member-row interactive" + (entry.speaking ? " speaking" : "");
     row.setAttribute("role", "listitem");
-    row.dataset.userId = currentUserId(entry);
-    row.appendChild(createAvatar(entry, "avatar-wrap"));
+    row.addEventListener("click", function () { openMemberDetail(currentUserId(member)); });
 
-    var memberCopy = document.createElement("div");
-    memberCopy.className = "member-copy";
-    var name = document.createElement("div");
+    var avatarWrap = document.createElement("div");
+    avatarWrap.className = "avatar-wrap";
+    avatarWrap.appendChild(avatarNode(member, "avatar"));
+    var ring = document.createElement("span");
+    ring.className = "speaker-ring";
+    ring.setAttribute("aria-hidden", "true");
+    avatarWrap.appendChild(ring);
+
+    var name = document.createElement("span");
     name.className = "member-name";
-    name.textContent = displayName(entry);
-    var meta = document.createElement("div");
-    meta.className = "member-meta";
-    meta.textContent = statusText(entry);
-    memberCopy.append(name, meta);
-    row.appendChild(memberCopy);
+    name.textContent = displayName(member);
 
-    var stateIcons = document.createElement("div");
-    stateIcons.className = "state-icons";
-    var voice = stateOf(entry);
-    if (entry.speaking) {
-      var speaker = document.createElement("span");
-      speaker.className = "state-chip speaker";
-      speaker.title = getCopy("Speaking");
-      speaker.innerHTML = iconSvg("speaker");
-      stateIcons.appendChild(speaker);
-    }
-    if (voice.mute) {
-      var mute = document.createElement("span");
-      mute.className = "state-chip active";
-      mute.title = getCopy("Muted");
-      mute.innerHTML = iconSvg("mic");
-      stateIcons.appendChild(mute);
-    }
-    if (voice.deaf) {
-      var deaf = document.createElement("span");
-      deaf.className = "state-chip active";
-      deaf.title = getCopy("Deafened");
-      deaf.innerHTML = iconSvg("headphones");
-      stateIcons.appendChild(deaf);
-    }
-    row.appendChild(stateIcons);
-    row.addEventListener("click", function () { openMemberDetail(entry); });
+    var states = document.createElement("span");
+    states.className = "member-states";
+    var voice = stateOf(member);
+    if (voice.mute) states.appendChild(statusIcon("mute"));
+    if (voice.deaf) states.appendChild(statusIcon("deaf"));
+
+    row.appendChild(avatarWrap);
+    row.appendChild(name);
+    row.appendChild(states);
     roster.appendChild(row);
   });
 }
 
-function relativeActivity(timestamp) {
-  var age = Math.max(0, Date.now() - timestamp);
-  if (age < 4500) return getCopy("spoke now");
-  return getCopy("spoke recently");
-}
-
 function renderActivity() {
-  var cfg = readSettings();
-  document.body.classList.toggle("recent-off", !cfg.showRecent);
-  var panel = document.getElementById("activityPanel");
   var list = document.getElementById("activityList");
+  if (!list) return;
   list.replaceChildren();
-  var entries = cfg.showRecent ? model.activity.slice(0, 8) : [];
-  panel.classList.toggle("is-empty", entries.length === 0);
-  setText("activityCount", String(entries.length));
-  entries.forEach(function (entry) {
-    var item = document.createElement("li");
-    item.className = "activity-item";
-    var dot = document.createElement("span");
-    dot.className = "activity-dot";
+  var cfg = readSettings();
+  var items = cfg.showRecent ? model.activity.slice(0, 6) : [];
+  items.forEach(function (entry) {
+    var li = document.createElement("li");
+    li.className = "activity-item";
     var name = document.createElement("span");
     name.className = "activity-name";
     name.textContent = entry.name;
-    var time = document.createElement("span");
-    time.className = "activity-time";
-    time.textContent = relativeActivity(entry.at);
-    item.append(dot, name, time);
-    list.appendChild(item);
+    var age = document.createElement("span");
+    age.className = "activity-age";
+    var seconds = Math.max(0, Math.round((Date.now() - entry.at) / 1000));
+    age.textContent = seconds < 2 ? "now" : seconds + "s";
+    li.appendChild(name);
+    li.appendChild(age);
+    list.appendChild(li);
   });
+  document.getElementById("activityCount").textContent = String(items.length);
+  document.getElementById("activityEmpty").style.display = items.length ? "none" : "block";
 }
 
 function renderControls() {
-  var canControl = model.state === "voice";
   var mute = document.getElementById("muteButton");
   var deafen = document.getElementById("deafenButton");
-  mute.disabled = !canControl;
-  deafen.disabled = !canControl;
-  mute.classList.toggle("is-active", Boolean(model.voice.mute));
-  deafen.classList.toggle("is-active", Boolean(model.voice.deaf));
-  setText("muteLabel", model.voice.mute ? getCopy("Unmute") : getCopy("Mute"));
-  setText("deafenLabel", model.voice.deaf ? getCopy("Undeafen") : getCopy("Deafen"));
-  mute.setAttribute("aria-label", model.voice.mute ? getCopy("Unmute microphone") : getCopy("Mute microphone"));
-  deafen.setAttribute("aria-label", model.voice.deaf ? getCopy("Undeafen audio") : getCopy("Deafen audio"));
+  var enabled = model.state === "voice";
+  mute.disabled = !enabled;
+  deafen.disabled = !enabled;
+  mute.classList.toggle("active", model.voice.mute);
+  deafen.classList.toggle("active", model.voice.deaf);
+  document.getElementById("muteLabel").textContent = model.voice.mute ? (copy["Unmute"] || "Unmute") : (copy["Mute"] || "Mute");
+  document.getElementById("deafenLabel").textContent = model.voice.deaf ? (copy["Undeafen"] || "Undeafen") : (copy["Deafen"] || "Deafen");
+  mute.setAttribute("aria-label", model.voice.mute ? (copy["Unmute microphone"] || "Unmute microphone") : (copy["Mute microphone"] || "Mute microphone"));
+  deafen.setAttribute("aria-label", model.voice.deaf ? (copy["Undeafen audio"] || "Undeafen audio") : (copy["Deafen audio"] || "Deafen audio"));
+}
+
+function stateCopy() {
+  if (model.state === "setup") return [copy["Discord setup required"] || "Discord setup required", copy["Add the PackRat Discord application Client ID before release."] || "Add the PackRat Discord application Client ID before release.", true];
+  if (model.state === "disconnected") return [copy["Discord desktop not connected"] || "Discord desktop not connected", copy["Start Discord desktop and the panel will reconnect."] || "Start Discord desktop and the panel will reconnect.", false];
+  if (model.state === "authorization") return [copy["Discord authorization required"] || "Discord authorization required", copy["Authorize voice read and voice write to continue."] || "Authorize voice read and voice write to continue.", true];
+  if (model.state === "auth-failed") return [copy["Authorization failed"] || "Authorization failed", copy["Try connecting again."] || "Try connecting again.", true];
+  if (model.state === "exchange-required") return [copy["Discord token exchange blocked"] || "Discord token exchange blocked", copy["Public Client PKCE could not complete from this widget."] || "Public Client PKCE could not complete from this widget.", true];
+  return [copy["Not in a voice channel"] || "Not in a voice channel", copy["Join a voice channel in Discord"] || "Join a voice channel in Discord", false];
 }
 
 function renderHeader() {
-  var channel = model.channel;
-  var count = channel && model.members ? model.members.length : 0;
-  var label = count === 1 ? getCopy("member") : getCopy("members");
-  setText("memberCount", count + " " + label);
-  setText("accountName", model.account && model.account.username ? String(model.account.username) : "Discord");
-  if (model.state === "voice" && channel) setText("channelName", channel.name || getCopy("VOICE CHANNEL"));
-  else if (model.state === "idle") setText("channelName", getCopy("Not in a voice channel"));
-  else if (model.state === "disconnected") setText("channelName", getCopy("Discord desktop not connected"));
-  else if (model.state === "authorization") setText("channelName", getCopy("Discord authorization required"));
-  else if (model.state === "exchange-required") setText("channelName", getCopy("Authorization approved"));
-  else setText("channelName", getCopy("Discord setup required"));
+  var channelName = document.getElementById("channelName");
+  var count = document.getElementById("memberCount");
+  var account = document.getElementById("accountName");
+  document.getElementById("eyebrow").textContent = copy["VOICE CHANNEL"] || "VOICE CHANNEL";
+  account.textContent = model.account ? (model.account.global_name || model.account.username || "Discord") : "Discord";
+  document.getElementById("accountDot").classList.toggle("connected", Boolean(rpcSocket || fixtureMode));
+  if (model.state === "voice" && model.channel) {
+    channelName.textContent = model.channel.name || "Voice";
+    var length = model.members.length;
+    count.textContent = length + " " + (length === 1 ? (copy["member"] || "member") : (copy["members"] || "members"));
+  } else {
+    var text = stateCopy();
+    channelName.textContent = text[0];
+    count.textContent = "";
+  }
 }
 
 function renderEmpty() {
-  var title = getCopy("Connecting to Discord");
-  var hint = getCopy("The panel will update automatically.");
-  if (model.state === "setup") {
-    title = getCopy("Discord setup required");
-    hint = getCopy("Add the PackRat Discord application Client ID before release.");
-  } else if (model.state === "disconnected") {
-    title = getCopy("Discord desktop not connected");
-    hint = getCopy("Start Discord desktop and the panel will reconnect.");
-  } else if (model.state === "authorization") {
-    title = getCopy("Discord authorization required");
-    hint = getCopy("Authorize voice read and voice write to continue.");
-  } else if (model.state === "exchange-required") {
-    title = getCopy("Authorization approved");
-    hint = getCopy("Secure token exchange is still required before release.");
-  } else if (model.state === "idle") {
-    title = getCopy("Not in a voice channel");
-    hint = getCopy("Join a voice channel in Discord") + ". " + getCopy("Panel updates automatically when you join.");
-  }
-  setText("emptyTitle", title);
-  setText("emptyHint", hint);
+  var empty = document.getElementById("emptyState");
+  var rosterVisible = model.state === "voice" && model.members.length > 0;
+  empty.style.display = rosterVisible ? "none" : "grid";
+  document.getElementById("roster").style.display = rosterVisible ? "grid" : "none";
+  if (rosterVisible) return;
+  var text = stateCopy();
+  document.getElementById("emptyTitle").textContent = text[0];
+  document.getElementById("emptyHint").textContent = text[1];
+  var button = document.getElementById("authorizeButton");
+  button.style.display = text[2] ? "inline-grid" : "none";
+  button.textContent = model.state === "exchange-required" ? (copy["Retry"] || "Retry") : (copy["Connect Discord"] || "Connect Discord");
 }
 
 function render() {
-  document.body.setAttribute("data-state", model.state);
   renderHeader();
-  renderRoster();
-  renderActivity();
-  renderControls();
   renderEmpty();
-}
-
-function openMemberDetail(entry) {
-  model.detailUserId = currentUserId(entry);
-  var sheet = document.getElementById("memberDetail");
-  var avatar = document.getElementById("detailAvatar");
-  avatar.replaceChildren();
-  var avatarContent = createAvatar(entry, "detail-avatar-inner");
-  while (avatarContent.firstChild) avatar.appendChild(avatarContent.firstChild);
-  setText("detailDisplayName", displayName(entry));
-  setText("detailUsername", fullUsername(entry));
-  var states = document.getElementById("detailStates");
-  states.replaceChildren();
-  var voice = stateOf(entry);
-  var values = [
-    { label: getCopy("Speaking"), active: Boolean(entry.speaking), alert: false },
-    { label: getCopy("Muted"), active: voice.mute, alert: voice.mute },
-    { label: getCopy("Deafened"), active: voice.deaf, alert: voice.deaf }
-  ];
-  values.forEach(function (value) {
-    var chip = document.createElement("span");
-    chip.className = "detail-state" + (value.active ? " active" : "") + (value.alert ? " alert" : "");
-    chip.textContent = value.label + ": " + (value.active ? getCopy("Yes") : getCopy("No"));
-    states.appendChild(chip);
-  });
-  sheet.classList.add("open");
-  sheet.setAttribute("aria-hidden", "false");
-}
-
-function closeMemberDetail() {
-  model.detailUserId = null;
-  var sheet = document.getElementById("memberDetail");
-  sheet.classList.remove("open");
-  sheet.setAttribute("aria-hidden", "true");
-}
-
-function normalizeMember(raw, order) {
-  var prior = findMember(currentUserId(raw));
-  return {
-    user: raw && raw.user ? raw.user : {},
-    nick: raw && raw.nick ? raw.nick : "",
-    voice_state: raw && raw.voice_state ? raw.voice_state : {},
-    volume: raw && raw.volume,
-    mute: raw && raw.mute,
-    pan: raw && raw.pan,
-    speaking: prior ? Boolean(prior.speaking) : false,
-    speakerHoldUntil: prior ? Number(prior.speakerHoldUntil || 0) : 0,
-    _order: prior ? prior._order : order
-  };
+  if (model.state === "voice") renderRoster();
+  else document.getElementById("roster").replaceChildren();
+  renderControls();
+  renderActivity();
+  renderMemberDetail();
 }
