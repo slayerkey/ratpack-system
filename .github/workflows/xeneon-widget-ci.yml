@@ -19,11 +19,52 @@ permissions:
   contents: read
 
 jobs:
+  resolve:
+    name: Resolve widget slug
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.slug.outputs.slug }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve one product
+        id: slug
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            slug="${{ inputs.slug }}"
+          else
+            mapfile -t slugs < <(
+              git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" |
+              awk -F/ '
+                /^widgets\/_src\/[^/]+\// { print $3 }
+                /^widgets\/[^_][^/]*\// { print $2 }
+              ' |
+              sort -u
+            )
+            if [[ ${#slugs[@]} -ne 1 ]]; then
+              echo "Expected exactly one changed widget slug, found ${#slugs[@]}: ${slugs[*]}" >&2
+              echo "Use workflow_dispatch with an explicit slug for shared or multi-product work." >&2
+              exit 1
+            fi
+            slug="${slugs[0]}"
+          fi
+          if [[ ! -d "widgets/_src/$slug" || ! -d "widgets/$slug" ]]; then
+            echo "Widget source or shipping directory is missing for $slug" >&2
+            exit 1
+          fi
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+          echo "Resolved XENEON widget: $slug"
+
   validate-package:
     name: Official CLI validate and package
+    needs: resolve
     runs-on: windows-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve.outputs.slug }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,10 +125,10 @@ jobs:
 
   streamspell:
     name: StreamSpell packaged preview
-    needs: validate-package
+    needs: [resolve, validate-package]
     runs-on: ubuntu-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve.outputs.slug }}
       STREAMSPELL_URL: http://127.0.0.1:8090/
     steps:
       - name: Checkout
