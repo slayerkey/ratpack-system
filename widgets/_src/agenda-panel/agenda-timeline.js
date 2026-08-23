@@ -116,6 +116,13 @@ function createEventButton(event, segment, topPct, rowHeightPct, laneCount, now)
 }
 
 function renderTimeline(now, days) {
+  var allDay = [];
+  days.forEach(function (day) {
+    STATE.events.filter(function (event) { return allDayActiveOn(event, day); }).forEach(function (event) {
+      if (!allDay.some(function (item) { return item.id === event.id; })) allDay.push(event);
+    });
+  });
+  renderAllDay(allDay);
   buildAxis(days);
   var rows = document.getElementById("eventRows");
   rows.innerHTML = "";
@@ -144,7 +151,9 @@ function renderTimeline(now, days) {
     });
     totalVisible += segments.length;
     var laneCount = layoutLanes(segments);
-    var maxLanes = STATE.mode === "four" ? 2 : 4;
+    var rowPixels = document.getElementById("timelineViewport").clientHeight * rowHeight / 100;
+    var laneCapacity = Math.max(1, Math.floor(Math.max(0, rowPixels - 18) / 49));
+    var maxLanes = Math.min(STATE.mode === "four" ? 2 : 4, laneCapacity);
     var hidden = 0;
     segments.forEach(function (segment) {
       if (segment.lane >= maxLanes) { hidden++; return; }
@@ -170,14 +179,6 @@ function renderTimeline(now, days) {
     marker.style.height = rowHeight + "%";
   } else marker.style.display = "none";
 
-  var allDay = [];
-  days.forEach(function (day) {
-    STATE.events.filter(function (event) { return allDayActiveOn(event, day); }).forEach(function (event) {
-      if (!allDay.some(function (item) { return item.id === event.id; })) allDay.push(event);
-    });
-  });
-  renderAllDay(allDay);
-
   var empty = document.getElementById("emptyState");
   empty.style.display = totalVisible === 0 && allDay.length === 0 && STATE.status !== "unconfigured" && STATE.status !== "bridge" && STATE.status !== "error" ? "flex" : "none";
 }
@@ -198,6 +199,7 @@ function renderAllDay(events) {
     more.type = "button";
     more.className = "allDayChip interactive";
     more.textContent = "+" + (events.length - 5);
+    more.onclick = function () { openAllDaySummary(events); };
     wrap.appendChild(more);
   }
 }
