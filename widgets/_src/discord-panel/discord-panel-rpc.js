@@ -74,7 +74,7 @@ function clearPending(reason) {
   });
 }
 
-function rpcRequest(cmd, args, evt) {
+function rpcRequest(cmd, args, evt, timeoutMs) {
   return new Promise(function (resolve, reject) {
     if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) {
       reject(new Error("Discord RPC socket is not open"));
@@ -87,7 +87,7 @@ function rpcRequest(cmd, args, evt) {
       if (!rpcPending[nonce]) return;
       delete rpcPending[nonce];
       reject(new Error(cmd + " timed out"));
-    }, REQUEST_TIMEOUT_MS);
+    }, Math.max(1000, Number(timeoutMs) || REQUEST_TIMEOUT_MS));
     rpcPending[nonce] = { resolve: resolve, reject: reject, timer: timer, cmd: cmd };
     try {
       rpcSocket.send(JSON.stringify(payload));
@@ -321,17 +321,24 @@ async function exchangeAuthorizationCode(code, verifier) {
   body.set("redirect_uri", DISCORD_REDIRECT_URI);
   body.set("code_verifier", verifier);
 
-  var response = await fetch(DISCORD_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    cache: "no-store",
-    credentials: "omit"
-  });
-  if (!response.ok) throw new Error("Discord token exchange returned HTTP " + response.status);
-  var data = await response.json();
-  if (!data || !data.access_token) throw new Error("Discord token exchange returned no access token");
-  return data;
+  var controller = typeof AbortController === "function" ? new AbortController() : null;
+  var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : null;
+  try {
+    var response = await fetch(DISCORD_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      cache: "no-store",
+      credentials: "omit",
+      signal: controller ? controller.signal : undefined
+    });
+    if (!response.ok) throw new Error("Discord token exchange returned HTTP " + response.status);
+    var data = await response.json();
+    if (!data || !data.access_token) throw new Error("Discord token exchange returned no access token");
+    return data;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function beginAuthorization() {
@@ -348,7 +355,7 @@ async function beginAuthorization() {
       scopes: DISCORD_SCOPES,
       code_challenge: pkce.challenge,
       code_challenge_method: "S256"
-    });
+    }, null, 120000);
     if (!data || !data.code) throw new Error("Discord authorization returned no code");
     model.authorizationCodeReceived = true;
     var tokenData;
