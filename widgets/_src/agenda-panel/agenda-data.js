@@ -18,20 +18,23 @@ async function refreshCalendars(force) {
 
   var results = await Promise.all(urls.map(function (url, sourceIndex) {
     return loadCalendarText(url, sourceIndex).then(function (loaded) {
-      if (!loaded) return { ok: false, events: [] };
+      if (!loaded) return { ok: false, transport: true, events: [] };
       try {
-        return { ok: true, events: parseCalendar(loaded.text, sourceIndex) };
+        return { ok: true, transport: false, events: parseCalendar(loaded.text, sourceIndex) };
       } catch (error) {
-        return { ok: false, events: [] };
+        return { ok: false, transport: false, events: [] };
       }
     });
   }));
 
   var merged = [];
   var failed = 0;
+  var transportFailures = 0;
   results.forEach(function (result) {
-    if (!result.ok) failed++;
-    else merged = merged.concat(result.events);
+    if (!result.ok) {
+      failed++;
+      if (result.transport) transportFailures++;
+    } else merged = merged.concat(result.events);
   });
 
   if (merged.length || failed < urls.length) {
@@ -60,8 +63,8 @@ async function refreshCalendars(force) {
       STATE.stale = true;
       STATE.sourceCount = urls.length;
       STATE.failedCount = failed;
-      STATE.status = "bridge";
-      STATE.message = "Calendar feed unavailable.";
+      STATE.status = transportFailures === urls.length ? "bridge" : "error";
+      STATE.message = transportFailures === urls.length ? "Calendar companion unavailable." : "Calendar feed unavailable.";
     }
   }
   render();
