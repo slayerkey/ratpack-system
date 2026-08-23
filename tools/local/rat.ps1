@@ -8,6 +8,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$ShipToolRoot = Join-Path $RepoRoot "tools\ship"
+$MakerProfile = Join-Path $env:LOCALAPPDATA "PackRat\maker-console-profile"
 
 function Require-Command {
     param([string]$Name, [string]$Hint)
@@ -135,18 +137,20 @@ function Show-Help {
     Write-Host "RatPack cheat sheet" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "NORMAL" -ForegroundColor Green
-    Write-Host "  rat ship <slug>    Build, validate, package, create Rat Art, download the fresh ship kit, then open it in Explorer."
+    Write-Host "  rat ship <slug>    Build, validate, package, create Rat Art, download the fresh kit, fill Maker Console, and submit."
     Write-Host "  rat status         Show the local repo branch, commit, and whether local files changed."
     Write-Host "  rat help           Show this cheat sheet."
     Write-Host ""
     Write-Host "OPTIONAL" -ForegroundColor DarkGray
+    Write-Host "  rat kit <slug>     Build and download the fresh ship kit without opening Maker Console."
+    Write-Host "  rat stage <slug>   Build and fill Maker Console, but stop before final Submit."
+    Write-Host "  rat submit <slug>  Alias for rat ship."
     Write-Host "  rat update         Pull the latest changes for the current branch."
     Write-Host "  rat main           Switch to main and pull the latest canonical RatPack."
-    Write-Host "  rat stage <slug>   Get a fresh ship kit and use the optional Maker Console Playwright bridge without final submit."
-    Write-Host "  rat submit <slug>  Get a fresh ship kit and use the optional authenticated Maker Console submit bridge."
     Write-Host "  rat open           Open the RatPack repo in Explorer."
     Write-Host "  rat doctor         Check Git, Node, npm, GitHub CLI, GitHub login, and repo state."
     Write-Host ""
+    Write-Host "Maker Console login persists at: $MakerProfile"
     Write-Host "Full reference: $RepoRoot\RAT-COMMANDS.md"
 }
 
@@ -206,37 +210,113 @@ function Download-ShipKit {
     return $dest
 }
 
-function Run-Ship {
+function Ensure-MakerConsoleRuntime {
+    Require-Command "node" "Install Node.js first."
+    Require-Command "npm" "Install Node.js first."
+
+    $playwrightModule = Join-Path $ShipToolRoot "node_modules\playwright"
+    Push-Location $ShipToolRoot
+    try {
+        if (-not (Test-Path $playwrightModule)) {
+            Write-Host "Installing the Rat Ship browser runtime once..." -ForegroundColor Cyan
+            & npm install --no-fund --no-audit | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not install the Rat Ship browser runtime."
+            }
+        }
+
+        & node -e "import('playwright').then(({chromium})=>process.exit(require('fs').existsSync(chromium.executablePath())?0:2)).catch(()=>process.exit(3))" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Installing Chromium for the Rat Ship browser runtime once..." -ForegroundColor Cyan
+            & npx playwright install chromium | Out-Host
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not install Chromium for Rat Ship."
+            }
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-MakerConsoleBridge {
+    param(
+        [string]$WidgetSlug,
+        [string]$Kit,
+        [switch]$Submit,
+        [switch]$Resume
+    )
+
+    Ensure-MakerConsoleRuntime
+    $driver = Join-Path $ShipToolRoot "maker_console.mjs"
+    if (-not (Test-Path $driver)) {
+        throw "Maker Console driver not found: $driver"
+    }
+
+    $nodeArgs = @($driver, $WidgetSlug, "--kit=$Kit", "--profile=$MakerProfile")
+    if ($Resume) { $nodeArgs += "--resume" }
+    if ($Submit) { $nodeArgs += "--submit" }
+
+    Push-Location $RepoRoot
+    try {
+        & node @nodeArgs | Out-Host
+        return $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Run-MakerConsole {
+    param(
+        [string]$WidgetSlug,
+        [string]$Kit,
+        [switch]$Submit
+    )
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $resume = $attempt -gt 1
+        if ($attempt -eq 1) {
+            Write-Host "Launching Maker Console for '$WidgetSlug'..." -ForegroundColor Cyan
+            Write-Host "Your local Maker Console login is reused automatically. If Elgato asks you to sign in, complete it once in the opened browser and Rat Ship will continue." -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "Maker Console attempt $($attempt - 1) stopped unexpectedly. Restarting the browser and resuming the same draft..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 2
+        }
+
+        $code = Invoke-MakerConsoleBridge -WidgetSlug $WidgetSlug -Kit $Kit -Submit:$Submit -Resume:$resume
+        if ($code -eq 0) {
+            if ($Submit) {
+                Write-Host "Rat Ship submitted '$WidgetSlug' to Maker Console." -ForegroundColor Green
+            }
+            else {
+                Write-Host "Rat Ship staged '$WidgetSlug' in Maker Console without submitting." -ForegroundColor Green
+            }
+            return
+        }
+    }
+
+    $logDir = Join-Path $Kit "log"
+    throw "Maker Console failed after three attempts. The ship kit is still safe at $Kit. Recovery screenshots and state, when available, are in $logDir"
+}
+
+function Run-Kit {
     param([string]$WidgetSlug)
     $dest = Download-ShipKit $WidgetSlug
     Start-Process explorer.exe $dest
 }
 
+function Run-Ship {
+    param([string]$WidgetSlug)
+    $dest = Download-ShipKit $WidgetSlug
+    Run-MakerConsole -WidgetSlug $WidgetSlug -Kit $dest -Submit
+}
+
 function Run-Stage {
     param([string]$WidgetSlug)
     $dest = Download-ShipKit $WidgetSlug
-    $script = Join-Path $dest "STAGE_ONLY.ps1"
-    if (-not (Test-Path $script)) {
-        throw "This ship kit does not contain the optional Maker Console staging bridge. Use rat ship and upload manually instead."
-    }
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $script
-    if ($LASTEXITCODE -ne 0) {
-        throw "Maker Console staging exited with code $LASTEXITCODE"
-    }
-}
-
-function Run-Submit {
-    param([string]$WidgetSlug)
-    $dest = Download-ShipKit $WidgetSlug
-    $script = Join-Path $dest "SUBMIT_NOW.ps1"
-    if (-not (Test-Path $script)) {
-        throw "This ship kit does not contain the optional Maker Console submit bridge. Use rat ship and upload manually instead."
-    }
-    Write-Host "Launching the optional Maker Console submission bridge for $WidgetSlug..." -ForegroundColor Cyan
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $script
-    if ($LASTEXITCODE -ne 0) {
-        throw "Maker Console submission exited with code $LASTEXITCODE"
-    }
+    Run-MakerConsole -WidgetSlug $WidgetSlug -Kit $dest
 }
 
 function Run-Doctor {
@@ -260,6 +340,13 @@ function Run-Doctor {
     else {
         Write-Host "Git checkout not found." -ForegroundColor Red
     }
+    Write-Host "Maker Console profile: $MakerProfile"
+    if (Test-Path $MakerProfile) {
+        Write-Host "Maker Console profile exists." -ForegroundColor Green
+    }
+    else {
+        Write-Host "Maker Console profile has not been created yet. The first rat ship run will create it." -ForegroundColor Yellow
+    }
 }
 
 switch ($Action.ToLowerInvariant()) {
@@ -269,8 +356,9 @@ switch ($Action.ToLowerInvariant()) {
     "update" { Sync-CurrentBranch }
     "main" { Sync-Main }
     "ship" { Run-Ship $Slug }
+    "submit" { Run-Ship $Slug }
+    "kit" { Run-Kit $Slug }
     "stage" { Run-Stage $Slug }
-    "submit" { Run-Submit $Slug }
     "open" { Start-Process explorer.exe $RepoRoot }
     "doctor" { Run-Doctor }
     default {
