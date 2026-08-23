@@ -37,7 +37,7 @@ function Invoke-GhCommand {
     param([string[]]$GhArgs)
     Push-Location $RepoRoot
     try {
-        & gh @GhArgs
+        & gh @GhArgs | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "gh $($GhArgs -join ' ') failed with exit code $LASTEXITCODE"
         }
