@@ -22,10 +22,51 @@ permissions:
   contents: read
 
 jobs:
+  resolve:
+    name: Resolve widget slug
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.slug.outputs.slug }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve one product
+        id: slug
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            slug="${{ inputs.slug }}"
+          else
+            mapfile -t slugs < <(
+              git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" |
+              awk -F/ '
+                /^widgets\/_src\/[^/]+\// { print $3 }
+                /^widgets\/[^_][^/]*\// { print $2 }
+              ' |
+              sort -u
+            )
+            if [[ ${#slugs[@]} -ne 1 ]]; then
+              echo "Expected exactly one changed widget slug, found ${#slugs[@]}: ${slugs[*]}" >&2
+              echo "Use workflow_dispatch with an explicit slug for shared or multi-product work." >&2
+              exit 1
+            fi
+            slug="${slugs[0]}"
+          fi
+          if [[ ! -d "widgets/_src/$slug" || ! -d "widgets/$slug" ]]; then
+            echo "Widget source or shipping directory is missing for $slug" >&2
+            exit 1
+          fi
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+          echo "Resolved XENEON widget: $slug"
+
   ship-kit:
+    needs: resolve
     runs-on: windows-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve.outputs.slug }}
       RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
       RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
     steps:
@@ -92,10 +133,16 @@ jobs:
         shell: pwsh
         run: |
           $kit = "artifacts/ship/$env:WIDGET_SLUG/SHIP_KIT"
-          $sub = Get-Content "$kit/submission.json" -Raw | ConvertFrom-Json
-          if ($sub.type -ne 'widget') { throw 'submission type must be widget' }
-          if ($sub.price_usd -ne 9.99) { throw 'unexpected price' }
-          if ($sub.name -ne 'Now Playing Panel') { throw 'unexpected name' }
+          $kitSub = Get-Content "$kit/submission.json" -Raw | ConvertFrom-Json
+          $sourceSub = Get-Content "widgets/_src/$env:WIDGET_SLUG/submission.json" -Raw | ConvertFrom-Json
+          $manifest = Get-Content "widgets/$env:WIDGET_SLUG/manifest.json" -Raw | ConvertFrom-Json
+          if ($sourceSub.type -ne 'widget' -or $kitSub.type -ne 'widget') { throw 'submission type must be widget' }
+          foreach ($field in @('slug','name','version','price_usd')) {
+            if ($kitSub.$field -ne $sourceSub.$field) { throw "ship kit metadata mismatch: $field" }
+          }
+          if ($manifest.name -ne $sourceSub.name) { throw 'manifest and submission name mismatch' }
+          if ($manifest.version -ne $sourceSub.version) { throw 'manifest and submission version mismatch' }
+          if ($manifest.author -ne 'PackRat 🐀') { throw 'unexpected XENEON author string' }
           if (-not (Test-Path "$kit/$env:WIDGET_SLUG.icuewidget")) { throw 'missing official widget package' }
           foreach ($f in @('01_search_icon.png','02_cover.png','03_gallery_01.png','04_gallery_02.png','05_gallery_03.png','06_gallery_04.png')) {
             if (-not (Test-Path "$kit/$f")) { throw "missing $f" }
