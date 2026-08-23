@@ -151,10 +151,10 @@ jobs:
           mkdir -p /tmp/ratpack-playwright-audit
           cd /tmp/ratpack-playwright-audit
           npm init -y >/dev/null 2>&1
-          npm install --save-dev playwright@1.62.1 ws@8.18.3
+          npm install --save-dev playwright@1.62.1 ws@8.21.3
           npm audit --audit-level=high
           cd "$GITHUB_WORKSPACE"
-          npm install --no-save playwright@1.62.1 ws@8.18.3
+          npm install --no-save playwright@1.62.1 ws@8.21.3
           npx playwright install --with-deps chromium
 
       - name: Run optional packaged network smoke
