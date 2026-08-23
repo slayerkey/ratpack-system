@@ -33,11 +33,25 @@ const expectedPresets = [
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1800, height: 1250 } });
 const consoleErrors = [];
+const previewLimitations = [];
 
 page.on("console", (msg) => {
   if (msg.type() !== "error") return;
   const text = msg.text();
   if (/CORS|Failed to load resource|net::ERR|Access to fetch/i.test(text)) return;
+
+  // StreamSpell intentionally renders packaged widgets inside a preview CSP with
+  // connect-src 'none'. A widget that talks only to a local desktop service can
+  // therefore validate and render correctly while its preview-only connection is
+  // blocked. Record that limitation explicitly, but ignore only loopback WebSocket
+  // CSP errors. Every other console error remains a release failure.
+  const loopbackWebSocket = /ws:\/\/(?:127\.0\.0\.1|localhost):\d+/i.test(text);
+  const blockedByPreviewCsp = /Content Security Policy/i.test(text) && /connect-src ['"]?none['"]?/i.test(text);
+  if (loopbackWebSocket && blockedByPreviewCsp) {
+    previewLimitations.push(text.slice(0, 240));
+    return;
+  }
+
   consoleErrors.push(text.slice(0, 240));
 });
 
@@ -48,6 +62,7 @@ const result = {
   validation: null,
   presets: [],
   consoleErrors,
+  previewLimitations,
 };
 
 try {
