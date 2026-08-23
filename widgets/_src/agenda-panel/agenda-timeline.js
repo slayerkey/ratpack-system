@@ -60,25 +60,76 @@ function timelinePercent(date, day) {
   return Math.max(0, Math.min(100, ((date.getTime() - start) / (end - start)) * 100));
 }
 
+function dayDurationMs(day) {
+  return nextDayStart(day).getTime() - dayStart(day).getTime();
+}
+
+function localHourDate(day, hour) {
+  if (hour === 24) return nextDayStart(day);
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, 0, 0, 0);
+}
+
+function localHourPercent(day, hour) {
+  return timelinePercent(localHourDate(day, hour), day);
+}
+
+function hourLabelText(hour, use24) {
+  var h = hour === 24 ? 0 : hour;
+  return use24 ? pad2(h) + ":00" : (h === 0 ? "12A" : h < 12 ? h + "A" : h === 12 ? "12P" : (h - 12) + "P");
+}
+
+function daysShareDuration(days) {
+  if (!days.length) return true;
+  var duration = dayDurationMs(days[0]);
+  return days.every(function (day) { return dayDurationMs(day) === duration; });
+}
+
+function addRowAxis(row, day) {
+  var use24 = getIcueProperty("use24Hour", false) === true;
+  [6, 12, 18].forEach(function (hour) {
+    var pct = localHourPercent(day, hour);
+    var line = document.createElement("span");
+    line.className = "rowAxisLine";
+    line.style.left = pct + "%";
+    row.appendChild(line);
+    var label = document.createElement("span");
+    label.className = "rowAxisLabel";
+    label.style.left = pct + "%";
+    label.textContent = hourLabelText(hour, use24);
+    row.appendChild(label);
+  });
+}
+
 function buildAxis(days) {
   var labels = document.getElementById("axisLabels");
   var lines = document.getElementById("gridLines");
   labels.innerHTML = "";
   lines.innerHTML = "";
   var use24 = getIcueProperty("use24Hour", false) === true;
+  var shared = daysShareDuration(days);
+  document.body.setAttribute("data-mixed-day-lengths", shared ? "false" : "true");
+  if (!shared && days.length > 1) {
+    var notice = document.createElement("span");
+    notice.className = "axisLabel axisNotice";
+    notice.style.left = "50%";
+    notice.textContent = "LOCAL TIME";
+    labels.appendChild(notice);
+    return false;
+  }
+  var reference = days.length ? days[0] : new Date();
   for (var hour = 0; hour <= 24; hour += 3) {
-    var pct = (hour / 24) * 100;
+    var pct = localHourPercent(reference, hour);
     var label = document.createElement("span");
     label.className = "axisLabel";
     label.style.left = pct + "%";
-    var h = hour === 24 ? 0 : hour;
-    label.textContent = use24 ? pad2(h) + ":00" : (h === 0 ? "12A" : h < 12 ? h + "A" : h === 12 ? "12P" : (h - 12) + "P");
+    label.textContent = hourLabelText(hour, use24);
     labels.appendChild(label);
     var line = document.createElement("span");
     line.className = "gridLine";
     line.style.left = pct + "%";
     lines.appendChild(line);
   }
+  return true;
 }
 
 function layoutLanes(segments) {
@@ -123,7 +174,7 @@ function renderTimeline(now, days) {
     });
   });
   renderAllDay(allDay);
-  buildAxis(days);
+  var sharedAxis = buildAxis(days);
   var rows = document.getElementById("eventRows");
   rows.innerHTML = "";
   var rowHeight = 100 / days.length;
@@ -137,6 +188,7 @@ function renderTimeline(now, days) {
     rowLabel.className = "dayRowLabel";
     rowLabel.textContent = STATE.mode === "four" ? formatDayShort(day).toUpperCase() : "";
     row.appendChild(rowLabel);
+    if (!sharedAxis && days.length > 1) addRowAxis(row, day);
     rows.appendChild(row);
 
     var start = dayStart(day);
