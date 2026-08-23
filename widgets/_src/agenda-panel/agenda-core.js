@@ -150,7 +150,7 @@ function getUrls() {
   var seen = {};
   return values.map(function (value) { return String(value || "").trim(); }).filter(function (value) {
     if (!value || seen[value]) return false;
-    if (!/^https?:\/\//i.test(value)) return false;
+    if (!/^(https?|webcal):\/\//i.test(value)) return false;
     seen[value] = true;
     return true;
   });
@@ -184,10 +184,11 @@ async function loadCalendarText(url, sourceIndex) {
     }
   } catch (error) {}
 
-  var direct = await withTimeout(url, { cache: "no-store" }, 8000);
+  var fetchUrl = url.replace(/^webcal:/i, "https:");
+  var direct = await withTimeout(fetchUrl, { cache: "no-store" }, 8000);
   if (direct && /BEGIN:VCALENDAR/i.test(direct)) return { text: direct, via: "direct" };
 
-  var bridged = await withTimeout(BRIDGE_URL + encodeURIComponent(url), { cache: "no-store" }, 8000);
+  var bridged = await withTimeout(BRIDGE_URL + encodeURIComponent(fetchUrl), { cache: "no-store" }, 8000);
   if (bridged && /BEGIN:VCALENDAR/i.test(bridged)) return { text: bridged, via: "bridge" };
   return null;
 }
