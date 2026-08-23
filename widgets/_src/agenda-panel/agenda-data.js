@@ -14,19 +14,24 @@ async function refreshCalendars(force) {
   if (!force && STATE.status === "loading") return;
   STATE.status = "loading";
   renderStatus();
+
+  var results = await Promise.all(urls.map(function (url, sourceIndex) {
+    return loadCalendarText(url, sourceIndex).then(function (loaded) {
+      if (!loaded) return { ok: false, events: [] };
+      try {
+        return { ok: true, events: parseCalendar(loaded.text, sourceIndex) };
+      } catch (error) {
+        return { ok: false, events: [] };
+      }
+    });
+  }));
+
   var merged = [];
   var failed = 0;
-  var bridgeFailures = 0;
-  for (var i = 0; i < urls.length; i++) {
-    var loaded = await loadCalendarText(urls[i], i);
-    if (!loaded) { failed++; bridgeFailures++; continue; }
-    try {
-      var parsed = parseCalendar(loaded.text, i);
-      merged = merged.concat(parsed);
-    } catch (error) {
-      failed++;
-    }
-  }
+  results.forEach(function (result) {
+    if (!result.ok) failed++;
+    else merged = merged.concat(result.events);
+  });
 
   if (merged.length || failed < urls.length) {
     merged.sort(compareEvents);
@@ -54,7 +59,7 @@ async function refreshCalendars(force) {
       STATE.stale = true;
       STATE.sourceCount = urls.length;
       STATE.failedCount = failed;
-      STATE.status = bridgeFailures === urls.length ? "bridge" : "error";
+      STATE.status = "bridge";
       STATE.message = "Calendar feed unavailable.";
     }
   }
