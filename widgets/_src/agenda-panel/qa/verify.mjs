@@ -11,7 +11,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const slots = {
   S_H: [840, 344], S_V: [696, 416], M_H: [840, 696], M_V: [696, 840],
-  L_H: [1688, 696], L_V: [696, 840], XL_H: [2536, 696], XL_V: [696, 2536],
+  L_H: [1688, 696], L_V: [696, 1688], XL_H: [2536, 696], XL_V: [696, 2536],
 };
 const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
