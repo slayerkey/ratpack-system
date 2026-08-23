@@ -165,7 +165,10 @@ function wallPartsToOccurrenceDate(template, wallDate) {
   var parts = { y: wallDate.y, m: wallDate.m, d: wallDate.d, h: original.h || 0, min: original.min || 0, s: original.s || 0 };
   var zone = template.startValue.zone;
   if (zone === "UTC") return new Date(Date.UTC(parts.y, parts.m - 1, parts.d, parts.h, parts.min, parts.s));
-  if (zone && zone !== "floating") {
+  if (zone && typeof zone === "object" && zone.type === "vtimezone") {
+    var embedded = vtimezonePartsToDate(parts, zone);
+    if (embedded) return embedded;
+  } else if (zone && zone !== "floating") {
     var zoned = zonedPartsToDate(parts, zone);
     if (zoned) return zoned;
   }
