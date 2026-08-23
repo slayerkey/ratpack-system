@@ -16,33 +16,33 @@ function Require-Command {
     }
 }
 
-function Invoke-Git {
-    param([string[]]$Args)
-    & git @Args
+function Invoke-GitCommand {
+    param([string[]]$GitArgs)
+    & git @GitArgs
     if ($LASTEXITCODE -ne 0) {
-        throw "git $($Args -join ' ') failed with exit code $LASTEXITCODE"
+        throw "git $($GitArgs -join ' ') failed with exit code $LASTEXITCODE"
     }
 }
 
 function Get-GitText {
-    param([string[]]$Args)
-    $output = & git @Args 2>&1
+    param([string[]]$GitArgs)
+    $output = & git @GitArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "git $($Args -join ' ') failed: $($output -join ' ')"
+        throw "git $($GitArgs -join ' ') failed: $($output -join ' ')"
     }
     return (($output -join "`n").Trim())
 }
 
-function Invoke-Gh {
-    param([string[]]$Args)
-    & gh @Args
+function Invoke-GhCommand {
+    param([string[]]$GhArgs)
+    & gh @GhArgs
     if ($LASTEXITCODE -ne 0) {
-        throw "gh $($Args -join ' ') failed with exit code $LASTEXITCODE"
+        throw "gh $($GhArgs -join ' ') failed with exit code $LASTEXITCODE"
     }
 }
 
 function Assert-CleanWorktree {
-    $dirty = Get-GitText @("status", "--porcelain")
+    $dirty = Get-GitText -GitArgs @("status", "--porcelain")
     if ($dirty) {
         throw "The RatPack checkout has local changes. Commit or stash them before syncing so nothing gets overwritten.`n$dirty"
     }
@@ -65,17 +65,17 @@ function Sync-CurrentBranch {
     Push-Location $RepoRoot
     try {
         Assert-CleanWorktree
-        Invoke-Git @("fetch", "--prune", "origin")
-        $branch = Get-GitText @("branch", "--show-current")
+        Invoke-GitCommand -GitArgs @("fetch", "--prune", "origin")
+        $branch = Get-GitText -GitArgs @("branch", "--show-current")
         if (-not $branch) {
             throw "The checkout is in detached HEAD state. Run: rat main"
         }
         & git rev-parse --abbrev-ref "${branch}@{upstream}" *> $null
         if ($LASTEXITCODE -eq 0) {
-            Invoke-Git @("pull", "--ff-only")
+            Invoke-GitCommand -GitArgs @("pull", "--ff-only")
         }
         elseif ($branch -eq "main") {
-            Invoke-Git @("pull", "--ff-only", "origin", "main")
+            Invoke-GitCommand -GitArgs @("pull", "--ff-only", "origin", "main")
         }
         else {
             Write-Host "Fetched origin. Branch '$branch' has no upstream, so it was not changed." -ForegroundColor Yellow
@@ -92,9 +92,9 @@ function Sync-Main {
     Push-Location $RepoRoot
     try {
         Assert-CleanWorktree
-        Invoke-Git @("fetch", "--prune", "origin")
-        Invoke-Git @("switch", "main")
-        Invoke-Git @("pull", "--ff-only", "origin", "main")
+        Invoke-GitCommand -GitArgs @("fetch", "--prune", "origin")
+        Invoke-GitCommand -GitArgs @("switch", "main")
+        Invoke-GitCommand -GitArgs @("pull", "--ff-only", "origin", "main")
         Write-Host "RatPack main is current." -ForegroundColor Green
     }
     finally {
@@ -106,9 +106,9 @@ function Show-Status {
     Require-Command "git" "Install Git for Windows first."
     Push-Location $RepoRoot
     try {
-        $branch = Get-GitText @("branch", "--show-current")
-        $commit = Get-GitText @("log", "-1", "--pretty=format:%h %cs %s")
-        $dirty = Get-GitText @("status", "--porcelain")
+        $branch = Get-GitText -GitArgs @("branch", "--show-current")
+        $commit = Get-GitText -GitArgs @("log", "-1", "--pretty=format:%h %cs %s")
+        $dirty = Get-GitText -GitArgs @("status", "--porcelain")
         Write-Host "Repo:   $RepoRoot"
         Write-Host "Branch: $branch"
         Write-Host "Commit: $commit"
@@ -149,7 +149,7 @@ function Get-NewShipRun {
     Assert-GitHubAuth
     $started = (Get-Date).ToUniversalTime().AddSeconds(-10)
     Write-Host "Triggering Rat Ship for '$WidgetSlug' on GitHub Actions..." -ForegroundColor Cyan
-    Invoke-Gh @("workflow", "run", "rat-ship-xeneon.yml", "--ref", "main", "-f", "slug=$WidgetSlug")
+    Invoke-GhCommand -GhArgs @("workflow", "run", "rat-ship-xeneon.yml", "--ref", "main", "-f", "slug=$WidgetSlug")
 
     for ($i = 0; $i -lt 30; $i++) {
         Start-Sleep -Seconds 2
@@ -175,14 +175,14 @@ function Download-ShipKit {
     Assert-GitHubAuth
     $runId = Get-NewShipRun $WidgetSlug
     Write-Host "Watching Rat Ship run $runId..." -ForegroundColor Cyan
-    Invoke-Gh @("run", "watch", $runId, "--exit-status")
+    Invoke-GhCommand -GhArgs @("run", "watch", $runId, "--exit-status")
 
     $dest = Join-Path $RepoRoot "out\ship\$WidgetSlug"
     if (Test-Path $dest) {
         Remove-Item $dest -Recurse -Force
     }
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Invoke-Gh @("run", "download", $runId, "--name", "rat-ship-$WidgetSlug", "--dir", $dest)
+    Invoke-GhCommand -GhArgs @("run", "download", $runId, "--name", "rat-ship-$WidgetSlug", "--dir", $dest)
 
     $submission = Join-Path $dest "submission.json"
     $widgetPackage = Get-ChildItem -Path $dest -Filter *.icuewidget -File | Select-Object -First 1
