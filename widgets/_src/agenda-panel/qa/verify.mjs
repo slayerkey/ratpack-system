@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../../..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const entry = path.join(root, 'widgets', 'agenda-panel', 'index.html');
+const entryHtml = fs.readFileSync(entry, 'utf8');
 const outDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'artifacts', 'agenda-panel-qa');
 if (!fs.existsSync(entry)) throw new Error('Run python tools/xeneon/inline.py agenda-panel first');
 fs.mkdirSync(outDir, { recursive: true });
@@ -21,7 +22,7 @@ const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 const fixture = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PackRat//Agenda QA//EN\r\nBEGIN:VEVENT\r\nUID:all-day\r\nDTSTART;VALUE=DATE:${ymd(today)}\r\nDTEND;VALUE=DATE:${ymd(tomorrow)}\r\nSUMMARY:Product planning day\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:descenders\r\nDTSTART:${dt(today, 20, 30)}\r\nDTEND:${dt(today, 21, 30)}\r\nSUMMARY:Planning sync by Gary\r\nLOCATION:Design Wing\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:daily\r\nDTSTART:${dt(yesterday, 11)}\r\nDTEND:${dt(yesterday, 11, 30)}\r\nRRULE:FREQ=DAILY;COUNT=4\r\nEXDATE:${dt(today, 11)}\r\nSUMMARY:Daily standup\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:daily\r\nRECURRENCE-ID:${dt(tomorrow, 11)}\r\nDTSTART:${dt(tomorrow, 12)}\r\nDTEND:${dt(tomorrow, 12, 30)}\r\nSUMMARY:Moved daily standup\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || undefined });
 const results = {};
 let failed = false;
 try {
@@ -30,7 +31,8 @@ try {
     const errors = [];
     page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
     page.on('pageerror', (error) => errors.push(String(error)));
-    await page.addInitScript(({ fixture }) => {
+    await page.goto('about:blank');
+    await page.evaluate(({ fixture, entryHtml }) => {
       globalThis.uniqueId = 'agenda-panel-qa';
       globalThis.calendarUrl1 = 'https://fixture.invalid/calendar.ics';
       globalThis.calendarUrl2 = '';
@@ -42,8 +44,10 @@ try {
       globalThis.backgroundColor = '#07090D';
       globalThis.tr = async (value) => value;
       globalThis.__ratpackAgendaFixtures = [fixture];
-    }, { fixture });
-    await page.goto(pathToFileURL(entry).href, { waitUntil: 'load' });
+      document.open();
+      document.write(entryHtml);
+      document.close();
+    }, { fixture, entryHtml });
     await page.waitForTimeout(800);
     const state = await page.evaluate(() => {
       const visible = (e) => {
@@ -80,6 +84,53 @@ try {
     if (errors.length) issues.push(`console errors ${errors.length}`);
     if (name.endsWith('_H') && name !== 'S_H' && !state.eventBlocks) issues.push('missing timeline events');
     if ((name.endsWith('_V') || name === 'S_H') && !state.compact) issues.push('missing compact events');
+
+    if (name === 'M_H') {
+      const behavior = await page.evaluate(async () => {
+        const initialMode = document.body.dataset.mode;
+        document.getElementById('heroCard').click();
+        const toggledMode = document.body.dataset.mode;
+        document.getElementById('heroCard').click();
+        const restoredMode = document.body.dataset.mode;
+
+        const eventButton = document.querySelector('.eventBlock');
+        if (eventButton) eventButton.click();
+        const detailOpened = document.getElementById('detailOverlay').classList.contains('open');
+        document.getElementById('detailClose').click();
+        const detailClosed = !document.getElementById('detailOverlay').classList.contains('open');
+
+        const lifecycleReady = Boolean(
+          globalThis.icueEvents &&
+          typeof globalThis.icueEvents.onICUEInitialized === 'function' &&
+          typeof globalThis.icueEvents.onDataUpdated === 'function'
+        );
+        let loadCalls = 0;
+        const originalLoad = globalThis.loadCalendarText;
+        globalThis.loadCalendarText = function () {
+          loadCalls++;
+          return originalLoad.apply(this, arguments);
+        };
+        globalThis.accentColor = '#FF00AA';
+        globalThis.icueEvents.onDataUpdated();
+        const callsAfterAppearance = loadCalls;
+        const accentAfterAppearance = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+        globalThis.calendarUrl1 = 'https://fixture.invalid/changed.ics';
+        globalThis.icueEvents.onDataUpdated();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        return {
+          initialMode, toggledMode, restoredMode, detailOpened, detailClosed, lifecycleReady,
+          callsAfterAppearance, callsAfterUrl: loadCalls, accentAfterAppearance
+        };
+      });
+      state.behavior = behavior;
+      if (behavior.initialMode !== 'today' || behavior.toggledMode !== 'four' || behavior.restoredMode !== 'today') issues.push('hero range toggle failed');
+      if (!behavior.detailOpened || !behavior.detailClosed) issues.push('event detail interaction failed');
+      if (!behavior.lifecycleReady) issues.push('iCUE lifecycle callbacks missing');
+      if (behavior.callsAfterAppearance !== 0) issues.push('appearance update refetched calendar');
+      if (behavior.callsAfterUrl < 1) issues.push('calendar URL update did not refresh');
+      if (behavior.accentAfterAppearance.toLowerCase() !== '#ff00aa') issues.push('appearance update did not render');
+    }
+
     if (issues.length) { failed = true; state.issues = issues; }
     await page.close();
   }
