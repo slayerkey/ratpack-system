@@ -49,7 +49,16 @@
       "spoke recently": "spoke recently",
       "Yes": "Yes",
       "No": "No",
-      "Unknown": "Unknown"
+      "Unknown": "Unknown",
+      "Unknown member": "Unknown member",
+      "No username available": "No username available",
+      "Disconnected": "Disconnected",
+      "Connected": "Connected",
+      "Authorization failed": "Authorization failed",
+      "Try connecting again.": "Try connecting again.",
+      "Discord token exchange blocked": "Discord token exchange blocked",
+      "Public Client PKCE could not complete from this widget.": "Public Client PKCE could not complete from this widget.",
+      "Retry": "Retry"
     }
   },
   "de": {
@@ -102,7 +111,16 @@
       "spoke recently": "sprach kürzlich",
       "Yes": "Ja",
       "No": "Nein",
-      "Unknown": "Unbekannt"
+      "Unknown": "Unbekannt",
+      "Unknown member": "Unbekanntes Mitglied",
+      "No username available": "Kein Benutzername verfügbar",
+      "Disconnected": "Getrennt",
+      "Connected": "Verbunden",
+      "Authorization failed": "Autorisierung fehlgeschlagen",
+      "Try connecting again.": "Versuche die Verbindung erneut.",
+      "Discord token exchange blocked": "Discord-Token-Austausch blockiert",
+      "Public Client PKCE could not complete from this widget.": "Public Client PKCE konnte aus diesem Widget nicht abgeschlossen werden.",
+      "Retry": "Erneut versuchen"
     }
   },
   "es": {
@@ -155,7 +173,16 @@
       "spoke recently": "habló hace poco",
       "Yes": "Sí",
       "No": "No",
-      "Unknown": "Desconocido"
+      "Unknown": "Desconocido",
+      "Unknown member": "Miembro desconocido",
+      "No username available": "Nombre de usuario no disponible",
+      "Disconnected": "Desconectado",
+      "Connected": "Conectado",
+      "Authorization failed": "La autorización falló",
+      "Try connecting again.": "Intenta conectarte de nuevo.",
+      "Discord token exchange blocked": "Intercambio de token de Discord bloqueado",
+      "Public Client PKCE could not complete from this widget.": "Public Client PKCE no pudo completarse desde este widget.",
+      "Retry": "Reintentar"
     }
   },
   "fr": {
@@ -208,7 +235,16 @@
       "spoke recently": "a parlé récemment",
       "Yes": "Oui",
       "No": "Non",
-      "Unknown": "Inconnu"
+      "Unknown": "Inconnu",
+      "Unknown member": "Membre inconnu",
+      "No username available": "Nom d'utilisateur indisponible",
+      "Disconnected": "Déconnecté",
+      "Connected": "Connecté",
+      "Authorization failed": "Échec de l'autorisation",
+      "Try connecting again.": "Essayez de vous reconnecter.",
+      "Discord token exchange blocked": "Échange de jeton Discord bloqué",
+      "Public Client PKCE could not complete from this widget.": "Public Client PKCE n'a pas pu être effectué depuis ce widget.",
+      "Retry": "Réessayer"
     }
   }
 }
