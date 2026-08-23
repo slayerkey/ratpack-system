@@ -20,7 +20,7 @@ function Require-Command {
 
 function Invoke-GitCommand {
     param([string[]]$GitArgs)
-    & git @GitArgs
+    & git @GitArgs | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "git $($GitArgs -join ' ') failed with exit code $LASTEXITCODE"
     }
@@ -185,13 +185,61 @@ function Get-NewShipRun {
     }
 }
 
+function Wait-RatShipRun {
+    param([string]$RunId)
+
+    Push-Location $RepoRoot
+    try {
+        $lastLabel = $null
+        while ($true) {
+            $json = & gh run view $RunId --json status,conclusion,jobs 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not read Rat Ship run $RunId: $($json -join ' ')"
+            }
+
+            $run = $json | ConvertFrom-Json
+            if ($run.status -eq "completed") {
+                if ($run.conclusion -eq "success") {
+                    Write-Host "Rat Ship workflow completed successfully." -ForegroundColor Green
+                    return
+                }
+
+                Write-Host "Rat Ship workflow failed. Showing failed logs..." -ForegroundColor Red
+                & gh run view $RunId --log-failed | Out-Host
+                throw "Rat Ship run $RunId finished with conclusion '$($run.conclusion)'."
+            }
+
+            $label = "Waiting for GitHub runner"
+            $activeJob = $run.jobs | Where-Object { $_.status -eq "in_progress" } | Select-Object -Last 1
+            if ($activeJob) {
+                $activeStep = $activeJob.steps | Where-Object { $_.status -eq "in_progress" } | Select-Object -Last 1
+                if ($activeStep) {
+                    $label = $activeStep.name
+                }
+                else {
+                    $label = $activeJob.name
+                }
+            }
+
+            if ($label -ne $lastLabel) {
+                Write-Host "Rat Ship: $label..." -ForegroundColor DarkGray
+                $lastLabel = $label
+            }
+            Start-Sleep -Seconds 4
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 function Download-ShipKit {
     param([string]$WidgetSlug)
     Sync-Main
     Assert-GitHubAuth
     $runId = Get-NewShipRun $WidgetSlug
     Write-Host "Watching Rat Ship run $runId..." -ForegroundColor Cyan
-    Invoke-GhCommand -GhArgs @("run", "watch", $runId, "--exit-status")
+    Wait-RatShipRun -RunId $runId
 
     $dest = Join-Path $RepoRoot "out\ship\$WidgetSlug"
     if (Test-Path $dest) {
