@@ -21,10 +21,37 @@ permissions:
   contents: read
 
 jobs:
+  resolve-slug:
+    name: Resolve widget slug
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.resolve.outputs.slug }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve slug
+        id: resolve
+        shell: bash
+        env:
+          DISPATCH_SLUG: ${{ inputs.slug }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            slug="$(python tools/xeneon/resolve_slug.py --slug "$DISPATCH_SLUG")"
+          else
+            slug="$(python tools/xeneon/resolve_slug.py --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA")"
+          fi
+          echo "Resolved XENEON slug: $slug"
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
   rat-art:
+    needs: resolve-slug
     runs-on: windows-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
       RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
       RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
     steps:
@@ -63,6 +90,7 @@ jobs:
         run: |
           $report = Get-Content artifacts/rat-art/review/rat-art-report.json -Raw | ConvertFrom-Json
           if ($report.image_generation -ne 'disabled') { throw 'Rat Art contract violated: image generation must stay disabled' }
+          if ($report.slug -ne $env:WIDGET_SLUG) { throw 'Rat Art report slug mismatch' }
           foreach ($name in @('1-hero.png','2-showcase.png','3-features.png','4-settings.png','5-sizes.png')) {
             if (-not (Test-Path "artifacts/rat-art/review/$name")) { throw "missing $name" }
           }
