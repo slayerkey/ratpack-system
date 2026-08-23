@@ -52,16 +52,32 @@ async function signedIn(page){
   if(await sign.isVisible().catch(()=>false)) return false;
   return await page.getByRole('button',{name:/^(account|switch apps)$/i}).first().isVisible().catch(()=>false);
 }
-async function waitSignedIn(page,ms=25000){ const end=Date.now()+ms; while(Date.now()<end){ if(await signedIn(page)) return true; await page.waitForTimeout(1500);} return false; }
+async function loginFormReady(page){ return await page.locator('#kc-form-login').isVisible().catch(()=>false); }
+async function waitSignedIn(page,ms=25000){ const end=Date.now()+ms; while(Date.now()<end){ if(await signedIn(page)) return true; await page.waitForTimeout(750);} return false; }
+async function waitAuthOrLoginForm(page,ms=10000){
+  const end=Date.now()+ms;
+  while(Date.now()<end){
+    if(await signedIn(page)) return 'signed-in';
+    if(await loginFormReady(page)) return 'login-form';
+    await page.waitForTimeout(250);
+  }
+  return null;
+}
 async function autoLogin(page){
   const sign = page.getByRole('button',{name:/^sign in$/i}).or(page.getByRole('link',{name:/^sign in$/i})).first();
   if(!await sign.isVisible().catch(()=>false)) return false;
-  await sign.click().catch(()=>{}); await page.waitForLoadState('domcontentloaded').catch(()=>{});
-  if(await waitSignedIn(page,20000)) return true;
-  const form=page.locator('#kc-form-login');
-  if(await form.isVisible().catch(()=>false)){
+  await sign.click().catch(()=>{});
+  await page.waitForLoadState('domcontentloaded').catch(()=>{});
+  const authState=await waitAuthOrLoginForm(page,10000);
+  if(authState==='signed-in') return true;
+  if(authState==='login-form'){
     const autofilled=await page.evaluate(()=>{const e=document.querySelector('#email'),p=document.querySelector('#password'); return !!e&&!!p&&e.value.length>0&&p.value.length>0;}).catch(()=>false);
-    if(autofilled){ await page.locator('#kc-login').click().catch(()=>{}); return await waitSignedIn(page,30000); }
+    if(autofilled){
+      console.log('Maker Console login form was autofilled locally. Signing in...');
+      await page.locator('#kc-login').click().catch(()=>{});
+      return await waitSignedIn(page,30000);
+    }
+    console.log('Maker Console login form is ready. Complete the one-time local sign in and Rat Ship will continue automatically.');
   }
   return false;
 }
@@ -89,9 +105,11 @@ async function step(page,id,label,fn){if(RESUME&&done(id)){console.log(`skip ${l
 
 const profileDir = profileArg ? resolve(profileArg) : join(ROOT,'.playwright-profile');
 const context=await chromium.launchPersistentContext(profileDir,{headless:false,viewport:{width:1500,height:950}});
+function wirePage(p){p.on('crash',()=>console.error(`RAT SHIP PAGE CRASH: ${p.url()}`));}
+context.pages().forEach(wirePage);context.on('page',wirePage);
 let page=context.pages()[0]??await context.newPage();
-await page.goto('https://maker.elgato.com',{waitUntil:'domcontentloaded',timeout:45000});await page.waitForTimeout(3000);
-let auth=await waitSignedIn(page); if(!auth)auth=await autoLogin(page); await snap(page,auth?'signed-in':'signed-out');
+await page.goto('https://maker.elgato.com',{waitUntil:'domcontentloaded',timeout:45000});await page.waitForTimeout(1200);
+let auth=await signedIn(page);if(!auth)auth=await autoLogin(page);await snap(page,auth?'signed-in':'signed-out');
 if(CHECK_LOGIN){console.log(auth?'MAKER LOGIN PASS':'MAKER LOGIN REQUIRED');await context.close();process.exit(auth?0:2);}
 if(!auth){
   console.log('Maker Console authentication is local. Sign in in the opened browser; this run will continue automatically when the session is ready.');
@@ -101,6 +119,7 @@ if(!auth){
 
 async function openExisting(){await page.goto('https://maker.elgato.com/products',{waitUntil:'domcontentloaded',timeout:45000});await page.waitForTimeout(3000);const row=page.getByRole('link',{name:new RegExp(`^${prod.name}`,'i')}).or(page.getByText(prod.name,{exact:true})).first();if(!await row.isVisible().catch(()=>false))return false;await row.click();await page.waitForTimeout(3500);return true;}
 const editing=await openExisting();
+if(editing)console.log(`Existing Maker Console product found for ${prod.name}. Continuing that draft/listing.`);
 if(!editing){
   await step(page,'1-create','Create Widget draft',async()=>{await click(page,/create product|new product|add product/i);const choice=page.getByRole('radio',{name:/^widget$/i}).or(page.getByText(/^widget$/i)).or(page.getByRole('button',{name:/^widget$/i})).first();await choice.click();await click(page,/^(next|continue)$/i);});
   await step(page,'2-file','Upload .icuewidget',async()=>{page=await livePage(context,page);const input=page.locator('input[type="file"]').first();await input.setInputFiles(join(KIT,packages[0]));await click(page,/^(next|continue)$/i,180000);});
