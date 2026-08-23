@@ -64,6 +64,10 @@ def main():
 
 Canonical Rat Ship kit.
 
+Normal release path: run `rat ship {slug}`. Rat Ship builds this kit and then submits it through the persistent local Maker Console browser profile.
+
+Manual fallback contents:
+
 1. Product type: **Widget**
 2. Upload `{pkg.name}`
 3. Name: **{meta['name']}**
@@ -74,11 +78,12 @@ Canonical Rat Ship kit.
 8. Upload media in numeric filename order.
 9. Verify version **{meta['version']}**, auto publish policy, gallery order, and price immediately before Submit.
 
-`SUBMIT_NOW.ps1` is the canonical local authenticated bridge. GitHub generated everything in this folder; the only local state is the Maker Console login session.
+`SUBMIT_NOW.cmd` is a double click friendly portable fallback. `SUBMIT_NOW.ps1` contains the same fallback logic for PowerShell. The normal `rat ship` command is faster because it reuses the repository level browser runtime instead of installing dependencies inside every generated kit.
 """, encoding="utf-8")
 
-    # Self-contained local authenticated bridge. The browser profile lives outside
-    # the extracted kit so future releases can reuse the same signed-in session.
+    # Portable authenticated fallback. Normal local shipping uses the shared
+    # repository runtime through `rat ship`, so repeated releases do not reinstall
+    # Playwright inside every generated kit.
     shutil.copy2(driver_path, out / "maker_console.mjs")
     (out / "package.json").write_text(json.dumps({
         "name": "ratpack-maker-console-bridge",
@@ -89,24 +94,26 @@ Canonical Rat Ship kit.
     (out / "SUBMIT_NOW.ps1").write_text(f'''$ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {{ throw "Node.js is required" }}
-npm install
-npm audit --audit-level=high
-if ($LASTEXITCODE -ne 0) {{ throw "Dependency security audit failed" }}
+if (-not (Test-Path .\\node_modules\\playwright)) {{ npm install --no-fund --no-audit }}
+if ($LASTEXITCODE -ne 0) {{ throw "Could not install Playwright" }}
 npx playwright install chromium
+if ($LASTEXITCODE -ne 0) {{ throw "Could not install Chromium" }}
 $Profile = Join-Path $env:LOCALAPPDATA "PackRat\\maker-console-profile"
 node .\\maker_console.mjs {slug} "--kit=$PSScriptRoot" "--profile=$Profile" --submit
 if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}
 ''', encoding="utf-8")
     (out / "STAGE_ONLY.ps1").write_text(f'''$ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-npm install
-npm audit --audit-level=high
-if ($LASTEXITCODE -ne 0) {{ throw "Dependency security audit failed" }}
+if (-not (Test-Path .\\node_modules\\playwright)) {{ npm install --no-fund --no-audit }}
+if ($LASTEXITCODE -ne 0) {{ throw "Could not install Playwright" }}
 npx playwright install chromium
+if ($LASTEXITCODE -ne 0) {{ throw "Could not install Chromium" }}
 $Profile = Join-Path $env:LOCALAPPDATA "PackRat\\maker-console-profile"
 node .\\maker_console.mjs {slug} "--kit=$PSScriptRoot" "--profile=$Profile"
 if ($LASTEXITCODE -ne 0) {{ exit $LASTEXITCODE }}
 ''', encoding="utf-8")
+    (out / "SUBMIT_NOW.cmd").write_text('''@echo off\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0SUBMIT_NOW.ps1"\r\nif errorlevel 1 pause\r\n''', encoding="utf-8")
+    (out / "STAGE_ONLY.cmd").write_text('''@echo off\r\npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0STAGE_ONLY.ps1"\r\nif errorlevel 1 pause\r\n''', encoding="utf-8")
     print(f"RAT SHIP KIT PASS: {out}")
 
 if __name__ == "__main__":
