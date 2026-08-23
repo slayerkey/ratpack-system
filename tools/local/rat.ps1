@@ -194,7 +194,7 @@ function Wait-RatShipRun {
         while ($true) {
             $json = & gh run view $RunId --json status,conclusion,jobs 2>&1
             if ($LASTEXITCODE -ne 0) {
-                throw "Could not read Rat Ship run $RunId: $($json -join ' ')"
+                throw "Could not read Rat Ship run ${RunId}: $($json -join ' ')"
             }
 
             $run = $json | ConvertFrom-Json
