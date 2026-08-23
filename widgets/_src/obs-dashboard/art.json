@@ -13,6 +13,11 @@
   ],
   "settings_title": "Connect once in iCUE.",
   "settings_subtitle": "Set the OBS WebSocket port and password, then personalize the board.",
+  "settings_items": [
+    "OBS WebSocket port",
+    "Password stored by iCUE",
+    "Text, accent and background colors"
+  ],
   "sizes_title": "Built for every XENEON slot.",
   "sizes_subtitle": "Eight tuned layouts across S, M, L and XL in both orientations."
 }
