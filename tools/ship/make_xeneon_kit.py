@@ -32,6 +32,8 @@ def main():
     if meta.get("type") != "widget": fail("submission.json type must be widget")
     for key in ("name","version","price_usd","marketplace_category","marketplace_dashboard_sizes","marketplace_language","description","release_notes"):
         if key not in meta or meta[key] in (None, "", []): fail(f"submission.json missing {key}")
+    if "marketplace_recommended_orientation" in meta and not str(meta["marketplace_recommended_orientation"]).strip():
+        fail("submission.json marketplace_recommended_orientation cannot be blank")
     if meta["name"] != manifest.get("name") or meta["version"] != manifest.get("version"):
         fail("submission metadata disagrees with manifest name/version")
     required_art = ["1-hero.png","2-showcase.png","3-features.png","4-settings.png","5-sizes.png","icon-288x288.png"]
@@ -53,13 +55,20 @@ def main():
     (out / "PASTE_release_notes.txt").write_text(meta["release_notes"].strip() + "\n", encoding="utf-8")
     public = {k: v for k, v in meta.items() if k not in ("description", "release_notes")}
     (out / "submission.json").write_text(json.dumps(public, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    orientation = meta.get("marketplace_recommended_orientation")
+    orientation_line = f"Recommended Orientation: {orientation}\n" if orientation else ""
     (out / "PASTE_metadata.txt").write_text(
         f"Name: {meta['name']}\nType: Widget\nPrice USD: {meta['price_usd']}\nVersion: {meta['version']}\n"
         f"Category: {', '.join(meta['marketplace_category'])}\n"
         f"Dashboard Sizes: {', '.join(meta['marketplace_dashboard_sizes'])}\n"
+        f"{orientation_line}"
         f"Language: {', '.join(meta['marketplace_language'])}\n"
         f"Author: {manifest.get('author')}\nWidget ID: {manifest.get('id')}\nOS: Windows\n",
         encoding="utf-8")
+    orientation_check = f"7. Recommended orientation: **{orientation}**\n" if orientation else ""
+    language_number = 8 if orientation else 7
+    media_number = language_number + 1
+    verify_number = media_number + 1
     (out / "CHECKLIST.md").write_text(f"""# {meta['name']} Maker Console kit
 
 Canonical Rat Ship kit.
@@ -74,9 +83,9 @@ Manual fallback contents:
 4. Price: **${meta['price_usd']:.2f}**
 5. Category: **{', '.join(meta['marketplace_category'])}**
 6. Dashboard sizes: **{', '.join(meta['marketplace_dashboard_sizes'])}**
-7. Language: **{', '.join(meta['marketplace_language'])}**
-8. Upload media in numeric filename order.
-9. Verify version **{meta['version']}**, auto publish policy, gallery order, and price immediately before Submit.
+{orientation_check}{language_number}. Language: **{', '.join(meta['marketplace_language'])}**
+{media_number}. Upload media in numeric filename order.
+{verify_number}. Verify version **{meta['version']}**, auto publish policy, dashboard sizes, recommended orientation when present, gallery order, and price immediately before Submit.
 
 `SUBMIT_NOW.cmd` is a double click friendly portable fallback. `SUBMIT_NOW.ps1` contains the same fallback logic for PowerShell. The normal `rat ship` command is faster because it reuses the repository level browser runtime instead of installing dependencies inside every generated kit.
 """, encoding="utf-8")
