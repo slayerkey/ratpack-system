@@ -35,7 +35,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git for Windows is required. Install Git, clone ratpack-system, then rerun setup-windows.ps1."
 }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "Node.js is not installed. RatPack source sync will work, but Maker Console submission requires Node.js." -ForegroundColor Yellow
+    Write-Host "Node.js is not installed. RatPack source sync and manual Rat Ship downloads still work, but the optional Maker Console Playwright bridge requires Node.js." -ForegroundColor Yellow
 }
 
 $origin = & git -C $RepoRoot remote get-url origin 2>$null
@@ -74,13 +74,10 @@ Write-Host ""
 Write-Host "RatPack local workspace is ready." -ForegroundColor Green
 Write-Host "Repo: $RepoRoot"
 Write-Host ""
-Write-Host "Open a new terminal and use:" -ForegroundColor Cyan
-Write-Host "  rat status"
-Write-Host "  rat update"
-Write-Host "  rat ship now-playing"
-Write-Host "  rat stage now-playing"
-Write-Host "  rat submit now-playing"
-Write-Host "  rat open"
-Write-Host "  rat doctor"
+Write-Host "The three commands worth remembering:" -ForegroundColor Cyan
+Write-Host "  rat ship now-playing    build + download + open the fresh ship kit"
+Write-Host "  rat status              show repo status"
+Write-Host "  rat help                show the full cheat sheet"
 Write-Host ""
 Write-Host "Generated local files stay under $RepoRoot\out and do not go into Downloads."
+Write-Host "The Maker Console Playwright bridge is optional; manual upload from rat ship output is supported."

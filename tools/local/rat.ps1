@@ -125,6 +125,25 @@ function Show-Status {
     }
 }
 
+function Show-Help {
+    Write-Host "RatPack cheat sheet" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "NORMAL" -ForegroundColor Green
+    Write-Host "  rat ship <slug>    Build, validate, package, create Rat Art, download the fresh ship kit, then open it in Explorer."
+    Write-Host "  rat status         Show the local repo branch, commit, and whether local files changed."
+    Write-Host "  rat help           Show this cheat sheet."
+    Write-Host ""
+    Write-Host "OPTIONAL" -ForegroundColor DarkGray
+    Write-Host "  rat update         Pull the latest changes for the current branch."
+    Write-Host "  rat main           Switch to main and pull the latest canonical RatPack."
+    Write-Host "  rat stage <slug>   Get a fresh ship kit and use the optional Maker Console Playwright bridge without final submit."
+    Write-Host "  rat submit <slug>  Get a fresh ship kit and use the optional authenticated Maker Console submit bridge."
+    Write-Host "  rat open           Open the RatPack repo in Explorer."
+    Write-Host "  rat doctor         Check Git, Node, npm, GitHub CLI, GitHub login, and repo state."
+    Write-Host ""
+    Write-Host "Full reference: $RepoRoot\RAT-COMMANDS.md"
+}
+
 function Get-NewShipRun {
     param([string]$WidgetSlug)
     Assert-GitHubAuth
@@ -165,19 +184,30 @@ function Download-ShipKit {
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
     Invoke-Gh @("run", "download", $runId, "--name", "rat-ship-$WidgetSlug", "--dir", $dest)
 
-    $submit = Join-Path $dest "SUBMIT_NOW.ps1"
-    $stage = Join-Path $dest "STAGE_ONLY.ps1"
-    if (-not (Test-Path $submit) -or -not (Test-Path $stage)) {
-        throw "Rat Ship completed but the local bridge scripts are missing from $dest"
+    $submission = Join-Path $dest "submission.json"
+    $widgetPackage = Get-ChildItem -Path $dest -Filter *.icuewidget -File | Select-Object -First 1
+    if (-not (Test-Path $submission) -or -not $widgetPackage) {
+        throw "Rat Ship completed but the expected marketplace kit is incomplete in $dest"
     }
+
     Write-Host "Rat Ship kit is ready at:`n$dest" -ForegroundColor Green
     return $dest
+}
+
+function Run-Ship {
+    param([string]$WidgetSlug)
+    $dest = Download-ShipKit $WidgetSlug
+    Start-Process explorer.exe $dest
 }
 
 function Run-Stage {
     param([string]$WidgetSlug)
     $dest = Download-ShipKit $WidgetSlug
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dest "STAGE_ONLY.ps1")
+    $script = Join-Path $dest "STAGE_ONLY.ps1"
+    if (-not (Test-Path $script)) {
+        throw "This ship kit does not contain the optional Maker Console staging bridge. Use rat ship and upload manually instead."
+    }
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $script
     if ($LASTEXITCODE -ne 0) {
         throw "Maker Console staging exited with code $LASTEXITCODE"
     }
@@ -186,8 +216,12 @@ function Run-Stage {
 function Run-Submit {
     param([string]$WidgetSlug)
     $dest = Download-ShipKit $WidgetSlug
-    Write-Host "Launching the explicit Maker Console submission bridge for $WidgetSlug..." -ForegroundColor Cyan
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dest "SUBMIT_NOW.ps1")
+    $script = Join-Path $dest "SUBMIT_NOW.ps1"
+    if (-not (Test-Path $script)) {
+        throw "This ship kit does not contain the optional Maker Console submit bridge. Use rat ship and upload manually instead."
+    }
+    Write-Host "Launching the optional Maker Console submission bridge for $WidgetSlug..." -ForegroundColor Cyan
+    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $script
     if ($LASTEXITCODE -ne 0) {
         throw "Maker Console submission exited with code $LASTEXITCODE"
     }
@@ -218,23 +252,17 @@ function Run-Doctor {
 
 switch ($Action.ToLowerInvariant()) {
     "status" { Show-Status }
+    "help" { Show-Help }
+    "commands" { Show-Help }
     "update" { Sync-CurrentBranch }
     "main" { Sync-Main }
-    "ship" { Download-ShipKit $Slug | Out-Null }
+    "ship" { Run-Ship $Slug }
     "stage" { Run-Stage $Slug }
     "submit" { Run-Submit $Slug }
     "open" { Start-Process explorer.exe $RepoRoot }
     "doctor" { Run-Doctor }
     default {
-        Write-Host "RatPack commands:" -ForegroundColor Cyan
-        Write-Host "  rat status"
-        Write-Host "  rat update"
-        Write-Host "  rat main"
-        Write-Host "  rat ship <slug>"
-        Write-Host "  rat stage <slug>"
-        Write-Host "  rat submit <slug>"
-        Write-Host "  rat open"
-        Write-Host "  rat doctor"
+        Show-Help
         exit 2
     }
 }
