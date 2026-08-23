@@ -1,0 +1,19 @@
+#allDayRail {
+  min-height: max(60px, calc(var(--u) * 6.2));
+}
+
+.allDayChip {
+  min-height: 48px;
+}
+
+body[data-slot="s-h"] #topbar {
+  height: max(48px, calc(var(--u) * 6.3));
+}
+
+body[data-slot="s-h"] #contentGrid {
+  height: calc(100% - max(48px, calc(var(--u) * 6.3)));
+}
+
+body[data-slot="m-h"] #allDayRail {
+  min-height: max(60px, calc(var(--u) * 5.5));
+}
