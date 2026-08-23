@@ -4,19 +4,19 @@ You only need to remember three commands for normal use.
 
 ## `rat ship <slug>`
 
-This is the main command.
+This is the main release command.
 
 Example:
 
 ```text
-rat ship now-playing
+rat ship helldivers
 ```
 
 What it does:
 
 1. Switches the local checkout to the latest `main`.
 2. Triggers the Rat Ship GitHub Actions workflow.
-3. Runs the canonical build, validation, package, Rat Art, and ship kit pipeline in GitHub.
+3. Runs the canonical build, validation, official package, Rat Art, and ship kit pipeline in GitHub.
 4. Waits for the workflow to finish.
 5. Replaces the old local output for that product.
 6. Downloads the fresh ship kit into:
@@ -25,9 +25,25 @@ What it does:
 out\ship\<slug>
 ```
 
-7. Opens that folder in Explorer.
+7. Reuses the local Rat Ship Playwright runtime instead of reinstalling it inside every ship kit.
+8. Opens Maker Console with the persistent local PackRat browser profile.
+9. Reuses the existing Maker Console login when the session is still valid.
+10. Fills the product draft from the canonical ship kit.
+11. Uploads the official widget package and Rat Art.
+12. Sets marketplace metadata, release notes, price, and auto publish policy.
+13. Submits the product.
 
-For normal marketplace work, manually upload the files from that folder. The Playwright Maker Console bridge is optional and is not required by `rat ship`.
+If Maker Console or Chromium stops unexpectedly, Rat Ship restarts the browser and retries with the saved resume state up to three times.
+
+Authentication is local only. Maker Console cookies and session state stay under:
+
+```text
+%LOCALAPPDATA%\PackRat\maker-console-profile
+```
+
+GitHub Actions never receives Maker Console cookies, passwords, browser profile data, or session tokens.
+
+The first time the local Maker Console profile is used, Elgato may require you to sign in manually in the browser window. After that, the persistent profile should normally reuse the session until Elgato expires it.
 
 ## `rat status`
 
@@ -46,6 +62,22 @@ Prints the command cheat sheet in the terminal.
 
 ## Optional commands
 
+### `rat kit <slug>`
+
+Runs the fresh Rat Ship GitHub pipeline and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
+
+This is the old `rat ship` behavior and is useful when you specifically want the files only.
+
+### `rat stage <slug>`
+
+Runs the same fresh Rat Ship process, launches Maker Console, fills the listing, uploads the package and media, and stops before the final Submit action.
+
+Use this when you want to inspect the finished Maker Console draft manually.
+
+### `rat submit <slug>`
+
+Alias for `rat ship <slug>`.
+
 ### `rat update`
 
 Fetches GitHub and fast forwards the current branch if the local worktree is clean.
@@ -54,23 +86,13 @@ Fetches GitHub and fast forwards the current branch if the local worktree is cle
 
 Switches to `main` and pulls the latest canonical RatPack.
 
-### `rat stage <slug>`
-
-Runs the same fresh Rat Ship process and then launches the optional local Maker Console Playwright bridge without final submission.
-
-### `rat submit <slug>`
-
-Runs the same fresh Rat Ship process and then launches the optional authenticated Maker Console Playwright submission bridge.
-
-Use this only if you want browser automation. Manual upload through `rat ship` is fully supported.
-
 ### `rat open`
 
 Opens the RatPack repo folder in Explorer.
 
 ### `rat doctor`
 
-Checks Git, Node, npm, GitHub CLI, GitHub authentication, and local repo state.
+Checks Git, Node, npm, GitHub CLI, GitHub authentication, repo state, and whether the persistent Maker Console profile exists.
 
 # Local layout
 
@@ -88,7 +110,13 @@ C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out
 
 `out/` is ignored by Git, so generated marketplace kits do not clutter source control or the Downloads folder.
 
-The Maker Console browser profile, if you ever use the optional Playwright bridge, stays outside the repo under:
+The shared local Rat Ship browser runtime lives in:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\tools\ship
+```
+
+The Maker Console browser profile stays outside the repo under:
 
 ```text
 %LOCALAPPDATA%\PackRat\maker-console-profile
