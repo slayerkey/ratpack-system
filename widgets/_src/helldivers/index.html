@@ -30,6 +30,35 @@
 <style>
 .campaign-rail { overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
 .campaign-rail::-webkit-scrollbar { display: none; }
+body[data-slot="s-h"] .war-stat:nth-of-type(3),
+body[data-slot="s-v"] .war-stat:nth-of-type(3) { display: flex; }
+body[data-slot="s-h"] .war-stat:nth-of-type(4),
+body[data-slot="s-v"] .war-stat:nth-of-type(4) { display: none; }
+body[data-slot="s-h"] .card-track,
+body[data-slot="s-v"] .card-track {
+  position: absolute;
+  left: 11px;
+  right: 11px;
+  bottom: 8px;
+  margin: 0;
+}
+body[data-slot="s-h"] .card-bottom,
+body[data-slot="s-v"] .card-bottom {
+  left: auto;
+  right: 11px;
+  bottom: 25px;
+  text-align: right;
+}
+body[data-slot="m-h"] .card-track,
+body[data-slot="m-v"] .card-track {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 50px;
+  margin: 0;
+}
+body[data-slot="m-h"] .card-bottom,
+body[data-slot="m-v"] .card-bottom { bottom: 10px; }
 </style>
 </head>
 <body data-slot="xl-h" data-connection="loading">
