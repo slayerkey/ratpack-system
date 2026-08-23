@@ -273,6 +273,8 @@ async function bootstrapAuthenticated() {
   }
 }
 
+var sessionAccessToken = "";
+
 async function authenticateWithToken(token) {
   try {
     var data = await rpcRequest("AUTHENTICATE", { access_token: token });
@@ -280,28 +282,85 @@ async function authenticateWithToken(token) {
     var hasRead = scopes.indexOf("rpc.voice.read") >= 0;
     var hasWrite = scopes.indexOf("rpc.voice.write") >= 0;
     if (!hasRead || !hasWrite) {
+      sessionAccessToken = "";
       setState("authorization");
-      return;
+      return false;
     }
+    sessionAccessToken = String(token || "");
     model.account = data.user || null;
     await bootstrapAuthenticated();
+    return true;
   } catch (error) {
+    sessionAccessToken = "";
     setState("authorization");
+    return false;
   }
+}
+
+function base64Url(bytes) {
+  var binary = "";
+  for (var index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function createPkce() {
+  if (!globalThis.crypto || !crypto.getRandomValues || !crypto.subtle) throw new Error("PKCE crypto unavailable");
+  var random = new Uint8Array(32);
+  crypto.getRandomValues(random);
+  var verifier = base64Url(random);
+  var encoded = new TextEncoder().encode(verifier);
+  var digest = await crypto.subtle.digest("SHA-256", encoded);
+  return { verifier: verifier, challenge: base64Url(new Uint8Array(digest)) };
+}
+
+async function exchangeAuthorizationCode(code, verifier) {
+  var body = new URLSearchParams();
+  body.set("grant_type", "authorization_code");
+  body.set("client_id", DISCORD_CLIENT_ID);
+  body.set("code", String(code || ""));
+  body.set("redirect_uri", DISCORD_REDIRECT_URI);
+  body.set("code_verifier", verifier);
+
+  var response = await fetch(DISCORD_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    cache: "no-store",
+    credentials: "omit"
+  });
+  if (!response.ok) throw new Error("Discord token exchange returned HTTP " + response.status);
+  var data = await response.json();
+  if (!data || !data.access_token) throw new Error("Discord token exchange returned no access token");
+  return data;
 }
 
 async function beginAuthorization() {
   if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return;
   var button = document.getElementById("authorizeButton");
   button.disabled = true;
+  model.authorizationCodeReceived = false;
   try {
-    var data = await rpcRequest("AUTHORIZE", { client_id: DISCORD_CLIENT_ID, scopes: DISCORD_SCOPES });
-    if (data && data.code) {
-      model.authorizationCodeReceived = true;
+    var pkce = await createPkce();
+    var data = await rpcRequest("AUTHORIZE", {
+      client_id: DISCORD_CLIENT_ID,
+      response_type: "code",
+      redirect_uri: DISCORD_REDIRECT_URI,
+      scopes: DISCORD_SCOPES,
+      code_challenge: pkce.challenge,
+      code_challenge_method: "S256"
+    });
+    if (!data || !data.code) throw new Error("Discord authorization returned no code");
+    model.authorizationCodeReceived = true;
+    var tokenData;
+    try {
+      tokenData = await exchangeAuthorizationCode(data.code, pkce.verifier);
+    } catch (exchangeError) {
       setState("exchange-required");
+      return;
     }
+    await authenticateWithToken(tokenData.access_token);
   } catch (error) {
-    setState("authorization");
+    setState("auth-failed");
   } finally {
     button.disabled = false;
   }
@@ -322,9 +381,9 @@ async function startLiveConnection() {
     return;
   }
   installSocket(socket);
-  var token = "";
+  var token = sessionAccessToken;
   try {
-    if (typeof globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN === "string") token = globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN.trim();
+    if (!token && typeof globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN === "string") token = globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN.trim();
   } catch (error) { }
   if (token) await authenticateWithToken(token);
   else setState("authorization");
@@ -336,7 +395,7 @@ async function setSelfVoice(field, nextValue) {
     renderControls();
     return;
   }
-  if (!rpcSocket || (model.state !== "voice" && model.state !== "idle")) return;
+  if (!rpcSocket || model.state !== "voice") return;
   var args = {};
   args[field] = Boolean(nextValue);
   try {
