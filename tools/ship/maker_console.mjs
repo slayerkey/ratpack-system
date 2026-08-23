@@ -39,7 +39,9 @@ if (CHECK_KIT) {
   console.log(`package: ${packages[0]}`);
   process.exit(0);
 }
-const LOG = join(KIT,'log'); mkdirSync(LOG,{recursive:true});
+
+const LOG = join(KIT,'log');
+mkdirSync(LOG,{recursive:true});
 const STATE = join(LOG,'state.json');
 const state = RESUME && existsSync(STATE) ? JSON.parse(readFileSync(STATE,'utf8')) : {done:[],uploaded:[]};
 const save = () => writeFileSync(STATE, JSON.stringify(state,null,2));
@@ -82,7 +84,24 @@ async function autoLogin(page){
   return false;
 }
 async function livePage(ctx,page){ if(page&&!page.isClosed()) return page; const ps=ctx.pages().filter(p=>!p.isClosed()); if(!ps.length) throw new Error('Maker Console closed every page'); return ps.at(-1); }
-async function click(page,re,timeout=15000){ const b=page.getByRole('button',{name:re}).or(page.getByRole('link',{name:re})).first(); await b.waitFor({state:'visible',timeout}); const txt=((await b.textContent())||'').trim(); if(/^(submit|publish|submit for review)$/i.test(txt)) throw new Error(`guard refused ${txt}`); await b.click({timeout}); await page.waitForTimeout(900); }
+async function visible(locator){ return await locator.first().isVisible().catch(()=>false); }
+async function click(page,re,timeout=15000){
+  const b=page.getByRole('button',{name:re}).or(page.getByRole('link',{name:re})).first();
+  await b.waitFor({state:'visible',timeout});
+  const txt=((await b.textContent())||'').trim();
+  if(/^(submit|publish|submit for review)$/i.test(txt)) throw new Error(`guard refused ${txt}`);
+  await b.click({timeout});
+  await page.waitForTimeout(900);
+}
+async function clickIfVisible(page,re){
+  const b=page.getByRole('button',{name:re}).or(page.getByRole('link',{name:re})).first();
+  if(!await visible(b)) return false;
+  const txt=((await b.textContent())||'').trim();
+  if(/^(submit|publish|submit for review)$/i.test(txt)) return false;
+  await b.click();
+  await page.waitForTimeout(1200);
+  return true;
+}
 async function listboxes(page){
   const triggers=page.locator('button[aria-haspopup="listbox"]'); const out=[];
   for(let i=0;i<await triggers.count();i++){
@@ -93,15 +112,107 @@ async function listboxes(page){
   writeFileSync(join(LOG,'details-listboxes.json'),JSON.stringify(out,null,2));
   return out;
 }
+const OPTION_ALIASES = new Map([
+  ['games',['Gaming']],
+]);
+function optionCandidates(value){ return [value,...(OPTION_ALIASES.get(String(value).toLowerCase())||[])]; }
 async function pickByContent(page,boxes,label,wanted){
   const grouped=new Map(),missing=[];
-  for(const value of wanted){const box=boxes.find(b=>b.options.some(o=>o.toLowerCase()===value.toLowerCase())); if(!box){missing.push(value);continue;} if(!grouped.has(box.index))grouped.set(box.index,[]); grouped.get(box.index).push(value);}
-  for(const [idx,values] of grouped){const t=page.locator('button[aria-haspopup="listbox"]').nth(idx);await t.click();await page.waitForTimeout(400);for(const v of values){const esc=v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');await page.getByRole('option',{name:new RegExp(`^${esc}$`,'i')}).first().click();await page.waitForTimeout(250);}await page.keyboard.press('Escape');console.log(`${label}: ${values.join(', ')}`);}
+  for(const value of wanted){
+    const candidates=optionCandidates(value);
+    let matched=null;
+    for(const candidate of candidates){
+      const box=boxes.find(b=>b.options.some(o=>o.toLowerCase()===candidate.toLowerCase()));
+      if(box){ matched={box,value:candidate}; break; }
+    }
+    if(!matched){missing.push(value);continue;}
+    if(!grouped.has(matched.box.index))grouped.set(matched.box.index,[]);
+    grouped.get(matched.box.index).push({requested:value,actual:matched.value});
+  }
+  for(const [idx,values] of grouped){
+    const t=page.locator('button[aria-haspopup="listbox"]').nth(idx);
+    await t.click(); await page.waitForTimeout(400);
+    for(const {requested,actual} of values){
+      const esc=actual.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      await page.getByRole('option',{name:new RegExp(`^${esc}$`,'i')}).first().click();
+      await page.waitForTimeout(250);
+      console.log(`${label}: ${requested}${requested===actual?'':` -> ${actual}`}`);
+    }
+    await page.keyboard.press('Escape');
+  }
   return missing;
 }
 async function countGallery(page){return await page.locator('img[src^="data:image"], img[src*="mp-cdn.elgato.com"]:not([src*="/organizations/"]), video').count().catch(()=>null);}
 async function proseMirror(page,selector,text){const el=selector;await el.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.press('Delete');await page.keyboard.insertText(text);await page.waitForTimeout(400);const back=((await el.innerText().catch(()=>''))||'').trim();if(!back)throw new Error('rich text write did not persist');}
 async function step(page,id,label,fn){if(RESUME&&done(id)){console.log(`skip ${label}`);return;}console.log(`\n== ${label} ==`);await fn();mark(id);await snap(page,id);}
+async function editorLooksLikeDetails(page){
+  const size=page.getByRole('button',{name:/^(extra large|large|medium|small)$/i}).first();
+  const paid=page.getByRole('button',{name:/^paid$/i}).first();
+  return await visible(size) || await visible(paid);
+}
+async function editorLooksLikeMedia(page){
+  if(await page.locator('input[type="file"]').count()) return true;
+  const body=((await page.locator('body').innerText().catch(()=>''))||'').toLowerCase();
+  return body.includes('thumbnail') || body.includes('gallery') || body.includes('cover image');
+}
+async function enterExistingEditor(page){
+  for(const re of [/continue editing/i,/edit draft/i,/resume draft/i,/continue setup/i,/edit product/i,/^edit$/i]){
+    if(await clickIfVisible(page,re)) return true;
+  }
+  return false;
+}
+async function ensureSizeSelected(page,size){
+  const chip=page.getByRole('button',{name:new RegExp(`^${size}$`,'i')}).first();
+  if(!await visible(chip)) throw new Error(`dashboard size not offered: ${size}`);
+  const attrs=await chip.evaluate(el=>({
+    pressed:el.getAttribute('aria-pressed'),
+    selected:el.getAttribute('aria-selected'),
+    checked:el.getAttribute('aria-checked'),
+    state:el.getAttribute('data-state'),
+    selectedData:el.getAttribute('data-selected'),
+    cls:el.className||''
+  })).catch(()=>({}));
+  const selected = attrs.pressed==='true' || attrs.selected==='true' || attrs.checked==='true' || attrs.selectedData==='true' || /^(on|checked|active|selected)$/i.test(attrs.state||'') || /\b(selected|active|checked)\b/i.test(String(attrs.cls||''));
+  if(!selected) await chip.click();
+}
+async function configureDetails(page){
+  page=await livePage(context,page);
+  for(const size of prod.marketplace_dashboard_sizes) await ensureSizeSelected(page,size);
+  const boxes=await listboxes(page);
+  const miss=[...await pickByContent(page,boxes,'Category',prod.marketplace_category),...await pickByContent(page,boxes,'Language',prod.marketplace_language)];
+  if(miss.length)throw new Error(`Maker Console no longer offers: ${miss.join(', ')}`);
+  if(prod.price_usd>0){
+    await page.getByRole('button',{name:/^paid$/i}).first().click();
+    const price=page.locator('input[type="number"],input[inputmode="decimal"]').or(page.locator('input:not([type=checkbox]):not([type=file]):not([readonly]):visible')).first();
+    await price.fill(String(prod.price_usd));
+    const back=Number(await price.inputValue());
+    if(back!==Number(prod.price_usd))throw new Error(`price mismatch ${back}`);
+  } else await page.getByRole('button',{name:/^free$/i}).first().click();
+  await click(page,/^continue$/i);
+}
+async function singleFileInputs(page){ return page.locator('input[type="file"]:not([multiple])'); }
+async function setIconAndCover(page){
+  page=await livePage(context,page);
+  const icon=page.locator('input#media-app-icon').first();
+  if(await icon.count()) await icon.setInputFiles(join(KIT,'01_search_icon.png'));
+  const singles=await singleFileInputs(page);
+  const count=await singles.count();
+  let cover=null;
+  for(let i=0;i<count;i++){
+    const candidate=singles.nth(i);
+    const id=(await candidate.getAttribute('id'))||'';
+    if(id==='media-app-icon') continue;
+    const name=(await candidate.getAttribute('name'))||'';
+    const accept=(await candidate.getAttribute('accept'))||'';
+    if(/image|png|jpe?g|webp/i.test(accept) || /media|cover|thumb/i.test(name+id) || !cover) cover=candidate;
+    if(/cover|thumb/i.test(name+id)) break;
+  }
+  if(!cover) throw new Error('cover upload input not found on Maker Console media step');
+  await cover.setInputFiles(join(KIT,'02_cover.png'),{timeout:60000});
+  await page.waitForTimeout(1800);
+  const body=await page.locator('body').innerText();
+  if(/Thumbnail required/i.test(body))throw new Error('thumbnail upload did not stick');
+}
 
 const profileDir = profileArg ? resolve(profileArg) : join(ROOT,'.playwright-profile');
 const context=await chromium.launchPersistentContext(profileDir,{headless:false,viewport:{width:1500,height:950}});
@@ -119,18 +230,39 @@ if(!auth){
 
 async function openExisting(){await page.goto('https://maker.elgato.com/products',{waitUntil:'domcontentloaded',timeout:45000});await page.waitForTimeout(3000);const row=page.getByRole('link',{name:new RegExp(`^${prod.name}`,'i')}).or(page.getByText(prod.name,{exact:true})).first();if(!await row.isVisible().catch(()=>false))return false;await row.click();await page.waitForTimeout(3500);return true;}
 const editing=await openExisting();
-if(editing)console.log(`Existing Maker Console product found for ${prod.name}. Continuing that draft/listing.`);
-if(!editing){
+if(editing){
+  console.log(`Existing Maker Console product found for ${prod.name}. Continuing that draft/listing.`);
+  page=await livePage(context,page);
+  await enterExistingEditor(page);
+  page=await livePage(context,page);
+  if(await editorLooksLikeDetails(page)){
+    await step(page,'4-details','Set category, dashboard sizes, language and price',async()=>{await configureDetails(page);});
+  } else if(await editorLooksLikeMedia(page)){
+    mark('4-details');
+  } else {
+    await snap(page,'resume-unknown');
+    const buttons=await page.getByRole('button').allTextContents().catch(()=>[]);
+    writeFileSync(join(LOG,'resume-buttons.json'),JSON.stringify(buttons,null,2));
+    throw new Error('Existing Maker Console draft was found, but Rat Ship could not identify its current edit step. See recovery screenshot and resume-buttons.json.');
+  }
+} else {
   await step(page,'1-create','Create Widget draft',async()=>{await click(page,/create product|new product|add product/i);const choice=page.getByRole('radio',{name:/^widget$/i}).or(page.getByText(/^widget$/i)).or(page.getByRole('button',{name:/^widget$/i})).first();await choice.click();await click(page,/^(next|continue)$/i);});
   await step(page,'2-file','Upload .icuewidget',async()=>{page=await livePage(context,page);const input=page.locator('input[type="file"]').first();await input.setInputFiles(join(KIT,packages[0]));await click(page,/^(next|continue)$/i,180000);});
   await step(page,'3-copy','Verify name and set description',async()=>{page=await livePage(context,page);const ro=page.locator('input[readonly][maxlength]').first();await ro.waitFor({state:'visible',timeout:10000});const name=(await ro.inputValue()).trim();if(name!==prod.name)throw new Error(`manifest name mismatch: ${name}`);const desc=page.locator('#description').or(page.locator('div[role="textbox"]')).or(page.locator('[contenteditable="true"]')).first();await proseMirror(page,desc,readFileSync(join(KIT,'PASTE_description.txt'),'utf8').trim());await click(page,/^create product$/i);page=await livePage(context,page);});
-  await step(page,'4-details','Set category, dashboard sizes, language and price',async()=>{page=await livePage(context,page);for(const size of prod.marketplace_dashboard_sizes){const chip=page.getByRole('button',{name:new RegExp(`^${size}$`,'i')}).first();if(!await chip.isVisible().catch(()=>false))throw new Error(`dashboard size not offered: ${size}`);await chip.click();}const boxes=await listboxes(page);const miss=[...await pickByContent(page,boxes,'Category',prod.marketplace_category),...await pickByContent(page,boxes,'Language',prod.marketplace_language)];if(miss.length)throw new Error(`Maker Console no longer offers: ${miss.join(', ')}`);if(prod.price_usd>0){await page.getByRole('button',{name:/^paid$/i}).first().click();const price=page.locator('input[type="number"],input[inputmode="decimal"]').or(page.locator('input:not([type=checkbox]):not([type=file]):not([readonly]):visible')).first();await price.fill(String(prod.price_usd));const back=Number(await price.inputValue());if(back!==Number(prod.price_usd))throw new Error(`price mismatch ${back}`);}else await page.getByRole('button',{name:/^free$/i}).first().click();await click(page,/^continue$/i);});
+  await step(page,'4-details','Set category, dashboard sizes, language and price',async()=>{await configureDetails(page);});
 }
 
-await step(page,'5-media','Upload icon and cover',async()=>{page=await livePage(context,page);const icon=page.locator('input#media-app-icon');if(await icon.count())await icon.setInputFiles(join(KIT,'01_search_icon.png'));const thumb=(await icon.count())?page.locator('input[name="media"]:not([multiple]):not(#media-app-icon)').first():page.locator('input[name="media"]:not([multiple])').first();await thumb.setInputFiles(join(KIT,'02_cover.png'));await page.waitForTimeout(1800);const body=await page.locator('body').innerText();if(/Thumbnail required/i.test(body))throw new Error('thumbnail upload did not stick');});
+await step(page,'5-media','Upload icon and cover',async()=>{await setIconAndCover(page);});
 for(const f of media.slice(2)){
   if(RESUME&&state.uploaded.includes(f))continue;
-  page=await livePage(context,page);const before=await countGallery(page);if(before==null)throw new Error('cannot verify gallery count');const input=page.locator('input[type="file"][accept*="mp4"]').first();await input.setInputFiles(join(KIT,f),{timeout:60000});await page.waitForTimeout(2500);const after=await countGallery(page);if(after!==before+1)throw new Error(`gallery invariant failed for ${f}: ${before} -> ${after}`);state.uploaded.push(f);save();await snap(page,`gallery-${f}`);
+  page=await livePage(context,page);
+  const before=await countGallery(page);if(before==null)throw new Error('cannot verify gallery count');
+  const input=page.locator('input[type="file"][accept*="mp4"]').first();
+  await input.setInputFiles(join(KIT,f),{timeout:60000});
+  await page.waitForTimeout(2500);
+  const after=await countGallery(page);
+  if(after!==before+1)throw new Error(`gallery invariant failed for ${f}: ${before} -> ${after}`);
+  state.uploaded.push(f);save();await snap(page,`gallery-${f}`);
 }
 mark('6-gallery');
 await step(page,'6-continue','Continue past media',async()=>{for(let i=0;i<6;i++){await click(page,/^(next|continue)$/i,30000).catch(()=>{});await page.waitForTimeout(1800);if(!await page.getByRole('button',{name:/^replace$/i}).first().isVisible().catch(()=>false))return;}throw new Error('media slide would not advance');});
