@@ -1,0 +1,17 @@
+{
+  "author": "PackRat 🐀",
+  "id": "com.packrat.discordpanel",
+  "name": "Discord Voice Panel",
+  "description": "A touch-first Discord voice roster for XENEON Edge with live speaker highlights, current voice channel members, self mute and deafen controls, and a calm idle state when you are not in voice.",
+  "version": "0.1.0",
+  "preview_icon": "resources/icon.svg",
+  "min_framework_version": "1.0.0",
+  "min_app_version": "5.47",
+  "os": [
+    { "platform": "windows" }
+  ],
+  "supported_devices": [
+    { "type": "dashboard_lcd" }
+  ],
+  "interactive": true
+}
