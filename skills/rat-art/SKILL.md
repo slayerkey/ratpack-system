@@ -43,6 +43,17 @@ Composite the real capture into the approved XENEON device plate using the calib
 
 The capture gate must test glyph safety for clipped descenders and other text-bound failures before the marketplace art is rendered.
 
+### Shared marketplace composition defaults
+
+These are repository defaults for future XENEON Rat Art and should not be reimplemented product by product.
+
+1. Footer center branding is the PackRat rat logo only. Do not render the `PACKRAT` wordmark beside it. Hero frames may still keep useful platform labels such as `iCUE WIDGET` and `CORSAIR XENEON EDGE` at the sides.
+2. Marketplace sequence is cover first, then the detailed feature or value breakdown, then the broader product showcase, then settings or interaction states, then size compatibility. The gallery should teach more as the customer moves forward rather than repeat the cover.
+3. Cover and gallery frames must be distinct. Rat Ship should fail if any generated marketplace image is byte identical to another listing image.
+4. Labels beneath screenshots need a visible safety gap from the screenshot frame. Never place a label directly on the screenshot edge.
+5. Multi-panel settings and size frames use the shared lower divider and a dedicated footer copy band. Labels stay above the divider, footer copy stays below it, and neither should collide with the main Rat Art footer.
+6. The Rat Art contact sheet should follow marketplace viewing order so visual review catches sequencing problems before shipping.
+
 ## Required preflight
 
 Verify canonical engine imports, required source assets, brand logo, device plate, required widget captures, and exact brand font resolution.
@@ -53,6 +64,6 @@ Missing brand typography is an error. Never silently fall back to Pillow's defau
 
 Run deterministic QA, inspect every candidate hero and contact sheet, and record visual review results.
 
-Judge title legibility, hierarchy, device dominance, contextual recognition, crop quality, clutter, accidental branding, text bounds, and marketplace polish.
+Judge title legibility, hierarchy, device dominance, contextual recognition, crop quality, clutter, accidental branding, text bounds, gallery sequencing, footer branding, divider consistency, and marketplace polish.
 
 If the candidate fails, make one evidence based correction pass before reporting the blocker.

@@ -1,5 +1,5 @@
 """Build a self-contained Maker Console SHIP_KIT for one XENEON widget."""
-import argparse, json, shutil
+import argparse, hashlib, json, shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -7,6 +7,9 @@ PLAYWRIGHT_VERSION = "1.62.1"
 
 def fail(msg):
     raise SystemExit(f"RAT SHIP FAIL: {msg}")
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def main():
     ap = argparse.ArgumentParser()
@@ -42,15 +45,29 @@ def main():
     if out.exists(): shutil.rmtree(out)
     out.mkdir(parents=True)
     shutil.copy2(pkg, out / pkg.name)
+
+    # Marketplace sequence is intentionally value-first after the cover:
+    # cover, breakdown/features, product showcase, settings/modes, slot sizes.
     mapping = {
         "icon-288x288.png": "01_search_icon.png",
         "1-hero.png": "02_cover.png",
-        "2-showcase.png": "03_gallery_01.png",
-        "3-features.png": "04_gallery_02.png",
+        "3-features.png": "03_gallery_01.png",
+        "2-showcase.png": "04_gallery_02.png",
         "4-settings.png": "05_gallery_03.png",
         "5-sizes.png": "06_gallery_04.png",
     }
     for src, dst in mapping.items(): shutil.copy2(art / src, out / dst)
+
+    # Fail closed if Rat Art accidentally produced a cover/gallery duplicate.
+    # The cover is not a gallery item and every gallery frame must add information.
+    listing_media = ["02_cover.png","03_gallery_01.png","04_gallery_02.png","05_gallery_03.png","06_gallery_04.png"]
+    by_hash = {}
+    for name in listing_media:
+        value = digest(out / name)
+        if value in by_hash:
+            fail(f"duplicate marketplace image: {name} is identical to {by_hash[value]}")
+        by_hash[value] = name
+
     (out / "PASTE_description.txt").write_text(meta["description"].strip() + "\n", encoding="utf-8")
     (out / "PASTE_release_notes.txt").write_text(meta["release_notes"].strip() + "\n", encoding="utf-8")
     public = {k: v for k, v in meta.items() if k not in ("description", "release_notes")}
@@ -84,7 +101,7 @@ Manual fallback contents:
 5. Category: **{', '.join(meta['marketplace_category'])}**
 6. Dashboard sizes: **{', '.join(meta['marketplace_dashboard_sizes'])}**
 {orientation_check}{language_number}. Language: **{', '.join(meta['marketplace_language'])}**
-{media_number}. Upload media in numeric filename order.
+{media_number}. Upload media in numeric filename order. The cover is separate; gallery 01 is the feature breakdown and must not duplicate the cover.
 {verify_number}. Verify version **{meta['version']}**, auto publish policy, dashboard sizes, recommended orientation when present, gallery order, and price immediately before Submit.
 
 `SUBMIT_NOW.cmd` is a double click friendly portable fallback. `SUBMIT_NOW.ps1` contains the same fallback logic for PowerShell. The normal `rat ship` command is faster because it reuses the repository level browser runtime instead of installing dependencies inside every generated kit.

@@ -11,6 +11,24 @@ Create the release candidate from canonical source and generated artifacts. Incl
 
 Validate that the ship helper has an explicit branch for the product type. Do not let widgets fall through to profile handling.
 
+## XENEON marketplace media
+
+For XENEON widgets, treat the cover and gallery as separate customer jobs.
+
+The default marketplace order is:
+
+1. Cover or hero
+2. Feature and value breakdown
+3. Product showcase
+4. Settings, interaction, or alternate state
+5. Slot size compatibility
+
+Do not upload the cover again as a gallery item. The ship kit must fail if the cover or any gallery image is byte identical to another listing image.
+
+The first gallery frame should normally explain the product in more detail with concise feature or value points rather than repeat the hero composition.
+
+Use the shared Rat Art footer and spacing rules. Do not add product-local footer wordmarks or one-off label/divider placement fixes when the shared renderer can own them.
+
 ## Elgato Maker Console
 
 Use the live Maker Console behavior as the operational source of truth when it conflicts with lagging public documentation.
