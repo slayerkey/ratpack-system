@@ -2,17 +2,25 @@
 
 You only need to remember a few commands for normal use.
 
-## `rat ship <slug>`
+## `rat ship <slug> [slug...]`
 
 This is the main release command.
 
-Example:
+Single product:
 
 ```text
 rat ship helldivers
 ```
 
-What it does:
+Multiple products in one queue:
+
+```text
+rat ship weather-timeline-pro weather-timeline snake desk-notes
+```
+
+Batch mode processes products sequentially so one authenticated Maker Console browser profile is never driven by two submissions at the same time. If one product fails, Rat Ship records that failure, continues the remaining queue, and prints a failure summary at the end.
+
+What it does for each product:
 
 1. Switches the local checkout to the latest `main`.
 2. Triggers the Rat Ship GitHub Actions workflow.
@@ -31,9 +39,34 @@ out\ship\<slug>
 10. Fills the product draft from the canonical ship kit.
 11. Uploads the official widget package and Rat Art.
 12. Sets marketplace metadata, release notes, price, and auto publish policy.
-13. Submits the product.
+13. Uploads gallery media in the canonical marketplace order.
+14. Submits the product.
 
-If Maker Console or Chromium stops unexpectedly, Rat Ship restarts the browser and retries with the saved resume state up to three times.
+### Gallery order
+
+The XENEON marketplace sequence is intentionally:
+
+1. Cover / hero
+2. Feature and value breakdown
+3. Main product showcase / highest value feature
+4. Settings, interaction, or alternate state
+5. Slot size compatibility
+
+The cover is separate from the gallery. Rat Ship uploads the four gallery images as one ordered FileList when Maker Console exposes a multi file input. If Maker Console only exposes a single file uploader, Rat Ship uses the compatibility ordering needed to preserve the final visible gallery sequence.
+
+### Crash and recovery behavior
+
+Recoverable Maker Console or Chromium failures are retried with saved resume state up to three times.
+
+Rat Ship does not blindly retry a draft whose irreversible state is wrong. For example, if a paid product is found in a Maker Console draft or listing whose monetization is already locked to Free, Rat Ship stops immediately and explains that the incorrect draft must be removed before recreating it.
+
+On a local Maker Console failure Rat Ship creates:
+
+```text
+out\ship\<slug>\log.zip
+```
+
+The ZIP contains the recovery screenshots, error text, state, and any page diagnostics. Rat Ship also opens Explorer with the recovery ZIP selected so it is easy to drag into a support or debugging chat.
 
 Authentication is local only. Maker Console cookies and session state stay under:
 
@@ -91,7 +124,7 @@ Shows:
 * local repo path
 * current branch
 * latest commit
-* whether local files have changed
+* whether local files changed
 
 Use this if you want to know whether your local RatPack checkout is clean and current.
 
@@ -113,21 +146,21 @@ rat dev-open discord-bridge
 
 Use this only when you actually want to inspect the generated plugin or local development files. Successful `rat dev` runs do not open Explorer automatically because there should normally be nothing to install by hand.
 
-### `rat kit <slug>`
+### `rat kit <slug> [slug...]`
 
 Runs the fresh Rat Ship GitHub pipeline and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
 
 This is useful when you specifically want the files only.
 
-### `rat stage <slug>`
+### `rat stage <slug> [slug...]`
 
 Runs the same fresh Rat Ship process, launches Maker Console, fills the listing, uploads the package and media, and stops before the final Submit action.
 
 Use this when you want to inspect the finished Maker Console draft manually.
 
-### `rat submit <slug>`
+### `rat submit <slug> [slug...]`
 
-Alias for `rat ship <slug>`.
+Alias for `rat ship`.
 
 ### `rat update`
 
