@@ -9,6 +9,7 @@ const baseSensors = {
 
 export const variants = [
   { name: 'info', slot: 'M_H', mode: 'info' },
+  { name: 'zero', slot: 'S_H', mode: 'zero' },
   { name: 'high-power', slot: 'M_H', mode: 'high' },
   { name: 'preview', slot: 'M_H', mode: 'preview' },
   { name: 'empty', slot: 'M_H', mode: 'empty' },
@@ -17,6 +18,7 @@ export const variants = [
 
 export async function prepare(page, context) {
   const fixtureSensors = structuredClone(baseSensors);
+  if (context.variant?.mode === 'zero') fixtureSensors.total.value = '0';
   if (context.variant?.mode === 'high') fixtureSensors.total.value = '12500';
   if (context.variant?.mode === 'empty') {
     for (const key of Object.keys(fixtureSensors)) if (fixtureSensors[key].type === 'power') delete fixtureSensors[key];
@@ -44,14 +46,17 @@ export async function prepare(page, context) {
       localStorage.clear();
       if (!['preview', 'empty', 'unavailable'].includes(mode)) {
         const now = Date.now();
+        const isZero = mode === 'zero';
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:session', JSON.stringify({
           sensorId: 'total', startedAt: now - 2 * 3600000, lastSeenAt: now - 1000,
-          energyWh: mode === 'high' ? 25000 : (mode === 'normal' ? 823.01 : 840), measuredMs: 7200000,
-          peakW: mode === 'high' ? 12500 : 517, samples: 7200,
+          energyWh: isZero ? 0 : (mode === 'high' ? 25000 : (mode === 'normal' ? 823.01 : 840)),
+          measuredMs: isZero ? 0 : 7200000,
+          peakW: isZero ? 0 : (mode === 'high' ? 12500 : 517),
+          samples: isZero ? 1 : 7200,
         }));
         const d = new Date(now);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:daily', JSON.stringify({ [key]: { wh: 1320, measuredMs: 10800000 } }));
+        localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:daily', JSON.stringify({ [key]: { wh: isZero ? 0 : 1320, measuredMs: isZero ? 0 : 10800000 } }));
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:history', JSON.stringify([{
           sensorId: 'total', startedAt: now - 6 * 3600000, endedAt: now - 4 * 3600000,
           energyWh: 620, measuredMs: 7200000, averageW: 310, peakW: 461,
@@ -100,6 +105,16 @@ export async function prepare(page, context) {
         store[id].value = String(value);
         plugin.sensorValueChanged.emit(id, String(value));
       },
+      remove(id) {
+        if (!store[id]) return;
+        delete store[id];
+        plugin.sensorRemoved.emit(id);
+      },
+      add(id, sensor) {
+        store[id] = sensor;
+        plugin.sensorAdded.emit(id);
+      },
+      totalSensor: structuredClone(baseSensors.total),
     };
   }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
 }
@@ -194,7 +209,9 @@ export async function assert(page, context) {
   if (report.comparisons !== 2) throw new Error(`comparison sensors failed: ${JSON.stringify(report)}`);
   if (!String(report.catalogue['psu-a']?.displayName || '').endsWith('#1') || !String(report.catalogue['psu-b']?.displayName || '').endsWith('#2')) throw new Error('duplicate Pro sensor labels were not disambiguated');
   if (!context.variant && report.graphPaths !== 3) throw new Error(`Pro graph did not render all three measured traces: ${JSON.stringify(report)}`);
-  if (context.variant?.mode === 'high') {
+  if (context.variant?.mode === 'zero') {
+    if (report.now !== '0.00' || report.cost !== '$0.000') throw new Error(`zero power/cost failed: ${JSON.stringify(report)}`);
+  } else if (context.variant?.mode === 'high') {
     if (report.now !== '12,500' || report.threshold !== 'high') throw new Error(`high power threshold failed: ${JSON.stringify(report)}`);
   } else {
     if (!report.cost.startsWith('$0.126')) throw new Error(`cost calculation/render failed: ${JSON.stringify(report)}`);
@@ -202,4 +219,14 @@ export async function assert(page, context) {
     if (!report.history.includes('LAST SESSION') || !report.history.includes('620')) throw new Error(`history summary failed: ${JSON.stringify(report)}`);
   }
   if (context.variant?.mode === 'info' && report.overlayHidden) throw new Error('Pro info overlay did not open');
+
+  if (!context.variant && context.slot === 'M_H') {
+    const before = await page.evaluate(() => globalThis.PackRatPowerMeterTest.getSession());
+    await page.evaluate(() => globalThis.__powerProFixture.remove('total'));
+    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'disconnected', null, { timeout: 3000 });
+    await page.evaluate(() => globalThis.__powerProFixture.add('total', globalThis.__powerProFixture.totalSensor));
+    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'ready' && globalThis.PackRatPowerMeterTest.getPrimary()?.id === 'total', null, { timeout: 3000 });
+    const after = await page.evaluate(() => globalThis.PackRatPowerMeterTest.getSession());
+    if (after.sensorId !== 'total' || after.energyWh + 1e-9 < before.energyWh) throw new Error(`Pro reconnect corrupted the primary session: ${JSON.stringify({ before, after })}`);
+  }
 }
