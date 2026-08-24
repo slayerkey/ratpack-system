@@ -135,6 +135,7 @@ export interface RuntimeStatus {
   cs2Running: boolean;
   gsiConfigured: boolean;
   gsiConnected: boolean;
+  gsiRestartRequired?: boolean;
   lastPayloadAt?: number;
   configPath?: string;
   listenerPort?: number;
