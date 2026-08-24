@@ -30,7 +30,7 @@
     try {
       var value = globalThis[name];
       if (typeof Node !== 'undefined' && value instanceof Node) return fallback;
-      if (value === undefined || value === null || value === '') return fallback;
+      if (value === undefined || value === null) return fallback;
       return value;
     } catch (e) { return fallback; }
   }
@@ -97,9 +97,10 @@
     };
   }
 
-  function parseBoard(title, raw, boardIndex, maxEntries) {
-    var normalized = String(raw || '').replace(/\r\n?/g, '\n');
-    var lines = normalized.split('\n');
+  function parseBoard(title, rawRows, boardIndex, maxFields) {
+    var rows = Array.isArray(rawRows)
+      ? rawRows.slice(0, maxFields)
+      : String(rawRows || '').replace(/\r\n?/g, '\n').split('\n').slice(0, maxFields);
     var cards = [];
     var card = { title: '', category: '', items: [] };
     var count = 0;
@@ -110,8 +111,8 @@
       card = { title: '', category: '', items: [] };
     }
 
-    for (var i = 0; i < lines.length && count < maxEntries; i++) {
-      var line = lines[i].trim();
+    for (var i = 0; i < rows.length; i++) {
+      var line = String(rows[i] || '').replace(/\r?\n/g, ' ').trim();
       if (!line) { pushCard(); continue; }
       if (/^##\s+/.test(line)) { card.title = line.replace(/^##\s+/, '').trim(); continue; }
       if (/^#\s+/.test(line)) { card.category = line.replace(/^#\s+/, '').trim(); continue; }
@@ -128,19 +129,33 @@
     return { title: String(title || '').trim() || 'TODAY', cards: cards, count: count };
   }
 
-  function readBoards() {
-    if (!cfg.pro) {
-      var liteTitle = getProp('boardTitle', 'TODAY');
-      var liteContent = getProp('boardContent', '[ ] Finish thumbnail\n[ ] Upload video\nRespond to email\nCall dentist');
-      return [parseBoard(liteTitle, liteContent, 0, cfg.maxEntries || 8)];
+  function collectEntries(prefix, count, defaults) {
+    var rows = [];
+    for (var i = 1; i <= count; i++) {
+      var fallback = defaults && defaults[i - 1] !== undefined ? defaults[i - 1] : '';
+      rows.push(String(getProp(prefix + i, fallback) || ''));
     }
+    return rows;
+  }
+
+  function readBoards() {
+    var entryCount = Math.max(1, Number(cfg.entryCount || cfg.maxEntries || (cfg.pro ? 16 : 8)) || 8);
+    if (!cfg.pro) {
+      var liteDefaults = ['[ ] Finish thumbnail', '[ ] Upload video', 'Respond to email', 'Call dentist', '', '', '', ''];
+      return [parseBoard(getProp('boardTitle', 'TODAY'), collectEntries('entry', entryCount, liteDefaults), 0, entryCount)];
+    }
+    var defaults = [
+      ['[ ] Finish thumbnail', '[ ] Upload video', 'Respond to email', '', '## Remember', 'Call dentist', 'Buy SSD'],
+      ['## Priority', '! [ ] Ship widget', '[ ] Test layouts', '[ ] Submit Marketplace assets'],
+      ['[ ] Grocery run', 'Book appointment', 'Text Alex'],
+      ['# Launch', '! [ ] Final QA', '[ ] Rat Art', '[ ] Ship kit', '', '## Later', 'Write changelog']
+    ];
     var boards = [];
     var count = Math.max(1, Math.min(Number(cfg.boardCount || 4), 4));
     for (var i = 0; i < count; i++) {
       var n = i + 1;
       var title = getProp('board' + n + 'Title', ['TODAY', 'WORK', 'PERSONAL', 'CURRENT PROJECT'][i] || ('BOARD ' + n));
-      var content = getProp('board' + n + 'Content', '');
-      boards.push(parseBoard(title, content, i, cfg.maxEntries || 16));
+      boards.push(parseBoard(title, collectEntries('board' + n + 'Entry', entryCount, defaults[i] || []), i, entryCount));
     }
     return boards;
   }

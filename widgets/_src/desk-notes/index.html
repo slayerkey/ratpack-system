@@ -5,8 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
 <title>tr('Desk Notes Lite')</title>
-<meta name="x-icue-property" content="boardTitle" data-label="tr('Board Title')" data-type="textfield" data-default="'TODAY'" />
-<meta name="x-icue-property" content="boardContent" data-label="tr('Notes')" data-type="textfield" data-default="'[ ] Finish thumbnail&#10;[ ] Upload video&#10;Respond to email&#10;Call dentist'" />
+<meta name="x-icue-property" content="boardTitle" data-label="tr('Board Title')" data-type="textfield" data-default="&#x27;TODAY&#x27;" />
+<meta name="x-icue-property" content="entry1" data-label="tr('Entry 1')" data-type="textfield" data-default="&#x27;[ ] Finish thumbnail&#x27;" />
+<meta name="x-icue-property" content="entry2" data-label="tr('Entry 2')" data-type="textfield" data-default="&#x27;[ ] Upload video&#x27;" />
+<meta name="x-icue-property" content="entry3" data-label="tr('Entry 3')" data-type="textfield" data-default="&#x27;Respond to email&#x27;" />
+<meta name="x-icue-property" content="entry4" data-label="tr('Entry 4')" data-type="textfield" data-default="&#x27;Call dentist&#x27;" />
+<meta name="x-icue-property" content="entry5" data-label="tr('Entry 5')" data-type="textfield" data-default="&#x27;&#x27;" />
+<meta name="x-icue-property" content="entry6" data-label="tr('Entry 6')" data-type="textfield" data-default="&#x27;&#x27;" />
+<meta name="x-icue-property" content="entry7" data-label="tr('Entry 7')" data-type="textfield" data-default="&#x27;&#x27;" />
+<meta name="x-icue-property" content="entry8" data-label="tr('Entry 8')" data-type="textfield" data-default="&#x27;&#x27;" />
 <meta name="x-icue-property" content="noteTheme" data-label="tr('Note Theme')" data-type="combobox" data-default="'midnight'" data-values="[{'key':'midnight','value':tr('Midnight')},{'key':'paper','value':tr('Paper')},{'key':'sage','value':tr('Sage')},{'key':'ocean','value':tr('Ocean')},{'key':'plum','value':tr('Plum')},{'key':'amber','value':tr('Amber')}]" />
 <meta name="x-icue-property" content="fontScale" data-label="tr('Font Size')" data-type="slider" data-default="100" data-min="80" data-max="125" data-step="5" data-unit-label="'%'" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F7FB'" />
@@ -15,13 +22,13 @@
 <meta name="x-icue-property" content="transparency" data-label="tr('Background Transparency')" data-type="slider" data-default="0" data-min="0" data-max="90" data-step="5" data-unit-label="'%'" />
 <script type="application/json" id="x-icue-groups">
 [
-  {"title":"tr('Desk Notes Lite')","properties":["boardTitle","boardContent"],"info":"tr('One line becomes one entry. Start a line with [ ] to make it a tappable checklist item. Lite shows up to 8 entries.')"},
+  {"title":"tr('Desk Notes Lite')","properties":["boardTitle","entry1","entry2","entry3","entry4","entry5","entry6","entry7","entry8"],"info":"tr('Each Entry field is one note. Start an entry with [ ] to make it a tappable checklist item. Lite supports up to 8 entries.')"},
   {"title":"tr('Layout')","properties":["noteTheme","fontScale"]},
   {"title":"tr('Appearance')","properties":["textColor","accentColor","backgroundColor","transparency"]}
 ]
 </script>
 <link rel="stylesheet" href="../desk-notes-common/desk-notes.css" />
-<script>globalThis.DeskNotesConfig={pro:false,maxEntries:8,boardCount:1};globalThis.DESK_NOTES_PRO_MARKETPLACE_URL='';</script>
+<script>globalThis.DeskNotesConfig={pro:false,entryCount:8,boardCount:1};globalThis.DESK_NOTES_PRO_MARKETPLACE_URL='';</script>
 </head>
 <body>
 <main id="stage" aria-label="Desk Notes Lite">
