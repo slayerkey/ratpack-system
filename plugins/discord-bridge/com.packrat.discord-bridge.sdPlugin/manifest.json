@@ -17,7 +17,7 @@
         }
       ],
       "SupportedInMultiActions": false,
-      "Tooltip": "Shows Discord IPC and XENEON bridge status. Press to connect or authorize.",
+      "Tooltip": "Shows PackRat Discord Panel bridge status. Press to refresh the configured voice channel.",
       "UserTitleEnabled": true,
       "UUID": "com.packrat.discord-bridge.status"
     }
@@ -25,7 +25,7 @@
   "Author": "PackRat 🐀",
   "Category": "PackRat Discord Bridge",
   "CodePath": "bin/plugin.js",
-  "Description": "Local Discord voice bridge for PackRat Discord Voice Panel on XENEON EDGE.",
+  "Description": "Local Discord voice companion for PackRat Discord Panel on XENEON Edge.",
   "Icon": "imgs/plugin/icon",
   "Name": "PackRat Discord Bridge",
   "Nodejs": {
@@ -42,6 +42,6 @@
     "MinimumVersion": "7.5"
   },
   "UUID": "com.packrat.discord-bridge",
-  "Version": "0.1.0.4",
+  "Version": "0.2.0.0",
   "CategoryIcon": "imgs/category/icon"
 }
