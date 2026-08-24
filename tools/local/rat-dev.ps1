@@ -76,15 +76,6 @@ function Ensure-XeneonTools {
     Require-Command "npm" "Install Node.js 24 or newer."
 }
 
-function Stop-ExistingLink {
-    param([string]$Uuid)
-    if (-not $Uuid) { return }
-    if (-not (Get-Command streamdeck -ErrorAction SilentlyContinue)) { return }
-    Write-Host "Stopping previous linked plugin $Uuid..." -ForegroundColor DarkGray
-    & streamdeck stop $Uuid *> $null
-    & streamdeck unlink -d $Uuid *> $null
-}
-
 function Read-OriginMainRegistration {
     $configObject = "origin/main:plugins/$Slug/rat-dev.json"
     $raw = & git -C $RepoRoot show $configObject 2>$null
@@ -378,12 +369,23 @@ function Build-And-TestPlugin {
 }
 
 function Install-DevPlugin {
-    param($Plugin)
+    param(
+        $Plugin,
+        [string]$PreviousUuid
+    )
 
     Write-Host "Enabling Stream Deck developer mode..." -ForegroundColor DarkGray
     & streamdeck dev *> $null
 
-    Write-Host "Linking $($Plugin.Uuid) into Stream Deck..." -ForegroundColor Cyan
+    # Keep the currently linked plugin alive while source sync, build, tests, and validation run.
+    # Only switch the link after the replacement has passed every local gate. This prevents a
+    # failed Rat Dev update from turning an existing profile into unresolved question-mark keys.
+    Write-Host "Switching $($Plugin.Uuid) to the validated development build..." -ForegroundColor Cyan
+    if ($PreviousUuid -and $PreviousUuid -ne $Plugin.Uuid) {
+        & streamdeck stop $PreviousUuid *> $null
+        & streamdeck unlink -d $PreviousUuid *> $null
+    }
+    & streamdeck stop $Plugin.Uuid *> $null
     & streamdeck unlink -d $Plugin.Uuid *> $null
     Invoke-Checked -Command "streamdeck" -Arguments @("link", $Plugin.PluginDir) -Failure "Stream Deck link failed"
     Invoke-Checked -Command "streamdeck" -Arguments @("restart", $Plugin.Uuid) -Failure "Stream Deck restart failed"
@@ -468,7 +470,6 @@ if ($source.Kind -eq "xeneon") {
 
 Ensure-StreamDeckCli
 $oldUuid = Get-ExistingPluginUuid $source
-Stop-ExistingLink $oldUuid
 
 if ($source.Kind -eq "external") {
     Sync-ExternalCheckout $source
@@ -479,4 +480,4 @@ else {
 
 $pluginRoot = Get-PluginRoot $source
 $plugin = Build-And-TestPlugin -PluginRoot $pluginRoot -RegistrationConfig $source.Config
-Install-DevPlugin $plugin
+Install-DevPlugin -Plugin $plugin -PreviousUuid $oldUuid
