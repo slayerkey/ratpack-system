@@ -51,10 +51,8 @@ jobs:
           command: deploy
           secrets: |
             FACEIT_API_KEY
-            LEETIFY_API_KEY
         env:
           FACEIT_API_KEY: ${{ secrets.FACEIT_API_KEY }}
-          LEETIFY_API_KEY: ${{ secrets.LEETIFY_API_KEY }}
 
       - name: Verify deployed health endpoint
         env:
@@ -68,4 +66,12 @@ jobs:
       - name: Record deployment URL
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: echo "CS2_GATEWAY_URL=$DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+        run: |
+          {
+            echo "CS2_GATEWAY_URL=$DEPLOYMENT_URL"
+            echo
+            echo "Leetify is intentionally deployed without a required API key."
+            echo "Its public API supports anonymous requests with stricter rate limits."
+            echo "A PackRat-owned LEETIFY_API_KEY can be added later if production traffic needs higher limits."
+          } >> "$GITHUB_STEP_SUMMARY"
