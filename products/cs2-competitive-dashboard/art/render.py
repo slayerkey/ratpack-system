@@ -129,52 +129,61 @@ def features():
     draw = ImageDraw.Draw(canvas)
     feature_card(draw, 120, "Live CS2", "Score, player state, money, equipment, weapon, ammo, map and team from local GSI.", "01", ACCENT)
     feature_card(draw, 520, "Session", "Track K/D, ADR, headshot percentage, matches and your current session record.", "02", ACCENT)
-    feature_card(draw, 920, "Competitive", "Premier rating, map ranks, recent results and competitive form through optional account data.", "03", WARN)
-    feature_card(draw, 1320, "FACEIT", "Elo, level, K/D, headshot percentage, win rate and recent form when a profile exists.", "04", WARN)
+    feature_card(draw, 920, "Competitive", "Premier rating, map ranks, recent results and competitive form through your Leetify key.", "03", WARN)
+    feature_card(draw, 1320, "FACEIT", "Elo, level, K/D, headshot percentage, win rate and recent form through your FACEIT key.", "04", WARN)
     footer(canvas)
     return canvas
 
 
 def setup():
     canvas = gradient_bg()
-    header(canvas, "Setup should take one click.", "Steam and CS2 auto-detection are the default, not a tutorial users have to follow")
+    header(canvas, "Live setup is one click. Online stats use free keys.", "Direct provider links and short setup steps are built into the Property Inspector")
     draw = ImageDraw.Draw(canvas)
-    rounded(draw, (150, 280, 930, 790), radius=30, fill=PANEL, outline=BORDER, width=2)
-    text(draw, (195, 322), "PACKRAT", 14, ACCENT)
-    text(draw, (195, 352), "CS2 Competitive Dashboard Pro", 28, WHITE)
-    text(draw, (195, 418), "LIVE CS2 TRACKING", 16, LABEL)
-    rounded(draw, (195, 454, 885, 520), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
-    text(draw, (220, 476), "Auto detect Steam and CS2", 18, MUTED, False)
-    rounded(draw, (195, 548, 610, 616), radius=12, fill=ACCENT, outline=ACCENT, width=1)
-    text(draw, (402, 582), "ENABLE LIVE CS2 TRACKING", 17, (7, 16, 10), anchor="mm")
-    text(draw, (195, 654), "COMPETITIVE ACCOUNT", 16, LABEL)
-    rounded(draw, (195, 687, 885, 749), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
-    text(draw, (220, 708), "One Steam profile URL or SteamID", 18, MUTED, False)
+    rounded(draw, (150, 272, 970, 802), radius=30, fill=PANEL, outline=BORDER, width=2)
+    text(draw, (195, 312), "PACKRAT", 14, ACCENT)
+    text(draw, (195, 342), "CS2 Competitive Dashboard Pro", 28, WHITE)
+
+    text(draw, (195, 400), "LIVE CS2 TRACKING", 15, LABEL)
+    rounded(draw, (195, 430, 925, 488), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
+    text(draw, (220, 449), "Auto detect Steam and CS2", 17, MUTED, False)
+    rounded(draw, (195, 506, 610, 568), radius=12, fill=ACCENT, outline=ACCENT, width=1)
+    text(draw, (402, 537), "ENABLE LIVE CS2 TRACKING", 16, (7, 16, 10), anchor="mm")
+
+    text(draw, (195, 602), "COMPETITIVE ACCOUNT", 15, LABEL)
+    rounded(draw, (195, 630, 925, 688), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
+    text(draw, (220, 649), "Steam profile URL or SteamID", 17, MUTED, False)
+
+    rounded(draw, (195, 710, 542, 770), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
+    text(draw, (220, 727), "LEETIFY", 13, WARN)
+    text(draw, (220, 747), "FREE API KEY", 14, WHITE)
+    rounded(draw, (578, 710, 925, 770), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
+    text(draw, (603, 727), "FACEIT", 13, WARN)
+    text(draw, (603, 747), "FREE API KEY", 14, WHITE)
 
     steps = [
-        ("1", "Install", "Install the Stream Deck plugin."),
-        ("2", "Enable", "Press Enable Live CS2 Tracking."),
-        ("3", "Play", "Launch CS2. The dashboard updates live."),
+        ("1", "Enable live tracking", "One click installs the local CS2 GSI config."),
+        ("2", "Add your Steam profile", "One account field identifies your CS2 profile."),
+        ("3", "Connect online stats", "Built-in links walk you through both free API keys."),
     ]
     for i, (n, title_value, body) in enumerate(steps):
-        y = 326 + i * 150
-        draw.ellipse((1045, y, 1095, y + 50), fill=(*ACCENT, 255))
-        text(draw, (1070, y + 25), n, 18, (7, 16, 10), anchor="mm")
-        text(draw, (1130, y - 2), title_value, 29, WHITE)
-        text(draw, (1130, y + 42), body, 20, MUTED, False)
-    text(draw, (1045, 735), "Manual path override only appears when auto-detection is not enough.", 18, MUTED, False)
+        y = 322 + i * 154
+        draw.ellipse((1055, y, 1105, y + 50), fill=(*ACCENT, 255))
+        text(draw, (1080, y + 25), n, 18, (7, 16, 10), anchor="mm")
+        text(draw, (1140, y - 2), title_value, 28, WHITE)
+        text(draw, (1140, y + 42), body, 19, MUTED, False)
+    text(draw, (1055, 746), "No shared PackRat provider key or quota.", 18, WARN, False)
     footer(canvas)
     return canvas
 
 
 def architecture():
     canvas = gradient_bg()
-    header(canvas, "Live data stays local.", "A clean split between CS2 telemetry and optional account lookups")
+    header(canvas, "Live data stays local. Provider keys stay yours.", "CS2 telemetry stays on your PC while account lookups go straight to each provider")
     draw = ImageDraw.Draw(canvas)
     boxes = [
         (170, "CS2", "Game State Integration", ACCENT),
         (650, "STREAM DECK", "Local plugin runtime", ACCENT),
-        (1130, "OPTIONAL ACCOUNT DATA", "Competitive + FACEIT", WARN),
+        (1130, "LEETIFY + FACEIT", "Direct HTTPS requests", WARN),
     ]
     for x, title_value, sub, tone in boxes:
         rounded(draw, (x, 360, x + 390, 590), radius=28, fill=PANEL, outline=BORDER, width=2)
@@ -188,7 +197,8 @@ def architecture():
     draw.polygon([(1122, 465), (1140, 475), (1122, 485)], fill=(*WARN, 255))
     text(draw, (365, 652), "LOCALHOST ONLY", 16, ACCENT, anchor="mm")
     text(draw, (845, 652), "RAW GSI NEVER LEAVES YOUR PC", 16, ACCENT, anchor="mm")
-    text(draw, (1325, 652), "SERVER-SIDE PROVIDER KEYS", 16, WARN, anchor="mm")
+    text(draw, (1325, 652), "CUSTOMER-OWNED API KEYS", 16, WARN, anchor="mm")
+    text(draw, (960, 724), "No PackRat provider gateway. No shared provider quota.", 19, MUTED, False, anchor="mm")
     footer(canvas)
     return canvas
 
