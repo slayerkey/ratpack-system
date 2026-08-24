@@ -40,8 +40,8 @@ function installTestHooks() {
       };
     },
     speaking: function (userId, active) { setSpeaking(String(userId), Boolean(active)); },
-    voiceState: function (raw) { upsertVoiceState(raw); },
-    remove: function (raw) { removeVoiceState(raw); },
+    voiceState: function (raw) { upsertVoiceState(raw); render(); },
+    remove: function (raw) { removeVoiceState(raw); render(); },
     channel: function (channel) { setChannel(channel || null); },
     selfVoice: function (voice) {
       if (voice && typeof voice.mute === "boolean") model.voice.mute = voice.mute;
@@ -86,6 +86,13 @@ window.addEventListener("click", function (event) {
 setInterval(function () {
   applySettings();
   if (model.activity.length) renderActivity();
+  if (!fixtureMode) {
+    var cfg = bridgeSettings();
+    if (validDiscordId(cfg.guildId) && validDiscordId(cfg.channelId)) {
+      if (rpcSocket && rpcSocket.readyState === WebSocket.OPEN) configureBridge(false);
+      else startLiveConnection();
+    }
+  }
 }, 1000);
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
