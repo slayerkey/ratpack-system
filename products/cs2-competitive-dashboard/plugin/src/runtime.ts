@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import streamDeck from "@elgato/streamdeck";
 import type { LiveState, RuntimeStatus, SessionMetrics } from "./core/types.js";
 import { StateStore } from "./core/store.js";
@@ -8,6 +10,8 @@ import { ONLINE_PROFILE_REFRESH_MS } from "./providers/config.js";
 import { ProviderClient } from "./providers/direct-client.js";
 import { emptyOnlineSnapshot, type OnlineProfileSnapshot } from "./providers/types.js";
 import { SessionTracker } from "./session/session-tracker.js";
+
+const execFileAsync = promisify(execFile);
 
 export interface DashboardSnapshot {
   live?: LiveState;
@@ -76,6 +80,7 @@ export class DashboardRuntime {
 
   async initialize(): Promise<void> {
     this.globals = (await streamDeck.settings.getGlobalSettings()) as GlobalSettings;
+    this.updateStatus({ cs2Running: await this.detectCs2Running() });
 
     if (this.globals.gsiEnabled && this.globals.gsiToken) {
       try {
@@ -98,6 +103,7 @@ export class DashboardRuntime {
 
         this.updateStatus({
           gsiConfigured: Boolean(this.globals.gsiConfigPath),
+          gsiRestartRequired: false,
           listenerPort: port,
           configPath: this.globals.gsiConfigPath,
           error: undefined
@@ -150,7 +156,7 @@ export class DashboardRuntime {
           this.globals.steamProfile = command.steamProfile?.trim() || undefined;
           await this.saveGlobals();
           this.publish({ online: emptyOnlineSnapshot(this.globals.steamProfile) });
-          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
           return this.publicState();
         case "set-provider-keys": {
           const faceit = command.faceitApiKey?.trim();
@@ -158,14 +164,14 @@ export class DashboardRuntime {
           if (faceit) this.globals.faceitApiKey = faceit;
           if (leetify) this.globals.leetifyApiKey = leetify;
           await this.saveGlobals();
-          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
           return this.publicState();
         }
         case "clear-provider-key":
           if (command.provider === "faceit") this.globals.faceitApiKey = undefined;
           else this.globals.leetifyApiKey = undefined;
           await this.saveGlobals();
-          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
           return this.publicState();
         case "refresh-online":
           if (this.onlineEnabled) await this.refreshOnline(true);
@@ -192,6 +198,9 @@ export class DashboardRuntime {
       manualCs2Path: manualCs2Path?.trim() || this.globals.manualCs2Path
     });
 
+    const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
+    const alreadyConnected = this.store.get().status.gsiConnected;
+
     this.globals = {
       ...this.globals,
       gsiEnabled: true,
@@ -204,7 +213,9 @@ export class DashboardRuntime {
     await this.saveGlobals();
 
     this.updateStatus({
+      cs2Running,
       gsiConfigured: true,
+      gsiRestartRequired: cs2Running && !alreadyConnected,
       listenerPort: port,
       configPath: installed.configPath,
       error: undefined
@@ -220,6 +231,7 @@ export class DashboardRuntime {
     this.updateStatus({
       gsiConfigured: false,
       gsiConnected: false,
+      gsiRestartRequired: false,
       listenerPort: undefined,
       configPath: undefined,
       error: undefined
@@ -238,6 +250,7 @@ export class DashboardRuntime {
         cs2Running: true,
         gsiConnected: true,
         gsiConfigured: true,
+        gsiRestartRequired: false,
         lastPayloadAt: live.receivedAt,
         error: undefined
       }
@@ -295,6 +308,15 @@ export class DashboardRuntime {
     const last = current.status.lastPayloadAt;
     if (current.status.gsiConnected && last && Date.now() - last > 15_000) {
       this.updateStatus({ gsiConnected: false });
+    }
+  }
+
+  private async detectCs2Running(): Promise<boolean> {
+    try {
+      const { stdout } = await execFileAsync("tasklist.exe", ["/FI", "IMAGENAME eq cs2.exe", "/NH"], { windowsHide: true });
+      return /(^|\s)cs2\.exe(\s|$)/im.test(stdout);
+    } catch {
+      return false;
     }
   }
 
