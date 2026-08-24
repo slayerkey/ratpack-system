@@ -47,6 +47,7 @@ main{width:min(960px,calc(100% - 32px));margin:40px auto 80px}
 .dot{width:8px;height:8px;border-radius:50%;background:#76808e}.good .dot{background:#2be86a}.bad .dot{background:#ff5a67}.warn .dot{background:#f3b84a}
 button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:11px;padding:10px 13px;background:#2be86a;color:#051009;font-weight:800}button.secondary{background:#202731;color:#edf1f5}button.danger{background:#3a1d23;color:#ffb7be}
 .row{display:flex;gap:8px;flex-wrap:wrap}.queueForm{display:flex;gap:8px}.queueForm input{flex:1;min-width:0;background:#0a0d11;color:white;border:1px solid #2a333f;border-radius:10px;padding:10px 11px}
+.field{margin:0 0 10px}.field label{display:block;margin:0 0 6px;color:#aeb6c2;font-size:12px;font-weight:700}.field select{width:100%;background:#0a0d11;color:white;border:1px solid #2a333f;border-radius:10px;padding:10px 11px}
 pre{white-space:pre-wrap;word-break:break-word;background:#090c10;border:1px solid #20262f;border-radius:12px;padding:12px;color:#cbd2da;max-height:360px;overflow:auto}
 .session{border-top:1px solid #222933;padding:12px 0}.session:first-of-type{border-top:0}.title{font-weight:800}.state{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#2be86a}
 .notice{margin-top:14px;padding:13px 15px;border-radius:13px;background:#121821;border:1px solid #253142;color:#aeb8c5;font-size:13px;line-height:1.45}
@@ -61,7 +62,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#090c10;border:1px sol
 </section>
 <div class="grid">
 <section class="card"><h2>Claude Code</h2><div id="claude" class="pill"><span class="dot"></span><span>Checking…</span></div><div style="height:10px"></div><div id="integration" class="pill"><span class="dot"></span><span>Checking hooks…</span></div><div class="row" style="margin-top:14px"><button id="connect">Connect Claude Code</button><button id="disconnect" class="secondary">Disconnect</button></div></section>
-<section class="card"><h2>Add test work</h2><form id="queueForm" class="queueForm"><input id="prompt" placeholder="Run tests and fix failures" required><button>Add</button></form><div class="row" style="margin-top:10px"><button id="remove" class="secondary">Remove next</button><button id="clear" class="danger">Clear queue</button></div><div class="notice">Start a real Claude Code turn, add one or more follow-ups here or from the Stream Deck Queue Prompt key, then let Claude finish normally. The Stop hook should start the next queued task in the same session.</div></section>
+<section class="card"><h2>Add test work</h2><div class="field"><label for="session">Target session</label><select id="session"><option value="">Auto: active Claude session</option></select></div><form id="queueForm" class="queueForm"><input id="prompt" placeholder="Run tests and fix failures" required><button>Add</button></form><div class="row" style="margin-top:10px"><button id="remove" class="secondary">Remove next</button><button id="clear" class="danger">Clear queue</button></div><div class="notice">Start a real Claude Code turn, add one or more follow-ups here or from the Stream Deck Queue Prompt key, then let Claude finish normally. The Stop hook should start the next queued task in the same session. Auto targeting refuses to guess when more than one session is ambiguous.</div></section>
 </div>
 <section class="card" style="margin-top:14px"><h2>Detected sessions</h2><div id="sessions" class="muted">No session data yet.</div></section>
 <section class="card" style="margin-top:14px"><h2>Raw diagnostic state</h2><pre id="raw">{}</pre></section>
@@ -74,22 +75,40 @@ async function request(url, options={}) {
   return data;
 }
 function esc(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
-function statePill(ok,text,warning=false){return '<span class="dot"></span><span>'+esc(text)+'</span>'}
+function statePill(text){return '<span class="dot"></span><span>'+esc(text)+'</span>'}
+function targetSession(){return document.getElementById('session').value||null}
+function refreshSessionSelect(sessions,activeSessionId){
+  const select=document.getElementById('session');
+  const previous=select.value;
+  select.textContent='';
+  const auto=document.createElement('option');auto.value='';auto.textContent=activeSessionId?'Auto: active session':'Auto: detect active session';select.appendChild(auto);
+  for(const session of sessions){
+    const option=document.createElement('option');
+    option.value=session.id;
+    const label=session.name||session.cwd||session.id;
+    option.textContent=(session.id===activeSessionId?'Active · ':'')+label+' · '+session.state;
+    select.appendChild(option);
+  }
+  if(previous&&sessions.some(session=>session.id===previous)) select.value=previous;
+}
 async function refresh(){
   try{
     const data=await request('/api/status');
-    const c=document.getElementById('claude');c.className='pill '+(data.claude.ok?'good':'bad');c.innerHTML=statePill(data.claude.ok, data.claude.ok?data.claude.version:(data.claude.error||'Not detected'));
-    const i=document.getElementById('integration');i.className='pill '+(data.integration.connected?'good':'warn');i.innerHTML=statePill(data.integration.connected, data.integration.connected?'Hooks connected':'Hooks not connected');
+    const c=document.getElementById('claude');c.className='pill '+(data.claude.ok?'good':'bad');c.innerHTML=statePill(data.claude.ok?data.claude.version:(data.claude.error||'Not detected'));
+    const i=document.getElementById('integration');
+    const integrationText=data.integration.needsReconnect?'Reconnect to upgrade hook auth':(data.integration.connected?'Hooks connected':'Hooks not connected');
+    i.className='pill '+(data.integration.connected&&!data.integration.needsReconnect?'good':'warn');i.innerHTML=statePill(integrationText);
     const sessions=data.queue.sessions||[];
+    refreshSessionSelect(sessions,data.queue.activeSessionId||null);
     document.getElementById('sessions').innerHTML=sessions.length?sessions.map(s=>'<div class="session"><div class="title">'+esc(s.name||s.cwd||s.id)+'</div><div class="state">'+esc(s.state)+(s.waitingFor?' · '+esc(s.waitingFor):'')+'</div><div class="muted">Queue: '+s.queue.length+' · Chain: '+s.continuationCount+'/6</div>'+(s.queue[0]?'<div class="muted">Next: '+esc(s.queue[0].prompt)+'</div>':'')+'</div>').join(''):'No Claude sessions detected yet.';
     document.getElementById('raw').textContent=JSON.stringify(data,null,2);
   }catch(error){document.getElementById('raw').textContent=String(error)}
 }
 document.getElementById('connect').onclick=async()=>{await request('/api/connect',{method:'POST',body:'{}'});await refresh()};
 document.getElementById('disconnect').onclick=async()=>{await request('/api/disconnect',{method:'POST',body:'{}'});await refresh()};
-document.getElementById('queueForm').onsubmit=async(e)=>{e.preventDefault();const input=document.getElementById('prompt');await request('/api/queue',{method:'POST',body:JSON.stringify({prompt:input.value})});input.value='';await refresh()};
-document.getElementById('remove').onclick=async()=>{await request('/api/remove-next',{method:'POST',body:'{}'});await refresh()};
-document.getElementById('clear').onclick=async()=>{await request('/api/clear',{method:'POST',body:'{}'});await refresh()};
+document.getElementById('queueForm').onsubmit=async(e)=>{e.preventDefault();const input=document.getElementById('prompt');await request('/api/queue',{method:'POST',body:JSON.stringify({prompt:input.value,sessionId:targetSession()})});input.value='';await refresh()};
+document.getElementById('remove').onclick=async()=>{await request('/api/remove-next',{method:'POST',body:JSON.stringify({sessionId:targetSession()})});await refresh()};
+document.getElementById('clear').onclick=async()=>{await request('/api/clear',{method:'POST',body:JSON.stringify({sessionId:targetSession()})});await refresh()};
 refresh();setInterval(refresh,1000);
 </script>
 </body></html>`;
@@ -113,13 +132,15 @@ export class LocalServer {
   async start() {
     if (this.server) return;
     this.claude = await getClaudeVersion();
+    await this.integration.initialize();
 
     this.server = http.createServer(async (req, res) => {
       try {
         const url = new URL(req.url || "/", `http://${HOST}:${PORT}`);
 
         if (req.method === "POST" && url.pathname === "/hook") {
-          if (req.headers[HOOK_HEADER.toLowerCase()] !== "1") {
+          const hookHeader = req.headers[HOOK_HEADER.toLowerCase()];
+          if (!this.integration.authorizeHookHeader(Array.isArray(hookHeader) ? hookHeader[0] : hookHeader)) {
             return json(res, 403, { error: "Forbidden." });
           }
           const payload = await readJson(req);
@@ -154,10 +175,12 @@ export class LocalServer {
           return json(res, 200, await this.service.enqueue(body.prompt, body.sessionId ?? null));
         }
         if (req.method === "POST" && url.pathname === "/api/remove-next") {
-          return json(res, 200, { removed: await this.service.removeNext() });
+          const body = await readJson(req);
+          return json(res, 200, { removed: await this.service.removeNext(body.sessionId ?? null) });
         }
         if (req.method === "POST" && url.pathname === "/api/clear") {
-          return json(res, 200, { cleared: await this.service.clearQueue() });
+          const body = await readJson(req);
+          return json(res, 200, { cleared: await this.service.clearQueue(body.sessionId ?? null) });
         }
 
         if (req.method === "GET" && url.pathname === "/") {

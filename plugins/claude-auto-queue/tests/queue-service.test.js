@@ -166,6 +166,40 @@ test("never guesses when multiple sessions exist and no active session is known"
   );
 });
 
+test("an explicit session binding routes queued work only to that session", async () => {
+  const service = await makeService();
+  await service.reconcileAgents([
+    { sessionId: "a", cwd: "/a", kind: "interactive" },
+    { sessionId: "b", cwd: "/b", kind: "interactive" }
+  ]);
+  service.activeSessionId = null;
+
+  const queued = await service.enqueue("Only session B should receive this", "b");
+  assert.equal(queued.sessionId, "b");
+  assert.equal(service.getSession("a").queue.length, 0);
+  assert.equal(service.getSession("b").queue.length, 1);
+
+  const wrongStop = await service.handleHook({
+    hook_event_name: "Stop",
+    session_id: "a",
+    stop_hook_active: false,
+    background_tasks: [],
+    session_crons: []
+  });
+  assert.equal(wrongStop, null);
+  assert.equal(service.getSession("b").queue.length, 1);
+
+  const rightStop = await service.handleHook({
+    hook_event_name: "Stop",
+    session_id: "b",
+    stop_hook_active: false,
+    background_tasks: [],
+    session_crons: []
+  });
+  assert.match(rightStop.hookSpecificOutput.additionalContext, /Only session B/);
+  assert.equal(service.getSession("b").queue.length, 0);
+});
+
 test("queue survives a service restart", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "claude-auto-queue-persist-"));
   const file = path.join(dir, "state.json");

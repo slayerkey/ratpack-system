@@ -2,6 +2,8 @@ let websocket = null;
 let uuid = null;
 let actionUuid = "";
 let settings = {};
+let sessionRows = [];
+let activeSessionId = null;
 
 const QUEUE_ACTION = "com.packrat.claude-auto-queue.queue-prompt";
 const CONTROL_ACTION = "com.packrat.claude-auto-queue.queue-control";
@@ -23,11 +25,17 @@ function connectElgatoStreamDeckSocket(inPort, inUUID, inRegisterEvent, inInfo, 
     websocket.send(JSON.stringify({ event: inRegisterEvent, uuid: inUUID }));
     build();
     render();
+    requestSessions();
   };
   websocket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.event === "didReceiveSettings") {
       settings = message.payload?.settings ?? {};
+      render();
+    }
+    if (message.event === "sendToPropertyInspector" && message.payload?.type === "sessions") {
+      sessionRows = Array.isArray(message.payload.sessions) ? message.payload.sessions : [];
+      activeSessionId = message.payload.activeSessionId ?? null;
       render();
     }
   };
@@ -37,8 +45,19 @@ function save() {
   if (websocket?.readyState !== WebSocket.OPEN) return;
   websocket.send(JSON.stringify({
     event: "setSettings",
+    action: actionUuid,
     context: uuid,
     payload: settings
+  }));
+}
+
+function requestSessions() {
+  if (websocket?.readyState !== WebSocket.OPEN) return;
+  websocket.send(JSON.stringify({
+    event: "sendToPlugin",
+    action: actionUuid,
+    context: uuid,
+    payload: { type: "get-sessions" }
   }));
 }
 
@@ -47,9 +66,51 @@ function openUrl(url) {
   websocket.send(JSON.stringify({ event: "openUrl", payload: { url } }));
 }
 
+function addOption(select, value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  select.appendChild(option);
+}
+
+function renderSessionSelect() {
+  const select = document.getElementById("session");
+  if (!select) return;
+  const selected = settings.sessionId ?? "";
+  select.textContent = "";
+  addOption(select, "", activeSessionId ? "Auto: active Claude session" : "Auto: detect active session");
+
+  for (const session of sessionRows) {
+    const prefix = session.id === activeSessionId ? "Active · " : "";
+    const state = session.state ? ` · ${session.state}` : "";
+    addOption(select, session.id, `${prefix}${session.label || session.cwd || session.id}${state}`);
+  }
+
+  if (selected && !sessionRows.some((session) => session.id === selected)) {
+    addOption(select, selected, "Selected session unavailable");
+  }
+  select.value = selected;
+
+  const help = document.getElementById("sessionHelp");
+  if (help) {
+    if (selected) {
+      const match = sessionRows.find((session) => session.id === selected);
+      help.textContent = match
+        ? `Bound to ${match.label || match.cwd || match.id}. Queue: ${match.queueCount ?? 0}.`
+        : "This key is bound to a Claude session that is not currently visible. Choose Auto or another session to rebind it.";
+    } else if (sessionRows.length > 1 && !activeSessionId) {
+      help.textContent = "Multiple Claude sessions are visible and none is active. Choose one explicitly before queueing.";
+    } else {
+      help.textContent = "Auto follows the session most recently identified by Claude hooks. If multiple sessions are ambiguous, queueing fails safely instead of guessing.";
+    }
+  }
+}
+
 function render() {
   document.getElementById("promptCard")?.classList.toggle("hidden", actionUuid !== QUEUE_ACTION);
   document.getElementById("controlCard")?.classList.toggle("hidden", actionUuid !== CONTROL_ACTION);
+
+  renderSessionSelect();
 
   const label = document.getElementById("label");
   if (label && document.activeElement !== label) label.value = settings.label ?? "";
@@ -61,6 +122,11 @@ function render() {
 
 function build() {
   document.getElementById("openSetup")?.addEventListener("click", () => openUrl(SETUP_URL));
+  document.getElementById("session")?.addEventListener("change", (event) => {
+    settings = { ...settings, sessionId: event.target.value || undefined };
+    save();
+    render();
+  });
   document.getElementById("label")?.addEventListener("change", (event) => {
     settings = { ...settings, label: event.target.value.trim() || undefined };
     save();

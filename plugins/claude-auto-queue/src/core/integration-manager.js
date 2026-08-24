@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -17,18 +18,23 @@ export const HOOK_EVENTS = [
 
 export const HOOK_URL = "http://127.0.0.1:19741/hook";
 export const HOOK_HEADER = "X-PackRat-Claude-Auto-Queue";
+const TOKEN_PREFIX = "v1:";
 
 function defaultSettingsPath() {
   return path.join(os.homedir(), ".claude", "settings.json");
 }
 
-function ourHandler() {
+export function generateHookToken() {
+  return `${TOKEN_PREFIX}${randomBytes(32).toString("hex")}`;
+}
+
+function ourHandler(token) {
   return {
     type: "http",
     url: HOOK_URL,
     timeout: 2,
     headers: {
-      [HOOK_HEADER]: "1"
+      [HOOK_HEADER]: token
     }
   };
 }
@@ -38,26 +44,43 @@ function isOurHandler(handler) {
     handler &&
     handler.type === "http" &&
     handler.url === HOOK_URL &&
-    handler.headers?.[HOOK_HEADER] === "1"
+    typeof handler.headers?.[HOOK_HEADER] === "string"
   );
+}
+
+function handlerToken(handler) {
+  return isOurHandler(handler) ? handler.headers[HOOK_HEADER] : null;
 }
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function addPackRatHooks(settings) {
-  const next = clone(settings && typeof settings === "object" ? settings : {});
+export function getPackRatHookToken(settings) {
+  if (!settings?.hooks || typeof settings.hooks !== "object") return null;
+  let token = null;
+  for (const event of HOOK_EVENTS) {
+    const groups = settings.hooks[event];
+    if (!Array.isArray(groups)) return null;
+    const eventTokens = groups
+      .flatMap((group) => (Array.isArray(group?.hooks) ? group.hooks : []))
+      .map(handlerToken)
+      .filter(Boolean);
+    if (eventTokens.length === 0) return null;
+    const current = eventTokens[0];
+    if (token === null) token = current;
+    if (current !== token || eventTokens.some((candidate) => candidate !== token)) return null;
+  }
+  return token;
+}
+
+export function addPackRatHooks(settings, token = generateHookToken()) {
+  const next = removePackRatHooks(settings);
   next.hooks = next.hooks && typeof next.hooks === "object" ? next.hooks : {};
 
   for (const event of HOOK_EVENTS) {
     const groups = Array.isArray(next.hooks[event]) ? next.hooks[event] : [];
-    const alreadyInstalled = groups.some(
-      (group) => Array.isArray(group?.hooks) && group.hooks.some(isOurHandler)
-    );
-    if (!alreadyInstalled) {
-      groups.push({ hooks: [ourHandler()] });
-    }
+    groups.push({ hooks: [ourHandler(token)] });
     next.hooks[event] = groups;
   }
   return next;
@@ -84,19 +107,22 @@ export function removePackRatHooks(settings) {
 }
 
 export function hasPackRatHooks(settings) {
-  if (!settings?.hooks || typeof settings.hooks !== "object") return false;
-  return HOOK_EVENTS.every((event) =>
-    Array.isArray(settings.hooks[event]) &&
-    settings.hooks[event].some(
-      (group) => Array.isArray(group?.hooks) && group.hooks.some(isOurHandler)
-    )
-  );
+  return Boolean(getPackRatHookToken(settings));
+}
+
+function secureTokenEqual(expected, received) {
+  if (typeof expected !== "string" || typeof received !== "string") return false;
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(received, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 export class IntegrationManager {
   constructor(settingsPath = defaultSettingsPath()) {
     this.settingsPath = settingsPath;
     this.backupPath = `${settingsPath}.packrat-auto-queue.backup.json`;
+    this.hookToken = null;
   }
 
   async readSettings() {
@@ -136,19 +162,39 @@ export class IntegrationManager {
     return true;
   }
 
+  async initialize() {
+    try {
+      const settings = await this.readSettings();
+      this.hookToken = getPackRatHookToken(settings);
+    } catch {
+      this.hookToken = null;
+    }
+  }
+
+  authorizeHookHeader(value) {
+    return secureTokenEqual(this.hookToken, value);
+  }
+
   async status() {
     try {
       const settings = await this.readSettings();
+      const token = getPackRatHookToken(settings);
+      this.hookToken = token;
       return {
         ok: true,
-        connected: hasPackRatHooks(settings),
+        connected: Boolean(token),
+        secureHookAuth: Boolean(token?.startsWith(TOKEN_PREFIX)),
+        needsReconnect: Boolean(token && !token.startsWith(TOKEN_PREFIX)),
         settingsPath: this.settingsPath,
         backupPath: this.backupPath
       };
     } catch (error) {
+      this.hookToken = null;
       return {
         ok: false,
         connected: false,
+        secureHookAuth: false,
+        needsReconnect: false,
         settingsPath: this.settingsPath,
         backupPath: this.backupPath,
         error: String(error?.message ?? error)
@@ -159,8 +205,10 @@ export class IntegrationManager {
   async connect() {
     const settings = await this.readSettings();
     await this.backupOnce();
-    const next = addPackRatHooks(settings);
+    const token = generateHookToken();
+    const next = addPackRatHooks(settings, token);
     await this.writeSettings(next);
+    this.hookToken = token;
     return this.status();
   }
 
@@ -168,6 +216,7 @@ export class IntegrationManager {
     const settings = await this.readSettings();
     const next = removePackRatHooks(settings);
     await this.writeSettings(next);
+    this.hookToken = null;
     return this.status();
   }
 }

@@ -22,6 +22,15 @@
       <button id="openSetup" type="button">Open Local Setup</button>
     </section>
 
+    <section class="card">
+      <h2>Target Session</h2>
+      <label for="session">Claude Code session</label>
+      <select id="session">
+        <option value="">Auto: active Claude session</option>
+      </select>
+      <div id="sessionHelp" class="help">Auto follows the session most recently identified by Claude hooks. If multiple sessions are ambiguous, queueing fails safely instead of guessing.</div>
+    </section>
+
     <section id="promptCard" class="card hidden">
       <h2>Queue Prompt</h2>
       <label for="label">Key label</label>
