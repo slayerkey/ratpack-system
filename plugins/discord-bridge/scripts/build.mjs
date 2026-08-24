@@ -19,7 +19,7 @@ const keyIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-for (const name of ["protocol.js", "discord-ipc.js", "local-bridge.js", "oauth.js", "plugin.js"]) {
+for (const name of ["protocol.js", "discord-ipc.js", "local-bridge.js", "streamkit-rpc.js", "plugin.js"]) {
   await cp(resolve(source, name), resolve(output, name));
 }
 await mkdir(pluginImages, { recursive: true });
