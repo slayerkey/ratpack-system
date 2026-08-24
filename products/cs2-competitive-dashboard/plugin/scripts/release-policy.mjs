@@ -79,7 +79,7 @@ function validateProfileRegistrations(manifest, flavor) {
     if (flavor === "pro") {
       assert(profile.Name.includes("-competitive-") || profile.Name.includes("-live-"), `Pro profile ${profile.Name} must declare competitive or live layout`);
     } else {
-      assert(profile.Name.includes("-lite-"), `Lite profile ${profile.Name} must be the starter layout`);
+      assert(profile.Name.includes("-starter-"), `Lite profile ${profile.Name} must be the starter layout`);
     }
   }
 }
