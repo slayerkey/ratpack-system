@@ -19,6 +19,14 @@
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
   "upgrade_url": "https://marketplace.elgato.com/%40packrat",
   "upgrade_url_state": "creator-page-until-pro-listing-exists",
+  "bundled_profiles": {
+    "value_proposition": "Lite includes one basic ready-to-use starter layout while Pro includes separate Competitive and Live Match layouts",
+    "layouts": ["Starter"],
+    "device_types": ["Stream Deck", "Stream Deck Mini", "Stream Deck XL", "Stream Deck +", "Stream Deck Neo"],
+    "auto_install": true,
+    "auto_switch_on_install": false,
+    "editable": true
+  },
   "lite_features": [
     "Live Score",
     "Health",
@@ -29,6 +37,7 @@
   "release_gate": [
     "shared source builds Pro and Lite deterministically",
     "Lite policy prevents Pro metrics from being selected",
+    "bundled Lite starter profiles expose only Lite actions and metrics",
     "unit and fixture tests pass",
     "production dependency audit passes",
     "manifest validation",
@@ -36,6 +45,7 @@
     "official .streamDeckPlugin packaging",
     "property inspector setup/error-state QA",
     "GSI installer custom-library fixtures",
+    "real bundled profile import smoke test on Stream Deck",
     "real normal-player CS2 GSI payload smoke test",
     "physical Stream Deck smoke test where required",
     "final direct Pro upgrade URL after Pro listing exists",
