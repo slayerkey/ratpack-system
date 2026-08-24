@@ -2,8 +2,8 @@
   "id": "cs2-competitive-dashboard-lite",
   "name": "CS2 Competitive Dashboard Lite",
   "type": "plugin",
-  "status": "building",
-  "workflow_state": "BUILDING",
+  "status": "built",
+  "workflow_state": "TESTING",
   "price_usd": 0,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
@@ -14,6 +14,8 @@
   "node_runtime": "20",
   "validation": "products/cs2-competitive-dashboard/VALIDATION.md",
   "plan": "products/cs2-competitive-dashboard/PLAN.md",
+  "qa": "products/cs2-competitive-dashboard/QA.md",
+  "release": "products/cs2-competitive-dashboard/RELEASE.md",
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
   "upgrade_url": "https://marketplace.elgato.com/%40packrat",
   "upgrade_url_state": "creator-page-until-pro-listing-exists",
@@ -28,12 +30,15 @@
     "shared source builds Pro and Lite deterministically",
     "Lite policy prevents Pro metrics from being selected",
     "unit and fixture tests pass",
+    "production dependency audit passes",
     "manifest validation",
     "official Elgato CLI validation",
     "official .streamDeckPlugin packaging",
     "property inspector setup/error-state QA",
     "GSI installer custom-library fixtures",
-    "real normal-player CS2 GSI payload spike",
-    "physical Stream Deck smoke test where required"
+    "real normal-player CS2 GSI payload smoke test",
+    "physical Stream Deck smoke test where required",
+    "final direct Pro upgrade URL after Pro listing exists",
+    "final deterministic Rat Art"
   ]
 }
