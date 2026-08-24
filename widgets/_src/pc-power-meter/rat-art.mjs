@@ -13,6 +13,8 @@ export const variants = [
   { name: 'zero', slot: 'S_H', mode: 'zero' },
   { name: 'high-power', slot: 'M_H', mode: 'high' },
   { name: 'empty', slot: 'M_H', mode: 'empty' },
+  { name: 'unavailable', slot: 'M_H', mode: 'unavailable' },
+  { name: 'preview', slot: 'M_H', mode: 'preview' },
 ];
 
 export async function prepare(page, context) {
@@ -33,7 +35,7 @@ export async function prepare(page, context) {
     globalThis.graphColor = '#2BE86A';
     globalThis.backgroundColor = '#070A0D';
     globalThis.tr = async value => value;
-    globalThis.iCUE = { isPreview: false };
+    globalThis.iCUE = { isPreview: mode === 'preview' };
     globalThis.pluginLinkprovider_initialized = true;
     globalThis.__fixtureErrors = [];
     addEventListener('error', event => globalThis.__fixtureErrors.push(`error:${event.message || event.error || 'unknown'}`));
@@ -41,7 +43,7 @@ export async function prepare(page, context) {
 
     try {
       localStorage.clear();
-      if (mode !== 'empty') {
+      if (!['empty', 'unavailable', 'preview'].includes(mode)) {
         const now = Date.now();
         const isZero = mode === 'zero';
         const isHigh = mode === 'high';
@@ -56,6 +58,11 @@ export async function prepare(page, context) {
         }));
       }
     } catch {}
+
+    if (mode === 'unavailable' || mode === 'preview') {
+      globalThis.plugins = {};
+      return;
+    }
 
     class Signal {
       constructor() { this.listeners = []; }
@@ -118,11 +125,7 @@ export async function prepare(page, context) {
 
 async function waitForPanel(page, expected) {
   try {
-    await page.waitForFunction(
-      state => document.body.getAttribute('data-panel-state') === state,
-      expected,
-      { timeout: 10000 },
-    );
+    await page.waitForFunction(state => document.body.getAttribute('data-panel-state') === state, expected, { timeout: 10000 });
   } catch (error) {
     const report = await page.evaluate(() => ({
       panel: document.body.getAttribute('data-panel-state'),
@@ -138,10 +141,8 @@ async function waitForPanel(page, expected) {
 }
 
 export async function ready(page, context) {
-  if (context.variant?.mode === 'empty') {
-    await waitForPanel(page, 'empty');
-    return;
-  }
+  if (context.variant?.mode === 'empty') { await waitForPanel(page, 'empty'); return; }
+  if (context.variant?.mode === 'unavailable') { await waitForPanel(page, 'unavailable'); return; }
   await waitForPanel(page, 'ready');
   await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
   if (context.variant?.mode === 'info') {
@@ -161,6 +162,7 @@ export async function assert(page, context) {
     energyUnit: document.getElementById('energyUnit')?.textContent?.trim() || '',
     scope: document.getElementById('scopeLabel')?.textContent?.trim() || '',
     overlayHidden: document.getElementById('infoOverlay')?.hidden,
+    primary: globalThis.PackRatPowerMeterTest?.getPrimary?.() || null,
     catalogue: globalThis.PackRatPowerMeterTest?.getCatalogue?.() || {},
   }));
 
@@ -169,7 +171,15 @@ export async function assert(page, context) {
     if (report.panel !== 'empty') throw new Error(`empty fixture did not render empty state: ${JSON.stringify(report)}`);
     return;
   }
+  if (context.variant?.mode === 'unavailable') {
+    if (report.panel !== 'unavailable') throw new Error(`unavailable fixture failed: ${JSON.stringify(report)}`);
+    return;
+  }
   if (report.panel !== 'ready') throw new Error(`power fixture not ready: ${JSON.stringify(report)}`);
+  if (context.variant?.mode === 'preview') {
+    if (report.primary?.id !== 'preview-power' || report.now === '—') throw new Error(`preview telemetry failed: ${JSON.stringify(report)}`);
+    return;
+  }
   if (!report.scope.includes('TOTAL POWER DRAW') || !report.scope.includes('MEASURED')) throw new Error(`scope is not explicit: ${JSON.stringify(report)}`);
   if (!String(report.catalogue['dup-a']?.displayName || '').endsWith('#1') || !String(report.catalogue['dup-b']?.displayName || '').endsWith('#2')) {
     throw new Error(`duplicate power sensor labels were not disambiguated: ${JSON.stringify(report.catalogue)}`);
