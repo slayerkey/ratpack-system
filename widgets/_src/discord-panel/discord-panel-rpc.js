@@ -1,3 +1,16 @@
+/* PackRat Discord Panel live transport.
+ *
+ * The XENEON widget talks only to the PackRat Discord Bridge on loopback.
+ * The companion owns the official Discord StreamKit page and sends a small,
+ * normalized voice snapshot to this widget. No Discord token or secret enters
+ * the XENEON package.
+ */
+
+var BRIDGE_URL = "ws://127.0.0.1:17483";
+var BRIDGE_RECONNECT_MS = 3000;
+var bridgeConfiguredSignature = "";
+var bridgeLastSnapshot = null;
+
 function findMember(userId) {
   for (var index = 0; index < model.members.length; index += 1) {
     if (currentUserId(model.members[index]) === String(userId || "")) return model.members[index];
@@ -30,7 +43,6 @@ function upsertVoiceState(raw) {
   } else {
     model.members.push(normalizeMember(raw, model.members.length + 100));
   }
-  render();
 }
 
 function removeVoiceState(raw) {
@@ -39,7 +51,6 @@ function removeVoiceState(raw) {
   if (!userId) return;
   model.members = model.members.filter(function (entry) { return currentUserId(entry) !== userId; });
   if (model.detailUserId === userId) closeMemberDetail();
-  render();
 }
 
 function setSpeaking(userId, speaking) {
@@ -57,152 +68,166 @@ function setSpeaking(userId, speaking) {
     member.speakerHoldUntil = Date.now() + SPEAKER_HOLD_MS;
     setTimeout(function () { render(); }, SPEAKER_HOLD_MS + 30);
   }
-  render();
 }
 
-function nextNonce() {
-  rpcNonce += 1;
-  return "packrat-discord-" + Date.now() + "-" + rpcNonce;
+function bridgeSettings() {
+  return {
+    guildId: String(getIcueProperty("discordServerId", "") || "").replace(/\D/g, ""),
+    channelId: String(getIcueProperty("discordVoiceChannelId", "") || "").replace(/\D/g, ""),
+    channelLabel: String(getIcueProperty("discordChannelLabel", "Discord Voice") || "Discord Voice").trim() || "Discord Voice"
+  };
 }
 
-function clearPending(reason) {
-  Object.keys(rpcPending).forEach(function (nonce) {
-    var pending = rpcPending[nonce];
-    clearTimeout(pending.timer);
-    pending.reject(new Error(reason || "RPC disconnected"));
-    delete rpcPending[nonce];
+function validDiscordId(value) {
+  return /^\d{5,24}$/.test(String(value || ""));
+}
+
+function sendBridge(value) {
+  if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return false;
+  try {
+    rpcSocket.send(JSON.stringify(value));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function configureBridge(force) {
+  var cfg = bridgeSettings();
+  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
+    bridgeConfiguredSignature = "";
+    model.channel = null;
+    model.members = [];
+    setState("setup");
+    return false;
+  }
+  var signature = cfg.guildId + ":" + cfg.channelId + ":" + cfg.channelLabel;
+  if (!force && signature === bridgeConfiguredSignature) return true;
+  if (!sendBridge({
+    command: "configure-streamkit",
+    guildId: cfg.guildId,
+    channelId: cfg.channelId,
+    channelLabel: cfg.channelLabel
+  })) return false;
+  bridgeConfiguredSignature = signature;
+  return true;
+}
+
+function applyBridgeChannel(channel, speakingMap) {
+  if (!channel) {
+    setChannel(null);
+    return;
+  }
+
+  var previousChannelId = model.channel && model.channel.id ? String(model.channel.id) : "";
+  var nextChannelId = channel.id ? String(channel.id) : "";
+  var states = Array.isArray(channel.voice_states) ? channel.voice_states : [];
+
+  if (!model.channel || previousChannelId !== nextChannelId) {
+    var initial = {
+      id: channel.id,
+      guild_id: channel.guild_id,
+      name: channel.name,
+      voice_states: states.map(function (entry) {
+        var clone = Object.assign({}, entry);
+        clone.speaking = false;
+        return clone;
+      })
+    };
+    setChannel(initial);
+  } else {
+    model.channel.id = channel.id;
+    model.channel.guild_id = channel.guild_id;
+    model.channel.name = channel.name;
+    var present = {};
+    states.forEach(function (entry) {
+      var id = currentUserId(entry);
+      if (!id) return;
+      present[id] = true;
+      upsertVoiceState(entry);
+    });
+    model.members.slice().forEach(function (entry) {
+      var id = currentUserId(entry);
+      if (id && !present[id]) removeVoiceState(entry);
+    });
+  }
+
+  var nextSpeaking = speakingMap || {};
+  model.members.forEach(function (entry) {
+    var id = currentUserId(entry);
+    setSpeaking(id, Boolean(nextSpeaking[id]));
   });
+  setState("voice");
 }
 
-function rpcRequest(cmd, args, evt, timeoutMs) {
-  return new Promise(function (resolve, reject) {
-    if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) {
-      reject(new Error("Discord RPC socket is not open"));
-      return;
-    }
-    var nonce = nextNonce();
-    var payload = { cmd: cmd, args: args || {}, nonce: nonce };
-    if (evt) payload.evt = evt;
-    var timer = setTimeout(function () {
-      if (!rpcPending[nonce]) return;
-      delete rpcPending[nonce];
-      reject(new Error(cmd + " timed out"));
-    }, Math.max(1000, Number(timeoutMs) || REQUEST_TIMEOUT_MS));
-    rpcPending[nonce] = { resolve: resolve, reject: reject, timer: timer, cmd: cmd };
-    try {
-      rpcSocket.send(JSON.stringify(payload));
-    } catch (error) {
-      clearTimeout(timer);
-      delete rpcPending[nonce];
-      reject(error);
-    }
-  });
-}
+function applyBridgeSnapshot(snapshot) {
+  bridgeLastSnapshot = snapshot || null;
+  if (!snapshot) return;
 
-function handleRpcMessage(event) {
-  var payload;
-  try { payload = JSON.parse(event.data); } catch (error) { return; }
+  if (snapshot.account) model.account = snapshot.account;
+  if (snapshot.voice) {
+    if (typeof snapshot.voice.mute === "boolean") model.voice.mute = snapshot.voice.mute;
+    if (typeof snapshot.voice.deaf === "boolean") model.voice.deaf = snapshot.voice.deaf;
+  }
 
-  if (payload && payload.nonce && rpcPending[payload.nonce]) {
-    var pending = rpcPending[payload.nonce];
-    clearTimeout(pending.timer);
-    delete rpcPending[payload.nonce];
-    if (payload.evt === "ERROR" || (payload.data && payload.data.code && payload.cmd === "DISPATCH")) {
-      pending.reject(new Error(payload.data && payload.data.message ? payload.data.message : "Discord RPC error"));
-    } else {
-      pending.resolve(payload.data);
-    }
+  var cfg = bridgeSettings();
+  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
+    setState("setup");
     return;
   }
 
-  if (!payload || payload.cmd !== "DISPATCH" || !payload.evt) return;
-  handleDispatch(payload.evt, payload.data || {});
+  if (!snapshot.bridge || snapshot.bridge.listening !== true) {
+    setState("disconnected");
+    return;
+  }
+
+  if (!snapshot.discord || snapshot.discord.ready !== true) {
+    setState("disconnected");
+    return;
+  }
+
+  var streamkit = snapshot.streamkit || {};
+  if (streamkit.stage === "failed" || streamkit.stage === "browser-exited") {
+    setState("auth-failed");
+    return;
+  }
+
+  if (streamkit.stage !== "ready" || !streamkit.pageReady) {
+    model.channel = null;
+    model.members = [];
+    setState("authorization");
+    return;
+  }
+
+  applyBridgeChannel(snapshot.channel || {
+    id: cfg.channelId,
+    guild_id: cfg.guildId,
+    name: cfg.channelLabel,
+    voice_states: []
+  }, snapshot.speaking || {});
+  renderControls();
 }
 
-function handleDispatch(evt, data) {
-  if (evt === "VOICE_CHANNEL_SELECT") {
-    refreshSelectedChannel();
-    return;
-  }
-  if (evt === "VOICE_SETTINGS_UPDATE") {
-    if (typeof data.mute === "boolean") model.voice.mute = data.mute;
-    if (typeof data.deaf === "boolean") model.voice.deaf = data.deaf;
-    renderControls();
-    return;
-  }
-  if (evt === "VOICE_STATE_CREATE" || evt === "VOICE_STATE_UPDATE") {
-    upsertVoiceState(data);
-    return;
-  }
-  if (evt === "VOICE_STATE_DELETE") {
-    removeVoiceState(data);
-    return;
-  }
-  if (evt === "SPEAKING_START") {
-    setSpeaking(data.user_id, true);
-    return;
-  }
-  if (evt === "SPEAKING_STOP") {
-    setSpeaking(data.user_id, false);
-  }
-}
-
-function connectOnePort(port) {
-  return new Promise(function (resolve) {
-    var settled = false;
-    var url = "ws://127.0.0.1:" + port + "/?v=1&client_id=" + encodeURIComponent(DISCORD_CLIENT_ID) + "&encoding=json";
-    var socket;
-    try { socket = new WebSocket(url); } catch (error) { resolve(null); return; }
-    var timer = setTimeout(function () {
-      if (settled) return;
-      settled = true;
-      try { socket.close(); } catch (error) { }
-      resolve(null);
-    }, 900);
-    socket.addEventListener("open", function () {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(socket);
-    }, { once: true });
-    socket.addEventListener("error", function () {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(null);
-    }, { once: true });
-    socket.addEventListener("close", function () {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(null);
-    }, { once: true });
-  });
-}
-
-async function findDiscordSocket() {
-  for (var port = DISCORD_PORT_FIRST; port <= DISCORD_PORT_LAST; port += 1) {
-    var socket = await connectOnePort(port);
-    if (socket) return socket;
-  }
-  return null;
-}
-
-function installSocket(socket) {
+function installBridgeSocket(socket) {
   rpcSocket = socket;
-  socket.addEventListener("message", handleRpcMessage);
+  socket.addEventListener("message", function (event) {
+    var payload;
+    try { payload = JSON.parse(String(event.data || "")); } catch (error) { return; }
+    if (payload && payload.type === "snapshot") applyBridgeSnapshot(payload);
+  });
   socket.addEventListener("close", function () {
     if (rpcSocket !== socket) return;
     rpcSocket = null;
-    clearPending("Discord RPC disconnected");
-    currentChannelSubscriptions = null;
-    model.channel = null;
-    model.members = [];
+    bridgeConfiguredSignature = "";
     if (!fixtureMode) {
       setState("disconnected");
       scheduleReconnect();
     }
   });
+  socket.addEventListener("error", function () {
+    if (rpcSocket === socket) setState("disconnected");
+  });
+  configureBridge(true);
 }
 
 function scheduleReconnect() {
@@ -210,190 +235,54 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(function () {
     reconnectTimer = null;
     startLiveConnection();
-  }, RECONNECT_MS);
-}
-
-async function subscribe(evt, args) {
-  return rpcRequest("SUBSCRIBE", args || {}, evt);
-}
-
-async function unsubscribe(evt, args) {
-  try { await rpcRequest("UNSUBSCRIBE", args || {}, evt); } catch (error) { }
-}
-
-async function setChannelSubscriptions(channelId) {
-  if (currentChannelSubscriptions === channelId) return;
-  if (currentChannelSubscriptions) {
-    var oldArgs = { channel_id: currentChannelSubscriptions };
-    await Promise.all([
-      unsubscribe("VOICE_STATE_CREATE", oldArgs),
-      unsubscribe("VOICE_STATE_UPDATE", oldArgs),
-      unsubscribe("VOICE_STATE_DELETE", oldArgs),
-      unsubscribe("SPEAKING_START", oldArgs),
-      unsubscribe("SPEAKING_STOP", oldArgs)
-    ]);
-  }
-  currentChannelSubscriptions = channelId || null;
-  if (!channelId) return;
-  var args = { channel_id: channelId };
-  await Promise.all([
-    subscribe("VOICE_STATE_CREATE", args),
-    subscribe("VOICE_STATE_UPDATE", args),
-    subscribe("VOICE_STATE_DELETE", args),
-    subscribe("SPEAKING_START", args),
-    subscribe("SPEAKING_STOP", args)
-  ]);
-}
-
-async function refreshSelectedChannel() {
-  if (!rpcSocket) return;
-  try {
-    var channel = await rpcRequest("GET_SELECTED_VOICE_CHANNEL", {});
-    await setChannelSubscriptions(channel && channel.id ? String(channel.id) : null);
-    setChannel(channel || null);
-  } catch (error) {
-    setChannel(null);
-  }
-}
-
-async function bootstrapAuthenticated() {
-  try {
-    await Promise.all([
-      subscribe("VOICE_CHANNEL_SELECT", {}),
-      subscribe("VOICE_SETTINGS_UPDATE", {})
-    ]);
-    var voice = await rpcRequest("GET_VOICE_SETTINGS", {});
-    if (voice) {
-      model.voice.mute = Boolean(voice.mute);
-      model.voice.deaf = Boolean(voice.deaf);
-    }
-    await refreshSelectedChannel();
-  } catch (error) {
-    setState("authorization");
-  }
-}
-
-var sessionAccessToken = "";
-
-async function authenticateWithToken(token) {
-  try {
-    var data = await rpcRequest("AUTHENTICATE", { access_token: token });
-    var scopes = data && Array.isArray(data.scopes) ? data.scopes : [];
-    var hasRead = scopes.indexOf("rpc.voice.read") >= 0;
-    var hasWrite = scopes.indexOf("rpc.voice.write") >= 0;
-    if (!hasRead || !hasWrite) {
-      sessionAccessToken = "";
-      setState("authorization");
-      return false;
-    }
-    sessionAccessToken = String(token || "");
-    model.account = data.user || null;
-    await bootstrapAuthenticated();
-    return true;
-  } catch (error) {
-    sessionAccessToken = "";
-    setState("authorization");
-    return false;
-  }
-}
-
-function base64Url(bytes) {
-  var binary = "";
-  for (var index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function createPkce() {
-  if (!globalThis.crypto || !crypto.getRandomValues || !crypto.subtle) throw new Error("PKCE crypto unavailable");
-  var random = new Uint8Array(32);
-  crypto.getRandomValues(random);
-  var verifier = base64Url(random);
-  var encoded = new TextEncoder().encode(verifier);
-  var digest = await crypto.subtle.digest("SHA-256", encoded);
-  return { verifier: verifier, challenge: base64Url(new Uint8Array(digest)) };
-}
-
-async function exchangeAuthorizationCode(code, verifier) {
-  var body = new URLSearchParams();
-  body.set("grant_type", "authorization_code");
-  body.set("client_id", DISCORD_CLIENT_ID);
-  body.set("code", String(code || ""));
-  body.set("redirect_uri", DISCORD_REDIRECT_URI);
-  body.set("code_verifier", verifier);
-
-  var controller = typeof AbortController === "function" ? new AbortController() : null;
-  var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : null;
-  try {
-    var response = await fetch(DISCORD_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-      cache: "no-store",
-      credentials: "omit",
-      signal: controller ? controller.signal : undefined
-    });
-    if (!response.ok) throw new Error("Discord token exchange returned HTTP " + response.status);
-    var data = await response.json();
-    if (!data || !data.access_token) throw new Error("Discord token exchange returned no access token");
-    return data;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-async function beginAuthorization() {
-  if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return;
-  var button = document.getElementById("authorizeButton");
-  button.disabled = true;
-  model.authorizationCodeReceived = false;
-  try {
-    var pkce = await createPkce();
-    var data = await rpcRequest("AUTHORIZE", {
-      client_id: DISCORD_CLIENT_ID,
-      response_type: "code",
-      redirect_uri: DISCORD_REDIRECT_URI,
-      scopes: DISCORD_SCOPES,
-      code_challenge: pkce.challenge,
-      code_challenge_method: "S256"
-    }, null, 120000);
-    if (!data || !data.code) throw new Error("Discord authorization returned no code");
-    model.authorizationCodeReceived = true;
-    var tokenData;
-    try {
-      tokenData = await exchangeAuthorizationCode(data.code, pkce.verifier);
-    } catch (exchangeError) {
-      setState("exchange-required");
-      return;
-    }
-    await authenticateWithToken(tokenData.access_token);
-  } catch (error) {
-    setState("auth-failed");
-  } finally {
-    button.disabled = false;
-  }
+  }, BRIDGE_RECONNECT_MS);
 }
 
 async function startLiveConnection() {
   if (fixtureMode) return;
-  if (!DISCORD_CLIENT_ID || DISCORD_CLIENT_ID === "__DISCORD_CLIENT_ID__") {
+  var cfg = bridgeSettings();
+  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
     setState("setup");
     return;
   }
-  if (rpcSocket && rpcSocket.readyState === WebSocket.OPEN) return;
+  if (rpcSocket && rpcSocket.readyState === WebSocket.OPEN) {
+    configureBridge(false);
+    return;
+  }
   setState("disconnected");
-  var socket = await findDiscordSocket();
-  if (!socket) {
-    setState("disconnected");
+  var socket;
+  try { socket = new WebSocket(BRIDGE_URL); } catch (error) {
     scheduleReconnect();
     return;
   }
-  installSocket(socket);
-  var token = sessionAccessToken;
-  try {
-    if (!token && typeof globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN === "string") token = globalThis.__PACKRAT_DISCORD_ACCESS_TOKEN.trim();
-  } catch (error) { }
-  if (token) await authenticateWithToken(token);
-  else setState("authorization");
+  var settled = false;
+  var timer = setTimeout(function () {
+    if (settled) return;
+    settled = true;
+    try { socket.close(); } catch (error) { }
+    scheduleReconnect();
+  }, 1800);
+  socket.addEventListener("open", function () {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    installBridgeSocket(socket);
+  }, { once: true });
+  socket.addEventListener("error", function () {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    scheduleReconnect();
+  }, { once: true });
+}
+
+async function beginAuthorization() {
+  if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) {
+    await startLiveConnection();
+    return;
+  }
+  configureBridge(true);
+  sendBridge({ command: "refresh" });
 }
 
 async function setSelfVoice(field, nextValue) {
@@ -402,22 +291,27 @@ async function setSelfVoice(field, nextValue) {
     renderControls();
     return;
   }
-  if (!rpcSocket || model.state !== "voice") return;
-  var args = {};
-  args[field] = Boolean(nextValue);
-  try {
-    var data = await rpcRequest("SET_VOICE_SETTINGS", args);
-    if (data && typeof data.mute === "boolean") model.voice.mute = data.mute;
-    if (data && typeof data.deaf === "boolean") model.voice.deaf = data.deaf;
-    renderControls();
-  } catch (error) {
-    try {
-      var refreshed = await rpcRequest("GET_VOICE_SETTINGS", {});
-      if (refreshed) {
-        model.voice.mute = Boolean(refreshed.mute);
-        model.voice.deaf = Boolean(refreshed.deaf);
-      }
-    } catch (innerError) { }
-    renderControls();
-  }
+  if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return;
+  sendBridge({ command: field === "mute" ? "mute" : "deafen", value: Boolean(nextValue) });
+  model.voice[field] = Boolean(nextValue);
+  renderControls();
 }
+
+/* Existing UI functions were written around the old Discord RPC transport.
+ * Override only the transport-specific copy/avatar assumptions so the visual
+ * product and eight-size layout remain unchanged.
+ */
+stateCopy = function () {
+  if (model.state === "setup") return ["Discord channel setup required", "Add your Discord Server ID and Voice Channel ID in widget settings.", true];
+  if (model.state === "disconnected") return ["PackRat Discord Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
+  if (model.state === "authorization") return ["Connecting to Discord voice", "The companion is loading this channel through Discord StreamKit.", true];
+  if (model.state === "auth-failed") return ["Discord voice source needs attention", "Press Refresh. If it persists, check the bridge status page.", true];
+  return ["No one in this voice channel", "The panel will update automatically when members appear.", false];
+};
+
+avatarUrl = function (raw) {
+  if (raw && raw.user && raw.user.avatar_url) return String(raw.user.avatar_url);
+  if (raw && raw.avatar_url) return String(raw.avatar_url);
+  if (!raw || !raw.user || !raw.user.id || !raw.user.avatar) return "";
+  return "https://cdn.discordapp.com/avatars/" + encodeURIComponent(raw.user.id) + "/" + encodeURIComponent(raw.user.avatar) + ".png?size=128";
+};
