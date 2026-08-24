@@ -1,6 +1,6 @@
 const LEETIFY_BASE = "https://api-public.cs-prod.leetify.com";
 const FACEIT_BASE = "https://open.faceit.com/data/v4";
-const STEAM_BASE = "https://api.steampowered.com";
+const STEAM_COMMUNITY_BASE = "https://steamcommunity.com";
 const STEAM64_RE = /^7656119\d{10}$/;
 const MAX_IDENTITY_LENGTH = 256;
 
@@ -33,7 +33,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
 
   let steamId64;
   try {
-    steamId64 = await resolveSteamIdentity(identity, env, fetchImpl);
+    steamId64 = await resolveSteamIdentity(identity, fetchImpl);
   } catch (error) {
     return json({ error: errorMessage(error) }, error?.status ?? 400);
   }
@@ -55,7 +55,7 @@ export async function handleRequest(request, env = {}, fetchImpl = fetch) {
   });
 }
 
-export async function resolveSteamIdentity(identity, env, fetchImpl = fetch) {
+export async function resolveSteamIdentity(identity, fetchImpl = fetch) {
   if (STEAM64_RE.test(identity)) return identity;
 
   let parsed;
@@ -68,23 +68,43 @@ export async function resolveSteamIdentity(identity, env, fetchImpl = fetch) {
   if (parsed && /(^|\.)steamcommunity\.com$/i.test(parsed.hostname)) {
     const parts = parsed.pathname.split("/").filter(Boolean);
     if (parts[0]?.toLowerCase() === "profiles" && STEAM64_RE.test(parts[1] ?? "")) return parts[1];
-    if (parts[0]?.toLowerCase() === "id" && parts[1]) return resolveVanity(parts[1], env, fetchImpl);
+    if (parts[0]?.toLowerCase() === "id" && parts[1]) return resolveVanity(parts[1], fetchImpl);
   }
 
-  if (/^[A-Za-z0-9_-]{2,64}$/.test(identity)) return resolveVanity(identity, env, fetchImpl);
+  if (/^[A-Za-z0-9_-]{2,64}$/.test(identity)) return resolveVanity(identity, fetchImpl);
   throw statusError("Steam identity format is not supported", 400);
 }
 
-async function resolveVanity(vanity, env, fetchImpl) {
-  if (!env.STEAM_WEB_API_KEY) throw statusError("Steam vanity URLs require STEAM_WEB_API_KEY on the gateway", 503);
-  const url = new URL(`${STEAM_BASE}/ISteamUser/ResolveVanityURL/v1/`);
-  url.searchParams.set("key", env.STEAM_WEB_API_KEY);
-  url.searchParams.set("vanityurl", vanity);
-  const response = await fetchImpl(url, { headers: { accept: "application/json" } });
-  if (!response.ok) throw statusError(`Steam identity lookup failed (${response.status})`, response.status === 429 ? 429 : 502);
-  const body = await safeJson(response);
-  const steamId = body?.response?.steamid;
-  if (!STEAM64_RE.test(steamId ?? "")) throw statusError("Steam vanity profile was not found", 404);
+async function resolveVanity(vanity, fetchImpl) {
+  // Steam community profile XML exposes steamID64 for public vanity URLs and
+  // avoids making every PackRat install depend on a separate Steam Web API key.
+  const url = new URL(`/id/${encodeURIComponent(vanity)}/`, STEAM_COMMUNITY_BASE);
+  url.searchParams.set("xml", "1");
+
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "GET",
+      headers: {
+        accept: "application/xml,text/xml;q=0.9,text/plain;q=0.8",
+        "user-agent": "PackRat-CS2-Competitive-Dashboard/1.0"
+      },
+      redirect: "follow"
+    });
+  } catch (error) {
+    throw statusError(`Steam identity lookup failed: ${errorMessage(error)}`, 502);
+  }
+
+  if (!response.ok) {
+    throw statusError(
+      response.status === 404 ? "Steam vanity profile was not found" : `Steam identity lookup failed (${response.status})`,
+      response.status === 404 ? 404 : response.status === 429 ? 429 : 502
+    );
+  }
+
+  const xml = await response.text();
+  const steamId = xml.match(/<steamID64>\s*(7656119\d{10})\s*<\/steamID64>/i)?.[1];
+  if (!STEAM64_RE.test(steamId ?? "")) throw statusError("Steam vanity profile did not expose a valid SteamID64", 404);
   return steamId;
 }
 
