@@ -309,45 +309,75 @@ async function inspectListboxes(target) {
 
 async function selectListboxValue(target, label, requested) {
   const candidates = optionCandidates(requested);
-  let boxes = await inspectListboxes(target);
+  const triggers = target.locator('button[aria-haspopup="listbox"]');
 
-  for (const candidate of candidates) {
-    const already = boxes.find(box => box.trigger.toLowerCase() === candidate.toLowerCase());
-    if (already) {
-      state.listboxProof.push({label,requested,actual:candidate,index:already.index,method:'already-selected'});
+  for (let i=0;i<await triggers.count();i++) {
+    const text = ((await triggers.nth(i).textContent()) || '').replace(/\s+/g,' ').trim();
+    const matched = candidates.find(candidate => candidate.toLowerCase() === text.toLowerCase());
+    if (matched) {
+      state.listboxProof.push({label,requested,actual:matched,index:i,method:'already-selected'});
       save();
       console.log(`${label}: ${requested} (already selected)`);
       return;
     }
   }
 
-  for (const candidate of candidates) {
-    const box = boxes.find(item => item.options.some(option => option.toLowerCase() === candidate.toLowerCase()));
-    if (!box) continue;
+  const placeholder = label === 'Category' ? /^type$/i : label === 'Language' ? /^language$/i : null;
+  let targetTrigger = placeholder ? target.getByRole('button',{name:placeholder}).first() : null;
+  let targetIndex = -1;
 
-    const triggers = target.locator('button[aria-haspopup="listbox"]');
-    const trigger = triggers.nth(box.index);
-    await trigger.click();
-    await target.waitForTimeout(250);
-
-    const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await target.getByRole('option',{name:new RegExp(`^${escaped}$`,'i')}).first().click();
-    await target.waitForTimeout(450);
-
-    const after = ((await trigger.textContent()) || '').replace(/\s+/g,' ').trim();
-    if (after.toLowerCase() !== candidate.toLowerCase()) {
-      boxes = await inspectListboxes(target);
-      const verified = boxes.some(item => item.trigger.toLowerCase() === candidate.toLowerCase());
-      if (!verified) throw new Error(`${label.toLowerCase()} did not stay selected: ${requested}`);
+  if (targetTrigger && await visible(targetTrigger)) {
+    const targetHandle = await targetTrigger.elementHandle();
+    for (let i=0;i<await triggers.count();i++) {
+      const same = targetHandle && await triggers.nth(i).evaluate((el,needle)=>el===needle,targetHandle).catch(()=>false);
+      if (same) { targetIndex=i; break; }
     }
-
-    state.listboxProof.push({label,requested,actual:candidate,index:box.index,method:'verified'});
-    save();
-    console.log(`${label}: ${requested}${requested === candidate ? '' : ` -> ${candidate}`}`);
-    return;
+  } else {
+    targetTrigger = null;
   }
 
-  throw new Error(`Maker Console no longer offers ${label.toLowerCase()}: ${requested}`);
+  let actual = null;
+  if (!targetTrigger) {
+    const boxes = await inspectListboxes(target);
+    for (const candidate of candidates) {
+      const box = boxes.find(item => item.options.some(option => option.toLowerCase() === candidate.toLowerCase()));
+      if (box) {
+        targetTrigger = target.locator('button[aria-haspopup="listbox"]').nth(box.index);
+        targetIndex = box.index;
+        actual = candidate;
+        break;
+      }
+    }
+  }
+
+  if (!targetTrigger) throw new Error(`Maker Console no longer offers ${label.toLowerCase()}: ${requested}`);
+
+  await targetTrigger.click();
+  await target.waitForTimeout(250);
+
+  if (!actual) {
+    const options = (await target.getByRole('option').allTextContents()).map(x => x.replace(/\s+/g,' ').trim());
+    actual = candidates.find(candidate => options.some(option => option.toLowerCase() === candidate.toLowerCase())) || null;
+  }
+  if (!actual) {
+    await target.keyboard.press('Escape').catch(()=>{});
+    throw new Error(`Maker Console no longer offers ${label.toLowerCase()}: ${requested}`);
+  }
+
+  const escaped = actual.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await target.getByRole('option',{name:new RegExp(`^${escaped}$`,'i')}).first().click();
+  await target.waitForTimeout(450);
+
+  const after = ((await targetTrigger.textContent()) || '').replace(/\s+/g,' ').trim();
+  if (after.toLowerCase() !== actual.toLowerCase()) {
+    const boxes = await inspectListboxes(target);
+    const verified = boxes.some(item => item.trigger.toLowerCase() === actual.toLowerCase());
+    if (!verified) throw new Error(`${label.toLowerCase()} did not stay selected: ${requested}`);
+  }
+
+  state.listboxProof.push({label,requested,actual,index:targetIndex,method:'verified'});
+  save();
+  console.log(`${label}: ${requested}${requested === actual ? '' : ` -> ${actual}`}`);
 }
 
 async function configurePrice(target) {
@@ -499,20 +529,35 @@ async function setIconAndCover(target) {
 
   let cover = await chooseFileInput(target,'cover',used);
   if (!cover) {
-    const labels = target.locator('label,button,[role="button"]').filter({hasText:/cover|thumbnail/i});
-    for (let i=0;i<await labels.count();i++) {
-      const zone = labels.nth(i);
+    const zones = target.locator('label,button,[role="button"]').filter({hasText:/cover|thumbnail/i});
+    for (let i=0;i<await zones.count();i++) {
+      const zone = zones.nth(i);
       const nested = zone.locator('input[type="file"]').first();
       if (await nested.count()) {
         cover = {locator:nested,index:-1,info:{method:'nested-cover-zone'}};
         break;
       }
     }
+
+    if (!cover) {
+      for (let i=0;i<await zones.count();i++) {
+        const zone = zones.nth(i);
+        if (!await zone.isVisible().catch(()=>false)) continue;
+        try {
+          const chooserPromise = target.waitForEvent('filechooser',{timeout:4000});
+          await zone.click();
+          const chooser = await chooserPromise;
+          await chooser.setFiles(join(KIT,'02_cover.png'));
+          cover = {locator:null,index:-1,info:{method:'filechooser-cover-zone'}};
+          break;
+        } catch {}
+      }
+    }
   }
 
   if (!cover) await mediaDiagnostic(target,'cover upload input not found on Maker Console media step');
 
-  await cover.locator.setInputFiles(join(KIT,'02_cover.png'),{timeout:60000});
+  if (cover.locator) await cover.locator.setInputFiles(join(KIT,'02_cover.png'),{timeout:60000});
   await target.waitForTimeout(1800);
 
   const body = await target.locator('body').innerText();
