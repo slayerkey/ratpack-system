@@ -18,6 +18,7 @@ Automated checks cover:
 - online provider client success/error fixtures
 - Competitive/Premier and FACEIT key-format fixtures
 - stateless gateway identity/provider/error fixtures
+- keyless Steam vanity/profile resolution through Steam Community XML
 - no-open-proxy gateway test
 - no-store gateway response policy
 - production dependency audit at high severity
@@ -50,11 +51,15 @@ Lite Live Metric is restricted to Score, Health, Money, and Map.
 
 The online gateway is deliberately stateless.
 
-- fixed Steam, Leetify, and FACEIT upstreams only
+- fixed Steam Community, Leetify, and FACEIT upstreams only
 - no arbitrary proxy target
 - no GSI endpoint
 - no KV, D1, R2, Durable Object, database, or persistent cache binding
 - provider secrets remain server-side
+- customers never create or paste API keys
+- Steam identity resolution does not require a Steam Web API key
+- one PackRat-owned FACEIT server-side key services all installs
+- a PackRat-owned Leetify key is recommended for production rate limits; anonymous Leetify requests remain supported by the upstream API
 - response header is `Cache-Control: no-store`
 - normalized data only is returned to the plugin
 - Leetify `not found`, private, rate-limit, unavailable, and offline states remain explicit
@@ -69,13 +74,13 @@ These are not ordinary code or packaging failures and cannot be truthfully simul
    - Commit it exactly as `plugin/static/ui/leetify-provided-dark.svg`.
    - Do not redraw, trace, recolor, or recreate it.
 
-2. **Provider / Cloudflare secrets**
+2. **PackRat provider / Cloudflare credentials**
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
    - `FACEIT_API_KEY`
-   - `STEAM_WEB_API_KEY`
-   - `LEETIFY_API_KEY`
-   - Store these as GitHub environment/repository secrets, never in source.
+   - `LEETIFY_API_KEY` for recommended production Leetify rate limits
+   - These are created once for PackRat infrastructure. Customers do not need any of them.
+   - Store them as GitHub environment/repository secrets, never in source.
 
 3. **Production provider deployment**
    - Run `.github/workflows/cs2-gateway-deploy.yml` manually after #1 and #2.
