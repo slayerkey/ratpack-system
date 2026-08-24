@@ -1,4 +1,4 @@
-import { access, readFile, readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 const proDir = "out/com.packrat.cs2-competitive-dashboard-pro.sdPlugin";
@@ -24,28 +24,35 @@ assert(liteConfig.includes('"sessionMetrics":[]'), "Lite session metrics must be
 const proConfig = await readFile(path.join(proDir, "ui", "build-config.js"), "utf8");
 for (const required of ["premier", "current-map-rank", "elo", "recent-record"]) assert(proConfig.includes(`\"${required}\"`), `Pro missing online metric ${required}`);
 
+const proPi = await readFile(path.join(proDir, "ui", "property-inspector.html"), "utf8");
+const proPiJs = await readFile(path.join(proDir, "ui", "pi.js"), "utf8");
+assert(proPi.includes('id="faceit-api-key"') && proPi.includes('type="password"'), "Pro must expose a masked customer FACEIT key field");
+assert(proPi.includes('id="leetify-api-key"') && proPi.includes('type="password"'), "Pro must expose a masked customer Leetify key field");
+assert(proPiJs.includes("https://developers.faceit.com/"), "Pro must link directly to FACEIT Developer Portal");
+assert(proPiJs.includes("https://docs.faceit.com/getting-started/authentication/api-keys/"), "Pro must link to official FACEIT API key instructions");
+assert(proPiJs.includes("https://leetify.com/app/developer"), "Pro must link directly to Leetify developer key page");
+assert(proPi.includes("never sent to a PackRat server"), "Pro must explain local customer-key handling");
+assert(proPi.includes("Data Provided by Leetify") || proPi.includes("leetify-provided-dark.svg"), "Pro must include Leetify attribution surface");
+assert(proPi.includes("view-leetify"), "Pro must include View on Leetify link surface");
+
+const runtime = await readFile("src/runtime.ts", "utf8");
+const directClient = await readFile("src/providers/direct-client.ts", "utf8");
 const providerConfig = await readFile("src/providers/config.ts", "utf8");
-const gatewayMatch = providerConfig.match(/PRO_GATEWAY_BASE_URL\s*=\s*\"([^\"]*)\"/);
-assert(gatewayMatch, "Could not inspect PRO_GATEWAY_BASE_URL");
-if (gatewayMatch[1]) {
-  await access("static/ui/leetify-provided-dark.svg");
-  await access(path.join(proDir, "ui", "leetify-provided-dark.svg"));
-  const pi = await readFile(path.join(proDir, "ui", "property-inspector.html"), "utf8");
-  assert(pi.includes("leetify-provided-dark.svg"), "Live Leetify builds must render the official unmodified attribution asset");
-  assert(pi.includes("view-leetify"), "Live Leetify builds must include View on Leetify");
-}
+assert(runtime.includes("faceitApiKey") && runtime.includes("leetifyApiKey"), "Pro runtime must support customer-owned provider keys");
+assert(directClient.includes("open.faceit.com/data/v4") && directClient.includes("api-public.cs-prod.leetify.com"), "Provider client must call the official provider origins directly");
+assert(!runtime.includes("GatewayClient") && !providerConfig.includes("PRO_GATEWAY_BASE_URL"), "PackRat shared provider gateway must remain disabled");
 
 for (const dir of [proDir, liteDir]) {
   const files = await walk(dir);
   for (const file of files.filter((file) => /\.(?:js|json|html|css)$/i.test(file))) {
     const content = await readFile(file, "utf8");
-    for (const secretName of ["FACEIT_API_KEY", "LEETIFY_API_KEY", "STEAM_WEB_API_KEY"]) {
-      assert(!content.includes(secretName), `${path.basename(dir)} unexpectedly contains server secret name ${secretName}`);
+    for (const forbiddenSecret of ["FACEIT_API_KEY=", "LEETIFY_API_KEY=", "STEAM_WEB_API_KEY=", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]) {
+      assert(!content.includes(forbiddenSecret), `${path.basename(dir)} unexpectedly contains PackRat infrastructure secret material`);
     }
   }
 }
 
-console.log("Release policy OK: Pro/Lite feature gates, provider safety, and attribution guard passed.");
+console.log("Release policy OK: Pro/Lite feature gates and customer-owned provider key architecture passed.");
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Release policy failed: ${message}`);
