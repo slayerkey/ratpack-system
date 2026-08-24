@@ -114,7 +114,7 @@ export async function prepare(page, context) {
         store[id] = sensor;
         plugin.sensorAdded.emit(id);
       },
-      totalSensor: structuredClone(baseSensors.total),
+      totalSensor: structuredClone(store.total),
     };
   }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
 }
