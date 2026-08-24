@@ -1,4 +1,23 @@
 @echo off
+setlocal
+
+set "_RAT_NEEDS_BOOTSTRAP="
+for %%A in (dev ship submit stage kit ship-cloud kit-cloud) do (
+  if /I "%~1"=="%%A" set "_RAT_NEEDS_BOOTSTRAP=1"
+)
+
+if defined _RAT_NEEDS_BOOTSTRAP if not defined RATPACK_BOOTSTRAPPED (
+  if not exist "%~dp0tools\local\rat-bootstrap.ps1" (
+    echo RatPack bootstrap helper is not installed. Run: rat main
+    exit /b 1
+  )
+  %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-bootstrap.ps1"
+  if errorlevel 1 exit /b 1
+  set "RATPACK_BOOTSTRAPPED=1"
+  call "%~f0" %*
+  exit /b %ERRORLEVEL%
+)
+
 if /I "%~1"=="dev" (
   if "%~2"=="" (
     echo Usage: rat dev ^<slug^>
