@@ -17,10 +17,12 @@ function compactWeapon(name?: string): string {
 }
 
 export function liveDisplay(metric: LiveMetric, live: LiveState | undefined, session: SessionMetrics, status: RuntimeStatus): DisplayValue {
-  if (!status.gsiConfigured) return { label: "CS2 LIVE", value: "SETUP", subtitle: "ENABLE GSI", tone: "warn" };
+  if (!status.gsiConfigured) return { label: "CS2 LIVE", value: "SETUP", subtitle: "ENABLE LIVE", tone: "warn" };
   if (!live || !status.gsiConnected) {
+    if (status.gsiRestartRequired && status.cs2Running) return { label: "CS2 LIVE", value: "RESTART", subtitle: "CS2 ONCE", tone: "warn" };
+    if (status.gsiRestartRequired && !status.cs2Running) return { label: "CS2 LIVE", value: "READY", subtitle: "LAUNCH CS2", tone: "warn" };
     if (!status.cs2Running) return { label: "CS2 LIVE", value: "OFFLINE", subtitle: "LAUNCH CS2", tone: "muted" };
-    return { label: "CS2 LIVE", value: "WAITING", subtitle: "GSI", tone: "warn" };
+    return { label: "CS2 LIVE", value: "WAITING", subtitle: "FOR GAME DATA", tone: "warn" };
   }
 
   switch (metric) {
@@ -30,8 +32,8 @@ export function liveDisplay(metric: LiveMetric, live: LiveState | undefined, ses
     case "deaths": return { label: "DEATHS", value: String(live.deaths) };
     case "assists": return { label: "ASSISTS", value: String(live.assists) };
     case "kd": return { label: "K/D", value: decimal(live.deaths === 0 ? live.kills : live.kills / live.deaths) };
-    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1), subtitle: "DERIVED" };
-    case "hs": return { label: "SESSION HS", value: `${decimal(session.hsPercent, 0)}%`, subtitle: "DERIVED" };
+    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1) };
+    case "hs": return { label: "SESSION HS%", value: `${decimal(session.hsPercent, 0)}%` };
     case "health": return { label: "HEALTH", value: live.health === undefined ? "--" : String(live.health), tone: live.health !== undefined && live.health <= 25 ? "danger" : "good" };
     case "armor": return { label: "ARMOR", value: live.armor === undefined ? "--" : String(live.armor), subtitle: live.helmet ? "HELMET" : undefined };
     case "money": return { label: "MONEY", value: live.money === undefined ? "--" : `$${live.money.toLocaleString("en-US")}` };
@@ -53,8 +55,8 @@ export function sessionDisplay(metric: string, session: SessionMetrics): Display
     case "record": return { label: "SESSION", value: `${session.wins}W ${session.losses}L`, subtitle: `${session.matches} MATCH${session.matches === 1 ? "" : "ES"}` };
     case "matches": return { label: "MATCHES", value: String(session.matches) };
     case "kd": return { label: "SESSION K/D", value: decimal(session.kd) };
-    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1), subtitle: "DERIVED" };
-    case "hs": return { label: "SESSION HS", value: `${decimal(session.hsPercent, 0)}%`, subtitle: "DERIVED" };
+    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1) };
+    case "hs": return { label: "SESSION HS%", value: `${decimal(session.hsPercent, 0)}%` };
     default: return { label: "SESSION", value: "--" };
   }
 }
@@ -63,6 +65,8 @@ export function statusDisplay(status: RuntimeStatus): DisplayValue {
   if (status.error) return { label: "CS2 STATUS", value: "ERROR", subtitle: "OPEN SETUP", tone: "danger" };
   if (!status.gsiConfigured) return { label: "CS2 STATUS", value: "SETUP", subtitle: "ENABLE LIVE", tone: "warn" };
   if (status.gsiConnected) return { label: "CS2 STATUS", value: "LIVE", subtitle: "CONNECTED", tone: "good" };
-  if (status.cs2Running) return { label: "CS2 STATUS", value: "WAITING", subtitle: "FOR GSI", tone: "warn" };
+  if (status.gsiRestartRequired && status.cs2Running) return { label: "CS2 STATUS", value: "RESTART", subtitle: "CS2 ONCE", tone: "warn" };
+  if (status.gsiRestartRequired) return { label: "CS2 STATUS", value: "READY", subtitle: "LAUNCH CS2", tone: "warn" };
+  if (status.cs2Running) return { label: "CS2 STATUS", value: "WAITING", subtitle: "FOR GAME DATA", tone: "warn" };
   return { label: "CS2 STATUS", value: "READY", subtitle: "LAUNCH CS2", tone: "muted" };
 }
