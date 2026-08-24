@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { patchMakerConsoleSource } from '../tools/ship/maker_console_runtime_patch_v3.mjs';
+import { patchMakerConsoleSource } from '../tools/ship/maker_console_runtime_patch_v4.mjs';
 
 const core = readFileSync(resolve('tools/ship/maker_console_core.mjs'), 'utf8').replace(/\r\n?/g, '\n');
 
@@ -17,7 +17,11 @@ function check(label, source) {
     "if (paidState === true && freeState !== true) return {mode:'paid'",
     "if (!RESUME) {",
     'state.lastUrl = page.url()',
-    "console.log('Resuming ' + prod.name + ' at the last verified Maker Console step.')"
+    "console.log('Resuming ' + prod.name + ' at the last verified Maker Console step.')",
+    'async function deleteConfirmedExistingDraft(target)',
+    "Existing ' + prod.name + ' is confirmed Draft. Deleting the stale draft and recreating it cleanly...",
+    "Maker Console reports ' + protectedStatus + '. Rat Ship will not modify or delete it.",
+    'await deleteConfirmedExistingDraft(page);'
   ];
 
   for (const needle of required) {
