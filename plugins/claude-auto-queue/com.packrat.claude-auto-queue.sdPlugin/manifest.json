@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "Claude Auto Queue",
+  "Version": "0.1.0.0",
+  "Author": "Packrat",
+  "Description": "Queue follow-up work for Claude Code from Stream Deck and see when Claude is working, finished, or needs your attention.",
+  "Category": "Claude Auto Queue",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "Icon": "imgs/plugin/marketplace",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Software": {
+    "MinimumVersion": "6.9"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    }
+  ],
+  "Nodejs": {
+    "Version": "20",
+    "Debug": "enabled"
+  },
+  "UUID": "com.packrat.claude-auto-queue",
+  "Actions": [
+    {
+      "Name": "Claude Status",
+      "UUID": "com.packrat.claude-auto-queue.status",
+      "Icon": "imgs/actions/common/icon",
+      "Tooltip": "Show the active Claude Code session state, elapsed turn time and PackRat queue count.",
+      "PropertyInspectorPath": "ui/config.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/common/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "Name": "Queue Prompt",
+      "UUID": "com.packrat.claude-auto-queue.queue-prompt",
+      "Icon": "imgs/actions/common/icon",
+      "Tooltip": "Add a reusable prompt to the current Claude Code session queue without interrupting its current work.",
+      "PropertyInspectorPath": "ui/config.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/common/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "Name": "Next Prompt",
+      "UUID": "com.packrat.claude-auto-queue.next-prompt",
+      "Icon": "imgs/actions/common/icon",
+      "Tooltip": "Show the next PackRat queued prompt and total pending count.",
+      "PropertyInspectorPath": "ui/config.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/common/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    },
+    {
+      "Name": "Queue Control",
+      "UUID": "com.packrat.claude-auto-queue.queue-control",
+      "Icon": "imgs/actions/common/icon",
+      "Tooltip": "Remove the next prompt, clear the queue or move the next prompt to the end.",
+      "PropertyInspectorPath": "ui/config.html",
+      "Controllers": ["Keypad"],
+      "States": [
+        {
+          "Image": "imgs/actions/common/key",
+          "TitleAlignment": "bottom"
+        }
+      ]
+    }
+  ]
+}
