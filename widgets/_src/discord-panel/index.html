@@ -6,9 +6,6 @@
 <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
 <title>tr('Discord Voice Panel')</title>
 
-<meta name="x-icue-property" content="discordServerId" data-label="'Discord Server ID'" data-type="textfield" data-default="''" />
-<meta name="x-icue-property" content="discordVoiceChannelId" data-label="'Voice Channel ID'" data-type="textfield" data-default="''" />
-<meta name="x-icue-property" content="discordChannelLabel" data-label="'Channel Label'" data-type="textfield" data-default="'Discord Voice'" />
 <meta name="x-icue-property" content="showRecentActivity" data-label="tr('Show Recent Activity')" data-type="switch" data-default="true" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
@@ -16,11 +13,6 @@
 
 <script type="application/json" id="x-icue-groups">
 [
-  {
-    "title": "'Discord Channel'",
-    "properties": ["discordServerId", "discordVoiceChannelId", "discordChannelLabel"],
-    "info": "'Enable Developer Mode in Discord, then copy the Server ID and Voice Channel ID. The free PackRat Discord Bridge must be running in Stream Deck.'"
-  },
   {
     "title": "tr('Voice')",
     "properties": ["showRecentActivity"],
@@ -64,7 +56,7 @@
           </div>
           <div id="emptyTitle">Connecting to Discord</div>
           <div id="emptyHint">The panel will update automatically.</div>
-          <button id="authorizeButton" class="interactive secondary-action" type="button">Refresh</button>
+          <button id="authorizeButton" class="interactive secondary-action" type="button">Connect Discord</button>
         </section>
       </div>
 
@@ -104,7 +96,6 @@
 </main>
 <script src="discord-panel-ui.js"></script>
 <script src="discord-panel-rpc.js"></script>
-<script src="discord-panel-streamkit-patch.js"></script>
 <script src="discord-panel.js"></script>
 </body>
 </html>
