@@ -24,6 +24,12 @@ artifacts/
 out/
 *.log
 
+# Generated XENEON widget outputs
+widgets/desk-notes-lite.icuewidget
+widgets/desk-notes-pro.icuewidget
+widgets/desk-notes/index.html
+widgets/desk-notes-pro/index.html
+
 # OS and editor files
 .DS_Store
 Thumbs.db
