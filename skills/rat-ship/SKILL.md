@@ -13,7 +13,7 @@ Validate that the ship helper has an explicit branch for the product type. Do no
 
 ## XENEON marketplace media
 
-For XENEON widgets, treat the cover and gallery as separate customer jobs.
+For XENEON widgets, treat the cover, search/app icon, and gallery as separate customer jobs.
 
 The default marketplace order is:
 
@@ -25,9 +25,21 @@ The default marketplace order is:
 
 Do not upload the cover again as a gallery item. The ship kit must fail if the cover or any gallery image is byte identical to another listing image.
 
-The first gallery frame should normally explain the product in more detail with concise feature or value points rather than repeat the hero composition.
+The first gallery frame should explain the product in more detail with concise feature or value points rather than repeat the hero composition. It is the conversion frame immediately after the click, so prioritize the most important practical reasons to use or buy the product rather than low-value implementation trivia.
+
+A search/app icon is never a gallery image. Only upload `01_search_icon.png` when Maker Console exposes a dedicated icon, search icon, or app icon control. If no dedicated icon control exists, skip the standalone icon upload. Never guess by sending the icon to an unlabeled or gallery file input.
+
+When the gallery input supports multiple files, upload the canonical gallery sequence as one ordered FileList and verify the browser FileList order before continuing. A resumed draft with unexpected pre-existing gallery media must not be treated as proof of correct ordering.
 
 Use the shared Rat Art footer and spacing rules. Do not add product-local footer wordmarks or one-off label/divider placement fixes when the shared renderer can own them.
+
+## Release notes
+
+Marketplace release notes are concise bullets, not a prose announcement.
+
+Default to three to six bullets describing the user-visible changes. Do not add headings or preambles such as `Initial release`, `What's new`, or `Version 1.0.0`. Do not submit one long paragraph when the information can be scanned as separate changes.
+
+For a first release, list the actual capabilities that shipped. For an update, list only meaningful changes in that version. Rat Ship may normalize legacy prose into bullet formatting, but new `submission.json` metadata should already be authored as clean bullet points.
 
 ## Elgato Maker Console
 

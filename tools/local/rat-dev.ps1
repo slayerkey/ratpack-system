@@ -36,8 +36,19 @@ function Test-GitRef {
 
 function Test-GitObject {
     param([string]$Object)
-    & git -C $RepoRoot cat-file -e $Object 2>$null
-    return $LASTEXITCODE -eq 0
+
+    # Missing candidate paths are expected while Rat Dev probes product layouts.
+    # Windows PowerShell can promote native stderr to a terminating error while
+    # the script-wide ErrorActionPreference is Stop, so temporarily relax it.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $RepoRoot cat-file -e $Object 2>$null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
 }
 
 function Ensure-StreamDeckCli {
