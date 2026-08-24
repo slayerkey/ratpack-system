@@ -22,13 +22,13 @@ They provide one Steam profile URL, SteamID64, or vanity name in the plugin. The
 
 ### FACEIT
 
-`FACEIT_API_KEY` is required for FACEIT metrics. Create **one PackRat-owned server-side Data API key** in FACEIT App Studio. FACEIT documents Data API keys as application credentials used programmatically, not credentials every end user must create.
+`FACEIT_API_KEY` is the **only mandatory provider API key** for the current full Pro feature set. Create one PackRat-owned server-side Data API key in FACEIT App Studio. FACEIT documents Data API access as programmatic application access, and server-side keys are specifically intended to stay on the app server rather than being shared with clients/users.
 
 ### Leetify
 
-`LEETIFY_API_KEY` is recommended for production reliability and rate limits, but the public API currently accepts requests without a key. Whether authenticated or anonymous, Leetify-sourced values still require Leetify's published `Data Provided by Leetify` attribution and `View on Leetify` link.
+No Leetify key is required to deploy or use the integration. Leetify's public API currently permits anonymous requests with stricter rate limits.
 
-The production release should use a PackRat-owned Leetify developer key rather than asking customers for theirs.
+A PackRat-owned `LEETIFY_API_KEY` can be added later if real production traffic needs the higher authenticated allowance. Whether authenticated or anonymous, Leetify-sourced values still require Leetify's official unmodified `Data Provided by Leetify` attribution and `View on Leetify` link.
 
 ### Steam
 
@@ -43,15 +43,15 @@ The deployment workflow itself needs PackRat's Cloudflare credentials:
 
 These are infrastructure credentials, not customer-facing product setup.
 
-## Secret setup
+## Minimum secret setup
 
-Required for full FACEIT support:
+Required for the current full FACEIT feature set:
 
 ```text
 npx wrangler secret put FACEIT_API_KEY
 ```
 
-Recommended for production Leetify traffic:
+Optional later, only if Leetify traffic needs higher limits:
 
 ```text
 npx wrangler secret put LEETIFY_API_KEY
