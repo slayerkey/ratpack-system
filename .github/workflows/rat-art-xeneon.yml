@@ -1,15 +1,6 @@
 name: Rat Art XENEON
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'widgets/_src/**'
-      - 'widgets/**'
-      - 'tools/art/**'
-      - 'tools/xeneon/**'
-      - 'skills/rat-art/**'
-      - '.github/workflows/rat-art-xeneon.yml'
   workflow_dispatch:
     inputs:
       slug:
@@ -28,22 +19,14 @@ jobs:
       slug: ${{ steps.resolve.outputs.slug }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Resolve slug
         id: resolve
         shell: bash
         env:
           DISPATCH_SLUG: ${{ inputs.slug }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            slug="$(python tools/xeneon/resolve_slug.py --slug "$DISPATCH_SLUG")"
-          else
-            slug="$(python tools/xeneon/resolve_slug.py --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA")"
-          fi
+          slug="$(python tools/xeneon/resolve_slug.py --slug "$DISPATCH_SLUG")"
           echo "Resolved XENEON slug: $slug"
           echo "slug=$slug" >> "$GITHUB_OUTPUT"
 

@@ -18,29 +18,41 @@ Multiple products in one queue:
 rat ship weather-timeline-pro weather-timeline snake desk-notes
 ```
 
-Batch mode processes products sequentially so one authenticated Maker Console browser profile is never driven by two submissions at the same time. If one product fails, Rat Ship records that failure, continues the remaining queue, and prints a failure summary at the end.
+Rat Ship now runs local first. At the start of the queue it switches the local checkout to the latest canonical `main` once. It then processes every product sequentially on the Windows PC so one authenticated Maker Console browser profile is never driven by two submissions at the same time.
+
+If one product fails, Rat Ship records that failure, continues the remaining queue, and prints a failure summary at the end.
 
 What it does for each product:
 
-1. Switches the local checkout to the latest `main`.
-2. Triggers the Rat Ship GitHub Actions workflow.
-3. Runs the canonical build, validation, official package, Rat Art, and ship kit pipeline in GitHub.
-4. Waits for the workflow to finish.
-5. Replaces the old local output for that product.
-6. Downloads the fresh ship kit into:
+1. Reuses the already synced canonical `main` checkout.
+2. Checks the required local runtime and installs only missing pieces.
+3. Regenerates the canonical shipping widget with `tools/xeneon/inline.py`.
+4. Refuses to ship if the generated shipping widget has uncommitted drift.
+5. Runs the official CORSAIR validator with the pinned iCUE Widget CLI.
+6. Creates the official `.icuewidget` package.
+7. Captures the real widget locally for Rat Art.
+8. Renders deterministic Rat Art locally.
+9. Renders the canonical marketplace search icon.
+10. Builds and validates the Maker Console `SHIP_KIT` under:
 
 ```text
 out\ship\<slug>
 ```
 
-7. Reuses the local Rat Ship Playwright runtime instead of reinstalling it inside every ship kit.
-8. Opens Maker Console with the persistent local PackRat browser profile.
-9. Reuses the existing Maker Console login when the session is still valid.
-10. Fills the product draft from the canonical ship kit.
-11. Uploads the official widget package and Rat Art.
-12. Sets marketplace metadata, release notes, price, and auto publish policy.
-13. Uploads gallery media in the canonical marketplace order.
-14. Submits the product.
+11. Reuses the persistent local Maker Console browser runtime and login.
+12. Fills the product draft from the canonical ship kit.
+13. Uploads the official package and Rat Art.
+14. Sets marketplace metadata, release notes, price, and auto publish policy.
+15. Uploads gallery media in the canonical order.
+16. Submits the product.
+
+The normal path does not start a GitHub Actions runner. GitHub remains the source of truth because the queue syncs canonical `main` before it builds anything.
+
+### Local dependency behavior
+
+Rat Ship expects Git, Python, Node, npm, and npx to exist on the Windows machine. It checks pinned runtime pieces such as Pillow and Playwright, and installs them only if missing. Chromium is checked by executable path and is only installed when the existing Playwright runtime cannot find it.
+
+The official CORSAIR CLI remains pinned through `npx`, so validation and packaging use the expected CLI version even when the rest of the runtime is reused locally.
 
 ### Gallery order
 
@@ -66,7 +78,7 @@ On a local Maker Console failure Rat Ship creates:
 out\ship\<slug>\log.zip
 ```
 
-The ZIP contains the recovery screenshots, error text, state, and any page diagnostics. Rat Ship also opens Explorer with the recovery ZIP selected so it is easy to drag into a support or debugging chat.
+The ZIP contains recovery screenshots, error text, state, and page diagnostics. Rat Ship also opens Explorer with the recovery ZIP selected so it is easy to drag into a support or debugging chat.
 
 Authentication is local only. Maker Console cookies and session state stay under:
 
@@ -76,7 +88,27 @@ Authentication is local only. Maker Console cookies and session state stay under
 
 GitHub Actions never receives Maker Console cookies, passwords, browser profile data, or session tokens.
 
-The first time the local Maker Console profile is used, Elgato may require you to sign in manually in the browser window. After that, the persistent profile should normally reuse the session until Elgato expires it.
+## Clean GitHub runner commands
+
+The old hosted build path is still available when a fresh external environment is useful.
+
+### `rat ship-cloud <slug> [slug...]`
+
+Explicitly runs the full Rat Ship GitHub Actions workflow, downloads the resulting ship kit, and then uses the local authenticated Maker Console bridge to submit it.
+
+Use this when you specifically want a clean GitHub hosted build rather than the normal local build.
+
+### `rat kit-cloud <slug> [slug...]`
+
+Runs the same clean GitHub Actions build and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
+
+The full Rat Ship, Rat Art, and deep XENEON workflows are manual dispatch workflows only. They do not run automatically on ordinary pull requests.
+
+## Automatic CI
+
+Normal pushes and pull requests use only `RatPack Lightweight CI`. It validates canonical context, parses JSON, and checks the syntax of local PowerShell helpers on an Ubuntu runner.
+
+It intentionally does not install Chromium, render Rat Art, package XENEON widgets, run StreamSpell, or create ship kits. Those expensive checks happen locally during normal shipping or through an explicit cloud workflow when requested.
 
 ## `rat dev <slug>`
 
@@ -137,14 +169,7 @@ The first Stream Deck run may install the official `@elgato/cli` once. Current S
 
 ## `rat status`
 
-Shows:
-
-* local repo path
-* current branch
-* latest commit
-* whether local files changed
-
-Use this if you want to know whether your local RatPack checkout is clean and current.
+Shows the local repo path, current branch, latest commit, and whether local files changed.
 
 ## `rat help`
 
@@ -156,29 +181,17 @@ Prints the main command cheat sheet in the terminal.
 
 Opens the reusable local development folder for a product without rebuilding or reinstalling it.
 
-Example:
-
-```text
-rat dev-open discord-bridge
-```
-
-Use this only when you actually want to inspect the generated plugin or local development files. Successful `rat dev` runs do not open Explorer automatically because there should normally be nothing to install by hand.
-
 ### `rat kit <slug> [slug...]`
 
-Runs the fresh Rat Ship GitHub pipeline and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
-
-This is useful when you specifically want the files only.
+Runs the full canonical shipping pipeline locally and opens the resulting ship kit, but does not open Maker Console or submit anything.
 
 ### `rat stage <slug> [slug...]`
 
-Runs the same fresh Rat Ship process, launches Maker Console, fills the listing, uploads the package and media, and stops before the final Submit action.
-
-Use this when you want to inspect the finished Maker Console draft manually.
+Runs the same local shipping process, launches Maker Console, fills the listing, uploads the package and media, and stops before final Submit.
 
 ### `rat submit <slug> [slug...]`
 
-Alias for `rat ship`.
+Alias for `rat ship` and therefore uses the normal local first path.
 
 ### `rat update`
 
@@ -194,7 +207,7 @@ Opens the RatPack repo folder in Explorer.
 
 ### `rat doctor`
 
-Checks Git, Node, npm, GitHub CLI, GitHub authentication, repo state, and whether the persistent Maker Console profile exists.
+Checks Git, Python, Node, npm, GitHub CLI, GitHub authentication, repo state, and whether the persistent Maker Console profile exists.
 
 # Local layout
 

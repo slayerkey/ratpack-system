@@ -14,7 +14,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $ShipToolRoot = Join-Path $RepoRoot "tools\ship"
 $MakerProfile = Join-Path $env:LOCALAPPDATA "PackRat\maker-console-profile"
 $RunnerUnavailablePrefix = "[RATSHIP_RUNNER_UNAVAILABLE]"
-$script:ForceLocalShip = $false
+$script:ForceLocalShip = -not ($Action.ToLowerInvariant() -in @("ship-cloud", "kit-cloud"))
 
 function Require-Command {
     param([string]$Name, [string]$Hint)
@@ -142,23 +142,25 @@ function Show-Help {
     Write-Host "RatPack cheat sheet" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "NORMAL" -ForegroundColor Green
-    Write-Host "  rat ship <slug> [slug...]    Build, validate, package, create Rat Art, fill Maker Console, and submit one or more products in sequence."
+    Write-Host "  rat ship <slug> [slug...]    Sync main once, build/validate/package/Rat Art locally, then fill Maker Console and submit."
     Write-Host "  rat status                   Show the local repo branch, commit, and whether local files changed."
     Write-Host "  rat help                     Show this cheat sheet."
     Write-Host ""
     Write-Host "BATCH EXAMPLE" -ForegroundColor Green
     Write-Host "  rat ship weather-timeline-pro weather-timeline snake desk-notes"
-    Write-Host "  Batch mode continues to later products if one product fails, then prints a failure summary."
-    Write-Host "  If GitHub cannot start a hosted runner, Rat Ship automatically uses the same canonical build/package/SHIP_KIT pipeline locally for the rest of that queue."
+    Write-Host "  Batch mode syncs canonical main once, then processes products sequentially on this PC."
+    Write-Host "  Existing Python, Node, Playwright, Chromium, and cached CLI dependencies are reused; missing runtime pieces are installed only when needed."
     Write-Host ""
     Write-Host "OPTIONAL" -ForegroundColor DarkGray
-    Write-Host "  rat kit <slug> [slug...]     Build and download fresh ship kits without opening Maker Console."
-    Write-Host "  rat stage <slug> [slug...]   Build and fill Maker Console, but stop before final Submit."
-    Write-Host "  rat submit <slug> [slug...]  Alias for rat ship."
+    Write-Host "  rat ship-cloud <slug> [...]  Use the old clean GitHub Actions build, download the kit, then submit locally."
+    Write-Host "  rat kit-cloud <slug> [...]   Use the clean GitHub Actions build and download the kit only."
+    Write-Host "  rat kit <slug> [slug...]     Build fresh ship kits locally without opening Maker Console."
+    Write-Host "  rat stage <slug> [slug...]   Build locally and fill Maker Console, but stop before final Submit."
+    Write-Host "  rat submit <slug> [slug...]  Alias for local rat ship."
     Write-Host "  rat update                   Pull the latest changes for the current branch."
     Write-Host "  rat main                     Switch to main and pull the latest canonical RatPack."
     Write-Host "  rat open                     Open the RatPack repo in Explorer."
-    Write-Host "  rat doctor                   Check Git, Node, npm, GitHub CLI, GitHub login, and repo state."
+    Write-Host "  rat doctor                   Check Git, Python, Node, npm, GitHub CLI, GitHub login, and repo state."
     Write-Host ""
     Write-Host "Maker Console login persists at: $MakerProfile"
     Write-Host "Full reference: $RepoRoot\RAT-COMMANDS.md"
@@ -269,7 +271,6 @@ function Build-ShipKitLocally {
 
 function Download-ShipKit {
     param([string]$WidgetSlug)
-    Sync-Main
 
     if ($script:ForceLocalShip) {
         return Build-ShipKitLocally $WidgetSlug
@@ -454,6 +455,8 @@ function Invoke-SlugBatch {
         throw "Rat $Mode needs at least one product slug."
     }
 
+    Sync-Main
+
     Write-Host "Rat $Mode queue: $($queue -join ', ')" -ForegroundColor Cyan
     $failures = @()
     $completed = @()
@@ -495,13 +498,13 @@ function Invoke-SlugBatch {
 function Run-Doctor {
     Write-Host "RatPack local doctor" -ForegroundColor Cyan
     Write-Host "Repo: $RepoRoot"
-    foreach ($cmd in @("git", "node", "npm", "gh")) {
+    foreach ($cmd in @("git", "python", "node", "npm", "gh")) {
         $found = Get-Command $cmd -ErrorAction SilentlyContinue
         if ($found) {
-            Write-Host ("{0,-5} OK  {1}" -f $cmd, $found.Source) -ForegroundColor Green
+            Write-Host ("{0,-7} OK  {1}" -f $cmd, $found.Source) -ForegroundColor Green
         }
         else {
-            Write-Host ("{0,-5} MISSING" -f $cmd) -ForegroundColor Red
+            Write-Host ("{0,-7} MISSING" -f $cmd) -ForegroundColor Red
         }
     }
     if (Get-Command gh -ErrorAction SilentlyContinue) {
@@ -531,8 +534,10 @@ switch ($Action.ToLowerInvariant()) {
     "update" { Sync-CurrentBranch }
     "main" { Sync-Main }
     "ship" { Invoke-SlugBatch -Mode "ship" -Slugs $RequestedSlugs }
+    "ship-cloud" { Invoke-SlugBatch -Mode "ship" -Slugs $RequestedSlugs }
     "submit" { Invoke-SlugBatch -Mode "submit" -Slugs $RequestedSlugs }
     "kit" { Invoke-SlugBatch -Mode "kit" -Slugs $RequestedSlugs }
+    "kit-cloud" { Invoke-SlugBatch -Mode "kit" -Slugs $RequestedSlugs }
     "stage" { Invoke-SlugBatch -Mode "stage" -Slugs $RequestedSlugs }
     "open" { Start-Process explorer.exe $RepoRoot }
     "doctor" { Run-Doctor }
