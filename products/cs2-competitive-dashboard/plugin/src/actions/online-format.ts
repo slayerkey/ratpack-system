@@ -35,7 +35,8 @@ function percent(value: number | undefined): string {
 }
 
 function cleanMap(map?: string): string {
-  return (map ?? "--").replace(/^de_/, "").replaceAll("_", " ").toUpperCase();
+  const value = map?.trim();
+  return (value || "--").replace(/^de_/, "").replaceAll("_", " ").toUpperCase();
 }
 
 function sourceState(source: string, status: OnlineSourceStatus, message?: string): DisplayValue | undefined {
