@@ -2,6 +2,7 @@ import { deflateSync } from "node:zlib";
 import { access, copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { builds } from "./builds.mjs";
+import { generateBundledProfiles } from "./profiles.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
 const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
@@ -32,12 +33,13 @@ for (const build of builds) {
     "utf8"
   );
 
-  await writeFile(path.join(build.output, "manifest.json"), `${JSON.stringify(createManifest(build), null, 2)}\n`, "utf8");
+  const profiles = await generateBundledProfiles(build);
+  await writeFile(path.join(build.output, "manifest.json"), `${JSON.stringify(createManifest(build, profiles), null, 2)}\n`, "utf8");
   await writeFile(path.join(build.output, ".sdignore"), "logs/\n*.map\n", "utf8");
   await generateImages(build);
 }
 
-function createManifest(build) {
+function createManifest(build, profiles) {
   return {
     $schema: "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
     Actions: build.actions.map((action) => ({
@@ -60,12 +62,13 @@ function createManifest(build) {
     CategoryIcon: "imgs/category",
     CodePath: "bin/plugin.js",
     Description: build.flavor === "pro"
-      ? "A live CS2 competitive dashboard for Stream Deck with match telemetry, session performance, Premier and Competitive rank views, and FACEIT stats."
-      : "A lightweight live CS2 dashboard for Stream Deck with Score, Health, Money, Map, and connection status.",
+      ? "A live CS2 competitive dashboard for Stream Deck with match telemetry, session performance, Premier and Competitive rank views, FACEIT stats, and ready-to-use profiles."
+      : "A lightweight live CS2 dashboard for Stream Deck with Score, Health, Money, Map, connection status, and a ready-to-use starter profile.",
     Icon: "imgs/plugin",
     Name: build.name,
     Nodejs: { Version: "20" },
     OS: [{ Platform: "windows", MinimumVersion: "10" }],
+    Profiles: profiles,
     PropertyInspectorPath: "ui/property-inspector.html",
     SDKVersion: 3,
     Software: { MinimumVersion: "6.9" },
