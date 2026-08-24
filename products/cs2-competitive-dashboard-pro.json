@@ -18,10 +18,12 @@
   "release": "products/cs2-competitive-dashboard/RELEASE.md",
   "gateway": "products/cs2-competitive-dashboard/gateway",
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
-  "commercial_gates": [
+  "customer_api_keys_required": false,
+  "provider_gates": [
     "Official unmodified Leetify Data Provided by Leetify dark-background asset is required before production Leetify-backed features are enabled",
-    "Leetify production developer key and current guidelines must be honored before Leetify-backed features ship",
-    "FACEIT production developer key must remain server-side before live provider calls ship"
+    "PackRat-owned Leetify developer key is recommended for production rate limits and current Leetify developer guidelines must be honored",
+    "PackRat-owned FACEIT server-side Data API key must remain server-side before live FACEIT provider calls ship",
+    "Steam profile and vanity resolution must remain keyless through Steam Community profile XML"
   ],
   "release_gate": [
     "shared source builds Pro and Lite deterministically",
@@ -37,6 +39,6 @@
     "production provider deployment and attribution gate",
     "real normal-player CS2 GSI payload smoke test",
     "physical Stream Deck smoke test where required",
-    "final deterministic Rat Art"
+    "deterministic Rat Art candidate passes visual review"
   ]
 }
