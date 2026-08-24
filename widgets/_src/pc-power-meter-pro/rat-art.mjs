@@ -46,7 +46,7 @@ export async function prepare(page, context) {
         const now = Date.now();
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:session', JSON.stringify({
           sensorId: 'total', startedAt: now - 2 * 3600000, lastSeenAt: now - 1000,
-          energyWh: mode === 'high' ? 25000 : 840, measuredMs: 7200000,
+          energyWh: mode === 'high' ? 25000 : (mode === 'normal' ? 823.01 : 840), measuredMs: 7200000,
           peakW: mode === 'high' ? 12500 : 517, samples: 7200,
         }));
         const d = new Date(now);
@@ -94,6 +94,13 @@ export async function prepare(page, context) {
     };
     globalThis.plugins = { Sensorsdataprovider: plugin };
     globalThis.pluginSensorsdataprovider_initialized = true;
+    globalThis.__powerProFixture = {
+      setValue(id, value) {
+        if (!store[id]) return;
+        store[id].value = String(value);
+        plugin.sensorValueChanged.emit(id, String(value));
+      },
+    };
   }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
 }
 
@@ -114,11 +121,36 @@ async function waitForPanel(page, expected) {
   }
 }
 
+async function seedBaseGraph(page) {
+  const traces = {
+    total: [330, 360, 410, 385, 455, 517, 470, 430, 412],
+    cpu: [80, 95, 120, 105, 135, 160, 145, 132, 128],
+    gpu: [170, 190, 220, 205, 250, 285, 270, 255, 244],
+  };
+  await page.evaluate(series => {
+    const originalNow = Date.now;
+    const base = originalNow();
+    try {
+      const count = series.total.length;
+      for (let index = 0; index < count; index += 1) {
+        Date.now = () => base - (count - 1 - index) * 18000;
+        globalThis.__powerProFixture.setValue('total', series.total[index]);
+        globalThis.__powerProFixture.setValue('cpu', series.cpu[index]);
+        globalThis.__powerProFixture.setValue('gpu', series.gpu[index]);
+      }
+    } finally {
+      Date.now = originalNow;
+    }
+  }, traces);
+  await page.waitForTimeout(80);
+}
+
 export async function ready(page, context) {
   if (context.variant?.mode === 'empty') { await waitForPanel(page, 'empty'); return; }
   if (context.variant?.mode === 'unavailable') { await waitForPanel(page, 'unavailable'); return; }
   await waitForPanel(page, 'ready');
   await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
+  if (!context.variant) await seedBaseGraph(page);
   if (context.variant?.mode === 'info') {
     await page.locator('#infoButton').click();
     await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden, null, { timeout: 3000 });
@@ -138,6 +170,7 @@ export async function assert(page, context) {
     todayUnit: document.getElementById('todayUnit')?.textContent?.trim() || '',
     history: document.getElementById('historySummary')?.textContent?.trim() || '',
     comparisons: document.querySelectorAll('.comparison-card').length,
+    graphPaths: document.querySelectorAll('#powerGraph path.series').length,
     overlayHidden: document.getElementById('infoOverlay')?.hidden,
     primary: globalThis.PackRatPowerMeterTest?.getPrimary?.() || null,
     catalogue: globalThis.PackRatPowerMeterTest?.getCatalogue?.() || {},
@@ -160,6 +193,7 @@ export async function assert(page, context) {
   if (report.primary?.id !== 'total') throw new Error(`wrong Pro primary sensor: ${JSON.stringify(report)}`);
   if (report.comparisons !== 2) throw new Error(`comparison sensors failed: ${JSON.stringify(report)}`);
   if (!String(report.catalogue['psu-a']?.displayName || '').endsWith('#1') || !String(report.catalogue['psu-b']?.displayName || '').endsWith('#2')) throw new Error('duplicate Pro sensor labels were not disambiguated');
+  if (!context.variant && report.graphPaths !== 3) throw new Error(`Pro graph did not render all three measured traces: ${JSON.stringify(report)}`);
   if (context.variant?.mode === 'high') {
     if (report.now !== '12,500' || report.threshold !== 'high') throw new Error(`high power threshold failed: ${JSON.stringify(report)}`);
   } else {
