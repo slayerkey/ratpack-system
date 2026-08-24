@@ -3,6 +3,7 @@ import path from "node:path";
 import { StateStore } from "./state-store.js";
 
 export const MAX_AUTOMATIC_CONTINUATIONS = 6;
+export const MAX_QUEUE_PROMPT_CHARS = 9000;
 
 const ATTENTION_NOTIFICATIONS = new Set([
   "permission_prompt",
@@ -19,7 +20,9 @@ function nowMs() {
 function cleanPrompt(value) {
   const prompt = String(value ?? "").trim();
   if (!prompt) throw new Error("Prompt cannot be empty.");
-  if (prompt.length > 10000) throw new Error("Prompt is too long. Maximum is 10,000 characters.");
+  if (prompt.length > MAX_QUEUE_PROMPT_CHARS) {
+    throw new Error(`Prompt is too long. Maximum is ${MAX_QUEUE_PROMPT_CHARS.toLocaleString("en-US")} characters.`);
+  }
   return prompt;
 }
 
@@ -357,7 +360,7 @@ export class AutoQueueService {
           hookSpecificOutput: {
             hookEventName: "Stop",
             additionalContext:
-              "The user queued the following follow-up task in PackRat Auto Queue. Continue this same session by doing it now:\n\n" +
+              "PackRat Auto Queue state: the user authored the following as the next queued request for this same conversation. It is the user's next requested work item:\n\n" +
               next.prompt
           }
         };

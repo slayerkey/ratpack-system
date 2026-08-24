@@ -6,7 +6,8 @@ import test from "node:test";
 
 import {
   AutoQueueService,
-  MAX_AUTOMATIC_CONTINUATIONS
+  MAX_AUTOMATIC_CONTINUATIONS,
+  MAX_QUEUE_PROMPT_CHARS
 } from "../src/core/queue-service.js";
 import { StateStore } from "../src/core/state-store.js";
 
@@ -30,7 +31,7 @@ async function startSession(service, id = "session-a") {
   });
 }
 
-test("queues a prompt and injects it at the next Stop boundary", async () => {
+test("queues a prompt and injects factual user-authored context at the next Stop boundary", async () => {
   const service = await makeService();
   await startSession(service);
   await service.enqueue("Run tests and fix failures");
@@ -45,11 +46,24 @@ test("queues a prompt and injects it at the next Stop boundary", async () => {
   });
 
   assert.equal(response.hookSpecificOutput.hookEventName, "Stop");
+  assert.match(response.hookSpecificOutput.additionalContext, /user authored the following as the next queued request/i);
   assert.match(response.hookSpecificOutput.additionalContext, /Run tests and fix failures/);
+  assert.doesNotMatch(response.hookSpecificOutput.additionalContext, /system command/i);
   const session = service.getSession("session-a");
   assert.equal(session.queue.length, 0);
   assert.equal(session.state, "working");
   assert.equal(session.continuationCount, 1);
+});
+
+test("rejects queued prompts that would approach Claude's 10k additionalContext spill threshold", async () => {
+  const service = await makeService();
+  await startSession(service);
+  assert.equal(MAX_QUEUE_PROMPT_CHARS, 9000);
+  await service.enqueue("x".repeat(MAX_QUEUE_PROMPT_CHARS));
+  await assert.rejects(
+    () => service.enqueue("x".repeat(MAX_QUEUE_PROMPT_CHARS + 1)),
+    /Maximum is 9,000 characters/
+  );
 });
 
 test("does not drain the queue while Claude has background work that can wake the session", async () => {
