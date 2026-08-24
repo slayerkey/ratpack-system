@@ -1,67 +1,89 @@
 # Discord Bridge QA
 
-Current feasibility build: `0.2.0.0`
+Current feasibility build: `0.3.0.0`
 
-## Proven before the StreamKit pivot
+## Proven on the user's Windows host
 
-PASS: Stream Deck plugin process runs on the user's Windows host.
+PASS: Stream Deck plugin process runs.
 
 PASS: localhost PackRat bridge listens on `127.0.0.1:17483`.
 
 PASS: plugin connects to `\\?\\pipe\\discord-ipc-0`.
 
-PASS: Discord returns the native IPC `READY` handshake.
+PASS: Discord returns the native IPC `READY` handshake with RPC v1.
 
-PASS: direct XENEON browser to legacy Discord WebSocket RPC is not viable because Discord returns Invalid Origin.
+PASS: direct XENEON browser to legacy Discord WebSocket RPC is not viable because Discord rejects the browser origin.
 
-PASS: native RPC `AUTHORIZE` reaches Discord, which rejects `rpc.voice.read` and `rpc.voice.write` with `invalid_scope` before issuing a code for the current application.
+PASS: the PackRat-owned Discord application reaches native RPC authorization, but Discord rejects its `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing a code.
 
-## Current automated checks
+## Active StreamKit public RPC feasibility path
 
-PASS: Discord IPC framing is little endian and handles chunked frames.
+Build `0.3.0.0` no longer uses the PackRat Discord application for voice authorization.
+
+The production build now:
+
+1. handshakes Discord native IPC with StreamKit client ID `207646673902501888`
+2. requests `rpc`, `rpc.voice.read`, and `rpc.voice.write` through native RPC `AUTHORIZE`
+3. exchanges the one time code at `https://streamkit.discord.com/overlay/token` by sending only `{ code }`
+4. authenticates the same Discord IPC session with the returned access token
+5. subscribes to current-channel, roster, speaking, and voice-setting events
+6. uses `SET_VOICE_SETTINGS` for real mute and deafen control
+7. forwards only normalized state to XENEON over the loopback bridge
+
+The StreamKit token is stored only in Stream Deck global settings for local reuse and is never included in `/state` or XENEON snapshots. No Discord Client Secret is embedded.
+
+## Automated coverage in source
+
+PASS: Discord IPC little-endian framing and chunked decoding.
 
 PASS: WebSocket RFC 6455 handshake and masked browser frames.
 
-PASS: bridge listens only on loopback.
+PASS: loopback-only bridge and XENEON local/file origin allowlist.
 
-PASS: XENEON-compatible local/file origins are accepted and normal remote web origins are rejected.
+PASS: local `Origin: null` WebSocket command delivery.
 
-PASS: local `Origin: null` bridge connection and command delivery.
+PASS: exact StreamKit public client ID, RPC scopes, and token endpoint are fixture-tested.
 
-PASS: official StreamKit voice URL generation uses `streamkit.discord.com/overlay/voice/<guild>/<channel>`.
+PASS: StreamKit token exchange test verifies the request body contains only the one time authorization code and no client secret.
 
-PASS: StreamKit DOM normalization preserves roster, order, speaking state, and self voice hints.
+PASS: production plugin test verifies it uses StreamKit native RPC, `AUTHORIZE`, `GET_SELECTED_VOICE_CHANNEL`, and `SET_VOICE_SETTINGS`, and does not instantiate the hidden Edge fallback.
 
-PASS: StreamKit DOM probe uses broad class substring selectors instead of a single generated CSS hash.
+PASS: normal operational states communicate through the Stream Deck key title instead of warning overlays.
 
-PASS: mute helper emits Discord's Ctrl Shift M shortcut.
+The old hidden Edge overlay and keyboard-shortcut helpers remain in source only as an experimental fallback. The deterministic production build does not copy them into the plugin package.
 
-PASS: deafen helper emits Discord's Ctrl Shift D shortcut.
-
-PASS: normal connection states do not invoke Stream Deck warning overlays.
-
-PASS: `UserTitleEnabled` remains true.
-
-## Current physical feasibility gate
+## Current real-machine gate
 
 Run:
 
 ```text
 rat dev discord-bridge
-rat dev discord-panel
 ```
 
-Configure the Discord Server ID and Voice Channel ID in the XENEON widget settings.
+Rat Dev must pass the product build, all Node tests, and official Stream Deck CLI validation before linking build `0.3.0.0`.
 
-Then prove on the user's Windows host and physical XENEON Edge:
+Expected pre-authorization state:
 
-1. bridge state reports `buildVersion: 0.2.0.0`
-2. `streamkit.mode` is `official_overlay_edge`
-3. `streamkit.stage` reaches `ready`
-4. roster members appear on XENEON
-5. speaking state changes are visible on XENEON
-6. mute touch toggles Discord
-7. deafen touch toggles Discord
-8. the companion recovers after Stream Deck or Discord restarts
+- `buildVersion: 0.3.0.0`
+- `protocol: 3`
+- `streamkit.mode: public_rpc`
+- `discord.ready: true`
+- `discord.authenticated: false`
 
-If `streamkit.stage` never reaches `ready`, inspect `/state` before changing architecture again. The next debugging target is current StreamKit DOM/runtime behavior in the hidden Edge page, not Discord restricted OAuth.
+Press the Stream Deck Bridge Status key once if it says `Press to Authorize`.
+
+A technical feasibility pass requires:
+
+- Discord accepts StreamKit RPC `AUTHORIZE`
+- StreamKit token endpoint returns an access token
+- Discord RPC `AUTHENTICATE` succeeds
+- `/state` shows `streamkit.stage: ready`
+- `/state` shows `discord.authenticated: true`
+- joining any Discord voice channel automatically populates `channel.voice_states`
+- `speaking` changes on real speech
+- mute/deafen commands update Discord and the returned voice state
+- cached authentication survives a normal Stream Deck plugin restart
+
+## Release caveat
+
+A successful technical spike does not by itself approve this mechanism for a commercial Marketplace product. Before release, review current Discord/StreamKit terms and Marketplace requirements for using StreamKit's public application identity from a third-party companion. If that usage is not acceptable, retain the technical result but use an approved PackRat identity or another compliant transport for production.
