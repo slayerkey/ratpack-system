@@ -1,4 +1,4 @@
-name: RatPack Context CI
+name: RatPack Lightweight CI
 
 on:
   push:
@@ -16,12 +16,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
       - name: Validate canonical context
         run: python tests/check_context.py
+
       - name: Validate JSON files
         run: |
           python - <<'PY'
@@ -31,3 +34,20 @@ jobs:
               json.loads(path.read_text(encoding='utf-8'))
               print(f'OK {path}')
           PY
+
+      - name: Validate local PowerShell syntax
+        shell: pwsh
+        run: |
+          $failures = @()
+          Get-ChildItem tools/local -Filter *.ps1 -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) {
+              $failures += $_.FullName
+              $errors | ForEach-Object { Write-Host "$($_.Extent.File):$($_.Extent.StartLineNumber) $($_.Message)" }
+            }
+          }
+          if ($failures.Count) {
+            throw "PowerShell syntax errors found in: $($failures -join ', ')"
+          }

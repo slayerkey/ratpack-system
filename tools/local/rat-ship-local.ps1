@@ -51,7 +51,17 @@ function Ensure-LocalDependencies {
     if (-not (Test-Path $playwrightCmd)) {
         throw "Playwright installed without its command shim at $playwrightCmd"
     }
-    Invoke-LocalStep "ensure Chromium runtime" { & $playwrightCmd install chromium }
+
+    Push-Location $ToolsRoot
+    try {
+        & node -e "import('playwright').then(({chromium})=>process.exit(require('fs').existsSync(chromium.executablePath())?0:2)).catch(()=>process.exit(3))" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Invoke-LocalStep "install Chromium runtime" { & $playwrightCmd install chromium }
+        }
+    }
+    finally {
+        Pop-Location
+    }
 }
 
 if ($WidgetSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
