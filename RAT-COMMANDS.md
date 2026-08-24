@@ -49,21 +49,24 @@ The first time the local Maker Console profile is used, Elgato may require you t
 
 This is the normal one-command local development updater for Stream Deck plugins that need a real local host application to test.
 
-Example:
+Examples:
 
 ```text
 rat dev discord-bridge
+rat dev valorant-tracker
 ```
 
 What it does:
 
 1. Fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout.
-2. Prefers `origin/product/<slug>` while a product is in development, then falls back to `origin/main` after the plugin is merged.
-3. Reuses a detached development worktree under:
+2. Prefers `origin/product/<slug>` for products developed inside RatPack. Products registered as external repositories automatically fetch their configured repository and development ref instead.
+3. Reuses a development checkout under:
 
 ```text
 out\dev\worktrees\<slug>
 ```
+
+RatPack-native products use detached worktrees. Registered external products use a reusable local clone in the same location.
 
 4. Installs plugin dependencies only when needed.
 5. Runs the plugin build and automated tests declared by the product.
@@ -74,7 +77,7 @@ out\dev\worktrees\<slug>
 
 Normal iteration should not use Downloads, hand-copied ZIP folders, or manually installed development packages. Product-specific local state stays inside the normal Stream Deck application or the ignored RatPack `out` directory.
 
-`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`.
+`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`. That file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
 
 The first run may install the official `@elgato/cli` once. Current Stream Deck CLI development requires Node.js 24 or newer.
 
@@ -143,7 +146,7 @@ C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out
 
 `out/` is ignored by Git, so generated marketplace kits and development worktrees do not clutter source control or the Downloads folder.
 
-Development worktrees live under:
+Development worktrees and external development clones live under:
 
 ```text
 C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\worktrees
