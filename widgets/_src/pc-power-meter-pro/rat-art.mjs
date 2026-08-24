@@ -35,6 +35,9 @@ export async function prepare(page, context) {
     globalThis.backgroundColor = '#070A0D';
     globalThis.tr = async value => value;
     globalThis.iCUE = { isPreview: mode === 'preview' };
+    globalThis.__fixtureErrors = [];
+    addEventListener('error', event => globalThis.__fixtureErrors.push(`error:${event.message || event.error || 'unknown'}`));
+    addEventListener('unhandledrejection', event => globalThis.__fixtureErrors.push(`rejection:${String(event.reason || 'unknown')}`));
 
     try {
       localStorage.clear();
@@ -45,7 +48,8 @@ export async function prepare(page, context) {
           energyWh: mode === 'high' ? 25000 : 840, measuredMs: 7200000,
           peakW: mode === 'high' ? 12500 : 517, samples: 7200,
         }));
-        const key = new Date(now).toLocaleDateString('en-CA');
+        const d = new Date(now);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:daily', JSON.stringify({ [key]: { wh: 1320, measuredMs: 10800000 } }));
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:history', JSON.stringify([{
           sensorId: 'total', startedAt: now - 6 * 3600000, endedAt: now - 4 * 3600000,
@@ -92,16 +96,30 @@ export async function prepare(page, context) {
   }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
 }
 
-export async function ready(page, context) {
-  if (context.variant?.mode === 'empty') {
-    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'empty', { timeout: 10000 });
-    return;
+async function waitForPanel(page, expected) {
+  try {
+    await page.waitForFunction(state => document.body.getAttribute('data-panel-state') === state, expected, { timeout: 10000 });
+  } catch (error) {
+    const report = await page.evaluate(() => ({
+      panel: document.body.getAttribute('data-panel-state'),
+      stateTitle: document.getElementById('stateTitle')?.textContent?.trim() || '',
+      stateBody: document.getElementById('stateBody')?.textContent?.trim() || '',
+      errors: globalThis.__fixtureErrors || [],
+      primary: globalThis.PackRatPowerMeterTest?.getPrimary?.() || null,
+      catalogue: globalThis.PackRatPowerMeterTest?.getCatalogue?.() || {},
+      primarySensor: typeof globalThis.primarySensor === 'string' ? globalThis.primarySensor : typeof globalThis.primarySensor,
+    }));
+    throw new Error(`Pro power fixture failed waiting for ${expected}: ${JSON.stringify(report)} :: ${error.message}`);
   }
-  await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'ready', { timeout: 10000 });
-  await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', { timeout: 5000 });
+}
+
+export async function ready(page, context) {
+  if (context.variant?.mode === 'empty') { await waitForPanel(page, 'empty'); return; }
+  await waitForPanel(page, 'ready');
+  await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
   if (context.variant?.mode === 'info') {
     await page.locator('#infoButton').click();
-    await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden);
+    await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden, null, { timeout: 3000 });
   }
   await page.waitForTimeout(150);
 }
