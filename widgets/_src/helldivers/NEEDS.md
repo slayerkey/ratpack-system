@@ -1,4 +1,4 @@
-# Helldivers 2 Galactic War shared needs
+# Helldivers 2 Panel shared needs
 
 No outstanding shared release blockers remain for this product.
 
