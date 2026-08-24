@@ -4,9 +4,9 @@ import { StateStore } from "./core/store.js";
 import { createGsiToken, installGsiConfig, removeGsiConfig } from "./gsi/installer.js";
 import { normalizeGsiPayload } from "./gsi/normalize.js";
 import { GsiServer } from "./gsi/server.js";
-import { ONLINE_PROFILE_REFRESH_MS, PRO_GATEWAY_BASE_URL } from "./providers/config.js";
-import { GatewayClient, GatewayError } from "./providers/gateway-client.js";
-import { emptyOnlineSnapshot, type OnlineProfileSnapshot, type OnlineSourceStatus } from "./providers/types.js";
+import { ONLINE_PROFILE_REFRESH_MS } from "./providers/config.js";
+import { ProviderClient } from "./providers/direct-client.js";
+import { emptyOnlineSnapshot, type OnlineProfileSnapshot } from "./providers/types.js";
 import { SessionTracker } from "./session/session-tracker.js";
 
 export interface DashboardSnapshot {
@@ -24,6 +24,8 @@ type GlobalSettings = {
   cs2InstallPath?: string;
   manualCs2Path?: string;
   steamProfile?: string;
+  faceitApiKey?: string;
+  leetifyApiKey?: string;
 };
 
 type PiCommand =
@@ -32,18 +34,19 @@ type PiCommand =
   | { type: "disable-gsi" }
   | { type: "reset-session" }
   | { type: "set-steam-profile"; steamProfile?: string }
+  | { type: "set-provider-keys"; faceitApiKey?: string; leetifyApiKey?: string }
+  | { type: "clear-provider-key"; provider: "faceit" | "leetify" }
   | { type: "refresh-online" };
 
 export interface DashboardRuntimeOptions {
   onlineEnabled?: boolean;
-  gatewayBaseUrl?: string;
 }
 
 export class DashboardRuntime {
   private readonly server = new GsiServer();
   private readonly sessionTracker = new SessionTracker();
   private readonly onlineEnabled: boolean;
-  private readonly gateway: GatewayClient;
+  private readonly providerClient = new ProviderClient();
   private readonly store = new StateStore<DashboardSnapshot>({
     session: this.sessionTracker.snapshot(),
     status: {
@@ -61,7 +64,6 @@ export class DashboardRuntime {
 
   constructor(options: DashboardRuntimeOptions = {}) {
     this.onlineEnabled = options.onlineEnabled ?? false;
-    this.gateway = new GatewayClient(options.gatewayBaseUrl ?? PRO_GATEWAY_BASE_URL);
   }
 
   subscribe(listener: (snapshot: DashboardSnapshot) => void): () => void {
@@ -148,6 +150,21 @@ export class DashboardRuntime {
           this.globals.steamProfile = command.steamProfile?.trim() || undefined;
           await this.saveGlobals();
           this.publish({ online: emptyOnlineSnapshot(this.globals.steamProfile) });
+          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          return this.publicState();
+        case "set-provider-keys": {
+          const faceit = command.faceitApiKey?.trim();
+          const leetify = command.leetifyApiKey?.trim();
+          if (faceit) this.globals.faceitApiKey = faceit;
+          if (leetify) this.globals.leetifyApiKey = leetify;
+          await this.saveGlobals();
+          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          return this.publicState();
+        }
+        case "clear-provider-key":
+          if (command.provider === "faceit") this.globals.faceitApiKey = undefined;
+          else this.globals.leetifyApiKey = undefined;
+          await this.saveGlobals();
           if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
           return this.publicState();
         case "refresh-online":
@@ -249,19 +266,21 @@ export class DashboardRuntime {
 
     this.onlineRefresh = (async () => {
       try {
-        const result = await this.gateway.getProfile(identity, controller.signal);
+        const result = await this.providerClient.getProfile(identity, {
+          faceitApiKey: this.globals.faceitApiKey,
+          leetifyApiKey: this.globals.leetifyApiKey
+        }, controller.signal);
         if (!controller.signal.aborted) this.publish({ online: result });
       } catch (error) {
         if (controller.signal.aborted) return;
-        const status = this.onlineErrorStatus(error);
         const message = this.errorMessage(error);
         const failed = emptyOnlineSnapshot(identity);
         failed.updatedAt = Date.now();
         failed.error = message;
-        failed.leetify.status = status;
-        failed.leetify.message = message;
-        failed.faceit.status = status;
-        failed.faceit.message = message;
+        failed.leetify.status = this.globals.leetifyApiKey ? "offline" : "not_configured";
+        failed.leetify.message = this.globals.leetifyApiKey ? message : "Add your free Leetify API key in setup";
+        failed.faceit.status = this.globals.faceitApiKey ? "offline" : "not_configured";
+        failed.faceit.message = this.globals.faceitApiKey ? message : "Add your free FACEIT API key in setup";
         this.publish({ online: failed });
       } finally {
         this.onlineRefresh = undefined;
@@ -269,15 +288,6 @@ export class DashboardRuntime {
     })();
 
     return this.onlineRefresh;
-  }
-
-  private onlineErrorStatus(error: unknown): OnlineSourceStatus {
-    if (error instanceof GatewayError) {
-      if (error.status === 429) return "rate_limited";
-      if (error.status === 404) return "not_found";
-      if (error.status === 401 || error.status === 403) return "unavailable";
-    }
-    return "offline";
   }
 
   private checkConnectionFreshness(): void {
@@ -310,7 +320,9 @@ export class DashboardRuntime {
       online: snapshot.online,
       account: {
         steamProfile: this.globals.steamProfile ?? "",
-        steamConfigured: Boolean(this.globals.steamProfile)
+        steamConfigured: Boolean(this.globals.steamProfile),
+        faceitKeyConfigured: Boolean(this.globals.faceitApiKey),
+        leetifyKeyConfigured: Boolean(this.globals.leetifyApiKey)
       },
       setup: {
         manualCs2Path: this.globals.manualCs2Path ?? ""
@@ -330,6 +342,16 @@ export class DashboardRuntime {
     }
     if (candidate.type === "set-steam-profile") {
       return { type: "set-steam-profile", steamProfile: typeof candidate.steamProfile === "string" ? candidate.steamProfile : undefined };
+    }
+    if (candidate.type === "set-provider-keys") {
+      return {
+        type: "set-provider-keys",
+        faceitApiKey: typeof candidate.faceitApiKey === "string" ? candidate.faceitApiKey : undefined,
+        leetifyApiKey: typeof candidate.leetifyApiKey === "string" ? candidate.leetifyApiKey : undefined
+      };
+    }
+    if (candidate.type === "clear-provider-key" && (candidate.provider === "faceit" || candidate.provider === "leetify")) {
+      return { type: "clear-provider-key", provider: candidate.provider };
     }
     return undefined;
   }
