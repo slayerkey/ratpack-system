@@ -27,8 +27,8 @@ assert.match(html, /discord-panel-rpc\.js/);
 const transport = fs.readFileSync(path.join(source, "discord-panel-rpc.js"), "utf8");
 assert.match(transport, /ws:\/\/127\.0\.0\.1:17483/);
 assert.match(transport, /command: model\.state === "authorization" \? "authorize" : "refresh"/);
-assert.match(transport, /field === "mute"/);
-assert.match(transport, /field === "deaf"/);
+assert.match(transport, /command: field === "mute" \? "mute" : "deafen"/);
+assert.match(transport, /value: Boolean\(nextValue\)/);
 assert.match(transport, /Join any Discord voice channel and the panel will follow automatically/);
 assert.equal(transport.includes("configure-streamkit"), false);
 assert.equal(transport.includes("discord.com/api/oauth2"), false);
@@ -36,4 +36,4 @@ assert.equal(transport.includes("rpc.voice.read"), false);
 assert.equal(transport.includes("rpc.voice.write"), false);
 assert.equal(transport.includes("6463"), false);
 
-console.log("DISCORD PANEL DEV QA PASS: source syntax, automatic loopback bridge transport, no fixed channel configuration, and no direct Discord OAuth/RPC dependency");
+console.log("DISCORD PANEL DEV QA PASS: source syntax, automatic loopback bridge transport, mute/deafen command mapping, no fixed channel configuration, and no direct Discord OAuth/RPC dependency");
