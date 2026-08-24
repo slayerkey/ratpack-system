@@ -7,37 +7,46 @@
 - The companion connects to Discord through `\\?\\pipe\\discord-ipc-0`.
 - Discord accepts the native IPC handshake and returns RPC v1 `READY`.
 - The old browser/WebSocket `Origin` problem is bypassed by the companion architecture.
-- Discord rejects this application's `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing an authorization code.
+- Discord rejects the PackRat-owned application's `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing an authorization code.
 
-## Current feasibility path
+## Active feasibility path
 
-The active spike no longer depends on those restricted voice scopes.
+Build `0.3.0.0` tests Discord StreamKit's public RPC identity instead of the PackRat application.
 
-The companion launches Discord's official StreamKit voice overlay as a top-level page in a hidden Microsoft Edge process, reads the rendered roster and speaking state locally through Edge DevTools, and forwards normalized display state over the existing loopback bridge.
+The companion uses StreamKit client ID `207646673902501888`, requests `rpc`, `rpc.voice.read`, and `rpc.voice.write` through native Discord IPC, exchanges the resulting one time code through `https://streamkit.discord.com/overlay/token`, then authenticates the IPC session.
 
-Mute and deafen use Discord's documented global Windows shortcuts instead of `rpc.voice.write`.
+No Discord Client Secret is embedded. The token is not sent to the XENEON widget or exposed through the local bridge state.
 
-## What still needs physical proof
+If this succeeds, the product regains the original experience rather than the fixed-channel fallback:
 
-1. Run build `0.2.0.0` through `rat dev discord-bridge`.
-2. Build/import the XENEON widget through `rat dev discord-panel`.
-3. Configure the Discord Server ID and Voice Channel ID in iCUE.
-4. Confirm the hidden official StreamKit page reaches `streamkit.stage: ready`.
-5. Confirm the real roster appears on XENEON Edge.
-6. Confirm speaking highlights update quickly enough for the panel experience.
-7. Confirm mute and deafen touch controls reach Discord while Discord is in the background.
-8. Confirm the helper survives Discord, Stream Deck, and iCUE restarts.
+- automatically follows whichever Discord voice channel the user joins
+- receives the real roster and speaking events
+- reads actual mute/deafen state
+- changes mute/deafen through Discord RPC
 
-## If the StreamKit spike works
+## What still needs real-machine proof
 
-- replace PoC/raw Stream Deck host plumbing with current `@elgato/streamdeck` v2+ and SDKVersion 3 before Marketplace release
-- harden StreamKit DOM change detection and add safe diagnostics for selector drift
-- decide how many saved Discord channels the final companion should support
-- decide whether channel label should be manual or discovered from the overlay
-- package and validate the companion with the official Elgato CLI on a clean runner
-- run the complete XENEON eight-size gate, official CORSAIR package, StreamSpell, Rat Art, and Rat Ship flow
-- review current Marketplace/Maker terms for the local Edge helper before public submission
+1. Run `rat dev discord-bridge` and confirm build `0.3.0.0` passes all local tests plus official Stream Deck validation.
+2. Confirm StreamKit's client ID receives the Discord native IPC `READY` handshake on Windows.
+3. Press the Bridge Status key and approve the Discord authorization prompt.
+4. Confirm native `AUTHORIZE` returns a code rather than `invalid_scope`.
+5. Confirm StreamKit's token endpoint accepts that code.
+6. Confirm RPC `AUTHENTICATE` succeeds.
+7. Join any voice channel and confirm current channel, roster, speaking events, and voice settings populate automatically.
+8. Confirm real RPC mute and deafen controls work.
+9. Confirm cached authentication works after restarting the linked Stream Deck plugin.
+10. Run `rat dev discord-panel`, import the package into iCUE, and prove the same data/control loop on the physical XENEON Edge.
 
-## Optional future enhancement
+## After technical feasibility passes
 
-Discord partner approval for `rpc.voice.read` and `rpc.voice.write` would still be valuable because it could enable automatic current-channel following and richer state. It is no longer required for this alternate feasibility test.
+- migrate the raw Stream Deck host layer to the current `@elgato/streamdeck` SDK and SDKVersion 3 before Marketplace release
+- remove the obsolete hidden Edge/fixed-channel fallback if it is no longer needed
+- package and validate the companion through the official Elgato release path
+- rerun the complete XENEON eight-size gate against the final loopback transport
+- run official CORSAIR package, StreamSpell, Rat Art, and Rat Ship
+- review current Discord/StreamKit terms before relying on StreamKit's public application identity in a commercial third-party product
+- review current Elgato Marketplace/Maker terms for the required free local companion
+
+## Production alternative if StreamKit identity is not acceptable
+
+The native IPC transport itself is already proven. If StreamKit's public identity is unsuitable for commercial release, the clean production path is to obtain the required Discord voice scope approval for a PackRat-owned application and reuse the same bridge/widget architecture.
