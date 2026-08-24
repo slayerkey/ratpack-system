@@ -72,7 +72,10 @@ const mark = id => { if (!done(id)) state.done.push(id); save(); };
 
 let context = null;
 let page = null;
-let shot = 0;
+const existingShotNumbers = readdirSync(LOG)
+  .map(name => Number((name.match(/^(\d+)-.*\.png$/) || [])[1]))
+  .filter(Number.isFinite);
+let shot = existingShotNumbers.length ? Math.max(...existingShotNumbers) : 0;
 
 async function snap(target, label) {
   if (!target || target.isClosed()) return;
@@ -96,6 +99,9 @@ function stopRetrying(reason) {
 
 async function captureFailure(error) {
   const message = error?.stack || String(error);
+  const priorErrors = readdirSync(LOG).filter(name => /^error-\d+\.txt$/i.test(name));
+  const errorName = `error-${String(priorErrors.length + 1).padStart(2, '0')}.txt`;
+  writeFileSync(join(LOG, errorName), message);
   writeFileSync(join(LOG, 'error.txt'), message);
   await snap(page, 'failure');
   const zipped = zipRecoveryLog();
@@ -324,6 +330,23 @@ function optionCandidates(value) {
   return [String(value), ...(OPTION_ALIASES.get(String(value).toLowerCase()) || [])];
 }
 
+function triggerIncludesValue(label, text, candidate) {
+  const wanted = String(candidate).replace(/\s+/g,' ').trim().toLowerCase();
+  const normalized = String(text || '').replace(/\s+/g,' ').trim().toLowerCase();
+  if (label === 'Category') {
+    return normalized.split(',').map(value => value.trim()).filter(Boolean).includes(wanted);
+  }
+  return normalized === wanted;
+}
+
+function recordedListboxIndex(label) {
+  for (let i = state.listboxProof.length - 1; i >= 0; i--) {
+    const proof = state.listboxProof[i];
+    if (proof?.label === label && Number.isInteger(proof.index) && proof.index >= 0) return proof.index;
+  }
+  return -1;
+}
+
 async function inspectListboxes(target) {
   await target.keyboard.press('Escape').catch(() => {});
   const triggers = target.locator('button[aria-haspopup="listbox"]');
@@ -351,7 +374,7 @@ async function selectListboxValue(target, label, requested) {
 
   for (let i=0;i<await triggers.count();i++) {
     const text = ((await triggers.nth(i).textContent()) || '').replace(/\s+/g,' ').trim();
-    const matched = candidates.find(candidate => candidate.toLowerCase() === text.toLowerCase());
+    const matched = candidates.find(candidate => triggerIncludesValue(label,text,candidate));
     if (matched) {
       state.listboxProof.push({label,requested,actual:matched,index:i,method:'already-selected'});
       save();
@@ -372,6 +395,14 @@ async function selectListboxValue(target, label, requested) {
     }
   } else {
     targetTrigger = null;
+  }
+
+  if (!targetTrigger) {
+    const rememberedIndex = recordedListboxIndex(label);
+    if (rememberedIndex >= 0 && rememberedIndex < await triggers.count()) {
+      targetTrigger = triggers.nth(rememberedIndex);
+      targetIndex = rememberedIndex;
+    }
   }
 
   let actual = null;
@@ -409,14 +440,16 @@ async function selectListboxValue(target, label, requested) {
   await target.keyboard.press('Escape').catch(() => {});
   await target.waitForTimeout(250);
 
-  const after = ((await targetTrigger.textContent()) || '').replace(/\s+/g,' ').trim();
-  if (after.toLowerCase() !== actual.toLowerCase()) {
-    const boxes = await inspectListboxes(target);
-    const verified = boxes.some(item => item.trigger.toLowerCase() === actual.toLowerCase());
-    if (!verified) throw new Error(`${label.toLowerCase()} did not stay selected: ${requested}`);
+  let after = ((await targetTrigger.textContent()) || '').replace(/\s+/g,' ').trim();
+  if (!triggerIncludesValue(label,after,actual)) {
+    await target.waitForTimeout(500);
+    after = ((await targetTrigger.textContent()) || '').replace(/\s+/g,' ').trim();
+  }
+  if (!triggerIncludesValue(label,after,actual)) {
+    throw new Error(`${label.toLowerCase()} did not stay selected: ${requested}; control now shows "${after}"`);
   }
 
-  state.listboxProof.push({label,requested,actual,index:targetIndex,method:'verified'});
+  state.listboxProof.push({label,requested,actual,index:targetIndex,method:label === 'Category' ? 'verified-multi-select' : 'verified'});
   save();
   console.log(`${label}: ${requested}${requested === actual ? '' : ` -> ${actual}`}`);
 }
@@ -637,7 +670,6 @@ async function galleryInput(target) {
 async function selectedFileNames(input) {
   return await input.evaluate(el => Array.from(el.files || []).map(file => file.name)).catch(() => []);
 }
-
 async function uploadGallery(target) {
   const pending = galleryFiles.filter(file => !state.uploaded.includes(file));
   if (!pending.length) {
