@@ -44,8 +44,17 @@ function Invoke-StreamDeckCli {
 function Read-JsonFromGitObject {
     param([string]$Object)
 
-    $raw = & git -C $RepoRoot show $Object 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $raw) { return $null }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & git -C $RepoRoot show $Object 2>$null
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+
+    if ($code -ne 0 -or -not $raw) { return $null }
 
     try {
         return (($raw -join "`n") | ConvertFrom-Json)
@@ -56,9 +65,13 @@ function Read-JsonFromGitObject {
 }
 
 function Get-Registration {
-    $productObject = "origin/product/${Slug}:plugins/${Slug}/rat-dev.json"
-    $config = Read-JsonFromGitObject $productObject
-    if ($config) { return $config }
+    $productRef = "refs/remotes/origin/product/${Slug}"
+    & git -C $RepoRoot rev-parse --verify --quiet $productRef *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $productObject = "origin/product/${Slug}:plugins/${Slug}/rat-dev.json"
+        $config = Read-JsonFromGitObject $productObject
+        if ($config) { return $config }
+    }
 
     $mainObject = "origin/main:plugins/${Slug}/rat-dev.json"
     return (Read-JsonFromGitObject $mainObject)
