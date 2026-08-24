@@ -6,7 +6,7 @@
   <title>CS2 Competitive Dashboard</title>
   <link rel="stylesheet" href="theme.css" />
   <script src="build-config.js"></script>
-  <script src="pi.js" defer></script>
+  <script src="pi.js"></script>
 </head>
 <body>
   <main class="pi-shell">
@@ -19,6 +19,11 @@
       </div>
     </header>
 
+    <div class="transport-strip" id="transport-strip">
+      <span class="status-dot" id="transport-dot"></span>
+      <span id="transport-text">Connecting to Stream Deck…</span>
+    </div>
+
     <section class="panel" id="metric-panel">
       <label class="field-label" for="metric-select">Key Display</label>
       <select id="metric-select"></select>
@@ -29,7 +34,7 @@
       <div class="section-row">
         <div>
           <div class="field-label">Live CS2 Tracking</div>
-          <div class="status-line"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking...</span></div>
+          <div class="status-line"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking…</span></div>
         </div>
         <span class="pill" id="port-pill">LOCAL</span>
       </div>
@@ -39,9 +44,10 @@
       <p class="hint">Leave blank unless automatic Steam library detection fails.</p>
 
       <div class="button-row">
-        <button class="primary" id="enable-gsi">Enable Live CS2 Tracking</button>
-        <button class="secondary" id="disable-gsi">Disable</button>
+        <button class="primary plugin-command" id="enable-gsi">Enable Live CS2 Tracking</button>
+        <button class="secondary plugin-command" id="disable-gsi">Disable</button>
       </div>
+      <p class="action-feedback" id="gsi-feedback">Enable once, then CS2 sends live game state to the plugin locally.</p>
       <div class="error-copy" id="setup-error" hidden></div>
     </section>
 
@@ -50,10 +56,11 @@
       <label class="sub-label" for="steam-profile">Steam profile URL or SteamID</label>
       <input id="steam-profile" type="text" spellcheck="false" placeholder="https://steamcommunity.com/id/..." />
       <div class="button-row">
-        <button class="primary compact" id="save-steam">Save Steam Profile</button>
-        <button class="secondary compact" id="refresh-online">Refresh Stats</button>
+        <button class="primary compact plugin-command" id="save-steam">Save Steam Profile</button>
+        <button class="secondary compact plugin-command" id="refresh-online">Refresh Stats</button>
       </div>
       <p class="hint">Your Steam profile identifies which CS2 account to load from Leetify and FACEIT.</p>
+      <p class="action-feedback" id="steam-feedback">Not saved yet.</p>
     </section>
 
     <section class="panel" id="provider-setup-panel" hidden>
@@ -76,7 +83,7 @@
         <p class="hint provider-note">Your Steam and CS2 data must already be connected in Leetify for Premier and Competitive map ranks to exist.</p>
         <div class="secret-row">
           <input id="leetify-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Leetify API key" />
-          <button class="secondary compact remove-key" id="clear-leetify-key">Remove</button>
+          <button class="secondary compact remove-key plugin-command" id="clear-leetify-key">Remove</button>
         </div>
       </div>
 
@@ -98,11 +105,12 @@
         <button class="text-link docs-link" id="faceit-key-guide">Official FACEIT key guide ↗</button>
         <div class="secret-row">
           <input id="faceit-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste FACEIT API key" />
-          <button class="secondary compact remove-key" id="clear-faceit-key">Remove</button>
+          <button class="secondary compact remove-key plugin-command" id="clear-faceit-key">Remove</button>
         </div>
       </div>
 
-      <button class="primary full-width" id="save-provider-keys">Save Keys and Test Connection</button>
+      <button class="primary full-width plugin-command" id="save-provider-keys">Save Keys and Test Connection</button>
+      <p class="action-feedback" id="provider-feedback">Add either key whenever you want to enable that provider's Pro stats.</p>
       <p class="privacy-note">Keys are stored in this plugin's local Stream Deck settings on this PC and sent only to the matching provider API. They are never sent to a PackRat server.</p>
 
       <div class="integration-grid">
@@ -122,8 +130,9 @@
           <div class="field-label">Current Session</div>
           <div class="session-value" id="session-value">0W 0L</div>
         </div>
-        <button class="secondary compact" id="reset-session">Reset</button>
+        <button class="secondary compact plugin-command" id="reset-session">Reset</button>
       </div>
+      <p class="hint">Session metrics start updating as soon as live CS2 tracking receives game data.</p>
     </section>
 
     <footer class="packrat-footer">
