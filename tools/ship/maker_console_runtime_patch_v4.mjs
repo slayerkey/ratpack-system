@@ -111,7 +111,7 @@ async function deleteConfirmedExistingDraft(target) {
   source = replaceOnce(
     source,
     `  } else {\n    editing = await openExisting(page);\n  }\n\n  if (editing) {`,
-    `  } else {\n    await deleteConfirmedExistingDraft(page);\n    editing = false;\n  }\n\n  if (editing) {`,
+    `  } else if (RESUME) {\n    editing = await openExisting(page);\n  } else {\n    await deleteConfirmedExistingDraft(page);\n    editing = false;\n  }\n\n  if (editing) {`,
     'fresh-run existing product handling'
   );
 
