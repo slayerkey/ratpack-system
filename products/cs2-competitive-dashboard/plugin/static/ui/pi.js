@@ -1,5 +1,8 @@
 (() => {
   const build = window.PACKRAT_BUILD || { flavor: "lite", name: "CS2 Competitive Dashboard", footerLabel: "Explore PackRat", footerUrl: "https://marketplace.elgato.com/%40packrat", liveMetrics: [] };
+  const FACEIT_DEVELOPER_PORTAL = "https://developers.faceit.com/";
+  const FACEIT_KEY_GUIDE = "https://docs.faceit.com/getting-started/authentication/api-keys/";
+  const LEETIFY_DEVELOPER_PAGE = "https://leetify.com/app/developer";
   const labels = {
     score: "Live Score",
     round: "Round / Phase",
@@ -38,7 +41,6 @@
   let actionUuid = "";
   let actionContext = "";
   let actionSettings = {};
-  let globalSettings = {};
   let latestState = {};
 
   const $ = (id) => document.getElementById(id);
@@ -54,7 +56,6 @@
     socket.onopen = () => {
       send({ event, uuid });
       send({ event: "getSettings", action: actionUuid, context: actionContext });
-      send({ event: "getGlobalSettings", context: registrationUuid });
       sendToPlugin({ type: "get-status" });
       render();
     };
@@ -71,6 +72,12 @@
     $("reset-session").addEventListener("click", () => sendToPlugin({ type: "reset-session" }));
     $("save-steam").addEventListener("click", () => sendToPlugin({ type: "set-steam-profile", steamProfile: $("steam-profile").value.trim() }));
     $("refresh-online").addEventListener("click", () => sendToPlugin({ type: "refresh-online" }));
+    $("save-provider-keys").addEventListener("click", saveProviderKeys);
+    $("clear-faceit-key").addEventListener("click", () => sendToPlugin({ type: "clear-provider-key", provider: "faceit" }));
+    $("clear-leetify-key").addEventListener("click", () => sendToPlugin({ type: "clear-provider-key", provider: "leetify" }));
+    $("get-faceit-key").addEventListener("click", () => openUrl(FACEIT_DEVELOPER_PORTAL));
+    $("faceit-key-guide").addEventListener("click", () => openUrl(FACEIT_KEY_GUIDE));
+    $("get-leetify-key").addEventListener("click", () => openUrl(LEETIFY_DEVELOPER_PAGE));
     $("view-leetify").addEventListener("click", () => openUrl(latestState.online?.leetify?.profileUrl));
     $("view-faceit").addEventListener("click", () => openUrl(latestState.online?.faceit?.profileUrl));
     $("leetify-attribution").addEventListener("click", () => openUrl("https://leetify.com/"));
@@ -80,6 +87,15 @@
     });
     render();
   });
+
+  function saveProviderKeys() {
+    const faceitApiKey = $("faceit-api-key").value.trim();
+    const leetifyApiKey = $("leetify-api-key").value.trim();
+    if (!faceitApiKey && !leetifyApiKey) return;
+    sendToPlugin({ type: "set-provider-keys", faceitApiKey, leetifyApiKey });
+    $("faceit-api-key").value = "";
+    $("leetify-api-key").value = "";
+  }
 
   function send(payload) {
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload));
@@ -100,11 +116,6 @@
       renderMetric();
       return;
     }
-    if (message.event === "didReceiveGlobalSettings") {
-      globalSettings = message.payload?.settings || {};
-      if (!$("manual-path").value) $("manual-path").value = globalSettings.manualCs2Path || "";
-      return;
-    }
     if (message.event === "sendToPropertyInspector") {
       latestState = message.payload || {};
       renderState();
@@ -115,6 +126,7 @@
     if (!document.body) return;
     const pro = build.flavor === "pro";
     $("pro-account-panel").hidden = !pro;
+    $("provider-setup-panel").hidden = !pro;
     $("session-panel").hidden = !pro;
     renderMetric();
     renderState();
@@ -138,6 +150,7 @@
     if (!$("status-text")) return;
     const status = latestState.status || {};
     const account = latestState.account || {};
+    const setup = latestState.setup || {};
     const session = latestState.session || {};
     const online = latestState.online || {};
     const error = latestState.message || status.error || "";
@@ -159,15 +172,42 @@
     $("setup-error").hidden = !error;
     $("setup-error").textContent = error;
     $("session-value").textContent = `${session.wins || 0}W ${session.losses || 0}L`;
+    if (document.activeElement !== $("manual-path")) $("manual-path").value = setup.manualCs2Path || "";
 
     if (build.flavor === "pro") {
       if (document.activeElement !== $("steam-profile")) $("steam-profile").value = account.steamProfile || "";
-      $("faceit-state").textContent = sourceText(online.faceit, account.steamConfigured ? "Waiting for provider" : "Add Steam profile");
-      $("leetify-state").textContent = sourceText(online.leetify, account.steamConfigured ? "Leetify required" : "Add Steam profile");
+      renderKeyState("faceit-key-state", account.faceitKeyConfigured, online.faceit);
+      renderKeyState("leetify-key-state", account.leetifyKeyConfigured, online.leetify);
+      $("faceit-state").textContent = sourceText(online.faceit, account.faceitKeyConfigured ? "Waiting for Steam profile" : "API key required");
+      $("leetify-state").textContent = sourceText(online.leetify, account.leetifyKeyConfigured ? "Waiting for Steam profile" : "API key required");
       $("view-faceit").hidden = !online.faceit?.profileUrl;
       $("view-leetify").hidden = !online.leetify?.profileUrl;
       $("leetify-attribution").hidden = online.leetify?.status !== "ready";
+      $("clear-faceit-key").hidden = !account.faceitKeyConfigured;
+      $("clear-leetify-key").hidden = !account.leetifyKeyConfigured;
     }
+  }
+
+  function renderKeyState(id, configured, source) {
+    const element = $(id);
+    element.className = "provider-state";
+    if (!configured) {
+      element.textContent = "API key required";
+      element.classList.add("warn");
+      return;
+    }
+    if (source?.status === "ready") {
+      element.textContent = "Key saved · Connected";
+      element.classList.add("ready");
+      return;
+    }
+    if (source?.status === "unavailable" && /key/i.test(source.message || "")) {
+      element.textContent = "Key rejected · replace it";
+      element.classList.add("warn");
+      return;
+    }
+    element.textContent = "Key saved";
+    element.classList.add("ready");
   }
 
   function sourceText(source, fallback) {
@@ -175,9 +215,9 @@
     const states = {
       ready: "Connected",
       loading: "Loading…",
-      not_found: "Not found",
+      not_found: "Profile not found",
       private: "Profile private",
-      rate_limited: "Rate limited",
+      rate_limited: "Your key is rate limited",
       commercial_gate: "Provider unavailable",
       offline: "API offline",
       unavailable: source.message || "Unavailable",
