@@ -94,6 +94,8 @@
     {"id":"drawdown-alarm","name":"Portfolio Drawdown Alarm","type":"plugin","status":"rejected","price_usd":null,"version":null},
     {"id":"rig-cost","name":"PC Power Cost Meter","type":"plugin","status":"rejected","price_usd":null,"version":null},
     {"id":"cloud-bill","name":"AWS & Cloud Cost Monitor","type":"plugin","status":"rejected","price_usd":null,"version":null},
-    {"id":"grid-price","name":"Live Electricity Price","type":"plugin","status":"rejected","price_usd":null,"version":null}
+    {"id":"grid-price","name":"Live Electricity Price","type":"plugin","status":"rejected","price_usd":null,"version":null},
+    {"id":"work-session-tracker","name":"Work Session Tracker Lite","type":"widget","status":"qa_passed","price_usd":0.0,"version":"1.0.0"},
+    {"id":"work-session-tracker-pro","name":"Work Session Tracker Pro","type":"widget","status":"qa_passed","price_usd":5.99,"version":"1.0.0"}
   ]
 }
