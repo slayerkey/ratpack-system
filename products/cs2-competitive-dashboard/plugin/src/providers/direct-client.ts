@@ -113,7 +113,7 @@ export class ProviderClient {
     } catch (error) {
       return this.sourceFailure("offline", `Leetify request failed: ${this.errorMessage(error)}`, "leetify");
     }
-    if (!response.ok) return this.mapFailure("Leetify", response.status, "leetify");
+    if (!response.ok) return this.mapLeetifyFailure(response.status);
     const body = await this.safeJson(response) as any;
     if (!body || typeof body !== "object") return this.sourceFailure("unavailable", "Leetify returned an invalid response", "leetify");
 
@@ -152,7 +152,7 @@ export class ProviderClient {
     } catch (error) {
       return this.sourceFailure("offline", `FACEIT request failed: ${this.errorMessage(error)}`, "faceit");
     }
-    if (!playerResponse.ok) return this.mapFailure("FACEIT", playerResponse.status, "faceit");
+    if (!playerResponse.ok) return this.mapFaceitFailure(playerResponse.status);
 
     const player = await this.safeJson(playerResponse) as any;
     const playerId = this.stringValue(player?.player_id);
@@ -197,8 +197,10 @@ export class ProviderClient {
   }
 
   private normalizeFaceitHistory(match: any, playerId: string): RecentMatchSummary {
-    const teams = match?.teams && typeof match.teams === "object" ? Object.entries(match.teams) : [];
-    const playerTeam = teams.find(([, team]: [string, any]) => this.array(team?.roster).some((member: any) => member?.player_id === playerId));
+    const teams: [string, any][] = match?.teams && typeof match.teams === "object"
+      ? Object.entries(match.teams) as [string, any][]
+      : [];
+    const playerTeam = teams.find(([, team]) => this.array(team?.roster).some((member: any) => member?.player_id === playerId));
     const teamKey = playerTeam?.[0];
     const winner = this.stringValue(match?.results?.winner);
     const outcome = teamKey && winner ? (teamKey === winner ? "WIN" : "LOSS") : undefined;
@@ -214,15 +216,26 @@ export class ProviderClient {
     };
   }
 
-  private mapFailure(provider: string, status: number, source: "leetify" | "faceit"): any {
-    if (status === 404) return this.sourceFailure("not_found", `${provider} profile not found`, source);
-    if (status === 403) return this.sourceFailure("private", `${provider} profile is unavailable or private`, source);
-    if (status === 429) return this.sourceFailure("rate_limited", `${provider} rate limit reached for your API key`, source);
-    if (status === 401) return this.sourceFailure("unavailable", `${provider} API key was rejected`, source);
-    if (status >= 500) return this.sourceFailure("offline", `${provider} is temporarily unavailable`, source);
-    return this.sourceFailure("unavailable", `${provider} request failed (${status})`, source);
+  private mapLeetifyFailure(status: number): LeetifyData {
+    if (status === 404) return this.sourceFailure("not_found", "Leetify profile not found", "leetify");
+    if (status === 403) return this.sourceFailure("private", "Leetify profile is unavailable or private", "leetify");
+    if (status === 429) return this.sourceFailure("rate_limited", "Leetify rate limit reached for your API key", "leetify");
+    if (status === 401) return this.sourceFailure("unavailable", "Leetify API key was rejected", "leetify");
+    if (status >= 500) return this.sourceFailure("offline", "Leetify is temporarily unavailable", "leetify");
+    return this.sourceFailure("unavailable", `Leetify request failed (${status})`, "leetify");
   }
 
+  private mapFaceitFailure(status: number): FaceitData {
+    if (status === 404) return this.sourceFailure("not_found", "FACEIT profile not found", "faceit");
+    if (status === 403) return this.sourceFailure("private", "FACEIT profile is unavailable or private", "faceit");
+    if (status === 429) return this.sourceFailure("rate_limited", "FACEIT rate limit reached for your API key", "faceit");
+    if (status === 401) return this.sourceFailure("unavailable", "FACEIT API key was rejected", "faceit");
+    if (status >= 500) return this.sourceFailure("offline", "FACEIT is temporarily unavailable", "faceit");
+    return this.sourceFailure("unavailable", `FACEIT request failed (${status})`, "faceit");
+  }
+
+  private sourceFailure(status: OnlineSourceStatus, message: string, source: "leetify"): LeetifyData;
+  private sourceFailure(status: OnlineSourceStatus, message: string, source: "faceit"): FaceitData;
   private sourceFailure(status: OnlineSourceStatus, message: string, source: "leetify" | "faceit"): LeetifyData | FaceitData {
     return source === "leetify"
       ? { status, message, competitiveRanks: [], recentMatches: [] }
