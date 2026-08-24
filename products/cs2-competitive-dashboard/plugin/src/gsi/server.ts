@@ -6,6 +6,7 @@ const HOST = "127.0.0.1";
 const DEFAULT_PORT = 32123;
 const MAX_PORT_ATTEMPTS = 24;
 const MAX_BODY_BYTES = 512 * 1024;
+const SHUTDOWN_GRACE_MS = 750;
 
 export interface GsiServerOptions {
   token: string;
@@ -57,7 +58,24 @@ export class GsiServer {
     if (!server?.listening) return;
 
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(forceTimer);
+        error ? reject(error) : resolve();
+      };
+
+      const forceTimer = setTimeout(() => {
+        try {
+          server.closeIdleConnections?.();
+          server.closeAllConnections?.();
+        } catch {
+          // Best effort only. The close callback below remains the source of truth.
+        }
+      }, SHUTDOWN_GRACE_MS);
+
+      server.close((error) => finish(error ?? undefined));
     });
   }
 
