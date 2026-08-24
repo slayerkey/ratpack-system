@@ -92,9 +92,7 @@
     return best.id;
   }
 
-  function applySlot() {
-    document.body.setAttribute("data-slot", nearestSlot());
-  }
+  function applySlot() { document.body.setAttribute("data-slot", nearestSlot()); }
 
   function sensorPlugin() {
     try { return window.plugins && window.plugins.Sensorsdataprovider; }
@@ -147,18 +145,16 @@
     try {
       if (plugin.sensorAdded && typeof plugin.sensorAdded.connect === "function") plugin.sensorAdded.connect(function () { scheduleScan(80); });
       if (plugin.sensorRemoved && typeof plugin.sensorRemoved.connect === "function") plugin.sensorRemoved.connect(function (id) {
-        if (tracked[String(id)]) breakContinuity();
+        if (tracked[String(id)] || selectedPrimaryId() === String(id)) breakContinuity();
         scheduleScan(80);
       });
       if (plugin.sensorDataChanged && typeof plugin.sensorDataChanged.connect === "function") plugin.sensorDataChanged.connect(function () { scheduleScan(120); });
       if (plugin.sensorUnitsChanged && typeof plugin.sensorUnitsChanged.connect === "function") plugin.sensorUnitsChanged.connect(function () { scheduleScan(120); });
-      if (plugin.sensorValueChanged && typeof plugin.sensorValueChanged.connect === "function") {
-        plugin.sensorValueChanged.connect(function (sensorId, value) {
-          var id = String(sensorId);
-          if (!tracked[id] || !catalogue[id]) return;
-          consumeReading(id, value, Date.now());
-        });
-      }
+      if (plugin.sensorValueChanged && typeof plugin.sensorValueChanged.connect === "function") plugin.sensorValueChanged.connect(function (sensorId, value) {
+        var id = String(sensorId);
+        if (!tracked[id] || !catalogue[id]) return;
+        consumeReading(id, value, Date.now());
+      });
       eventsPlugin = plugin;
     } catch (e) { }
   }
@@ -196,12 +192,8 @@
   async function inspectSensor(sensorId) {
     var id = String(sensorId);
     var result = await Promise.all([
-      ask("sensorIsConnected", [id]),
-      ask("getSensorType", [id]),
-      ask("getSensorKind", [id]),
-      ask("getSensorDeviceName", [id]),
-      ask("getSensorName", [id]),
-      ask("getSensorUnits", [id])
+      ask("sensorIsConnected", [id]), ask("getSensorType", [id]), ask("getSensorKind", [id]),
+      ask("getSensorDeviceName", [id]), ask("getSensorName", [id]), ask("getSensorUnits", [id])
     ]);
     return {
       id: id,
@@ -244,7 +236,6 @@
     var inspected = await Promise.all(powerIds.map(inspectSensor));
     var next = {};
     inspected.forEach(function (sensor) { if (sensor && sensor.connected) next[sensor.id] = sensor; });
-
     var byLabel = {};
     Object.keys(next).forEach(function (id) {
       var label = sensorDisplayName(next[id]);
@@ -262,15 +253,7 @@
   }
 
   function newSession(sensorId, now) {
-    return {
-      sensorId: String(sensorId || ""),
-      startedAt: now || Date.now(),
-      lastSeenAt: 0,
-      energyWh: 0,
-      measuredMs: 0,
-      peakW: null,
-      samples: 0
-    };
+    return { sensorId: String(sensorId || ""), startedAt: now || Date.now(), lastSeenAt: 0, energyWh: 0, measuredMs: 0, peakW: null, samples: 0 };
   }
 
   function archiveSession(snapshot) {
@@ -278,13 +261,9 @@
     var history = storeRead("history", []);
     if (!Array.isArray(history)) history = [];
     history.unshift({
-      sensorId: snapshot.sensorId,
-      startedAt: snapshot.startedAt,
-      endedAt: snapshot.lastSeenAt,
-      energyWh: snapshot.energyWh,
-      measuredMs: snapshot.measuredMs,
-      averageW: math.averageWatts(snapshot.energyWh, snapshot.measuredMs),
-      peakW: snapshot.peakW
+      sensorId: snapshot.sensorId, startedAt: snapshot.startedAt, endedAt: snapshot.lastSeenAt,
+      energyWh: snapshot.energyWh, measuredMs: snapshot.measuredMs,
+      averageW: math.averageWatts(snapshot.energyWh, snapshot.measuredMs), peakW: snapshot.peakW
     });
     storeWrite("history", history.slice(0, HISTORY_LIMIT));
   }
@@ -306,18 +285,14 @@
       if (saved && saved.sensorId && saved.samples) archiveSession(saved);
       session = newSession(sensorId, now);
     }
-    // Never bridge an iCUE/widget restart. Totals can resume, continuity cannot.
     lastSample = null;
   }
 
-  function persistSession() {
-    if (!session) return;
-    storeWrite("session", session);
-  }
+  function persistSession() { if (session) storeWrite("session", session); }
 
   function resetSession() {
     if (session && session.samples) archiveSession(session);
-    session = newSession(primary ? primary.id : "", Date.now());
+    session = newSession(primary ? primary.id : selectedPrimaryId(), Date.now());
     lastSample = null;
     graphSeries = {};
     currentW = null;
@@ -328,16 +303,13 @@
   function breakContinuity() {
     lastSample = null;
     currentW = null;
-    if (primary) document.body.setAttribute("data-live", "stale");
+    document.body.setAttribute("data-live", "stale");
     renderMetrics();
   }
 
   function dayKey(timestamp) {
     var date = new Date(timestamp);
-    var y = date.getFullYear();
-    var m = String(date.getMonth() + 1).padStart(2, "0");
-    var d = String(date.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + d;
+    return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
   }
 
   function midnightBoundaries(t0, t1) {
@@ -385,16 +357,13 @@
     session.samples += 1;
     session.lastSeenAt = timestamp;
     session.peakW = session.peakW === null ? watts : Math.max(session.peakW, watts);
-
     if (lastSample) {
       var pieces = math.splitLinearInterval(lastSample, { t: timestamp, w: watts }, midnightBoundaries(lastSample.t, timestamp), MAX_INTEGRATION_GAP_MS);
-      if (pieces.length) {
-        pieces.forEach(function (piece) {
-          session.energyWh += piece.wh;
-          session.measuredMs += piece.ms;
-          addDailyPiece(piece);
-        });
-      }
+      pieces.forEach(function (piece) {
+        session.energyWh += piece.wh;
+        session.measuredMs += piece.ms;
+        addDailyPiece(piece);
+      });
     }
     lastSample = { t: timestamp, w: watts };
     persistSession();
@@ -402,7 +371,7 @@
 
   function consumeReading(sensorId, rawValue, timestamp) {
     var sensor = catalogue[sensorId];
-    if (!sensor || sensor.type !== "power") return false;
+    if (!sensor || sensor.type !== "power" || !tracked[sensorId]) return false;
     var watts = math.parseWatts(rawValue, sensor.units);
     if (watts === null) {
       if (primary && sensorId === primary.id) breakContinuity();
@@ -437,6 +406,8 @@
     pollTimer = setInterval(pollOnce, POLL_MS);
   }
 
+  function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
+
   function enterState(name, title, body) {
     document.body.setAttribute("data-panel-state", name);
     setText("stateTitle", title);
@@ -448,18 +419,16 @@
     tracked = {};
     primary = primarySensor;
     if (primarySensor) tracked[primarySensor.id] = { sensor: primarySensor, color: getIcueProperty("accentColor", "#2BE86A"), watts: null };
-    if (config.edition === "pro") {
-      comparisonSettings().forEach(function (setting) {
-        var sensor = catalogue[setting.sensorId];
-        if (!sensor || sensor.type !== "power" || sensor.id === primarySensor.id) return;
-        tracked[sensor.id] = { sensor: sensor, color: setting.color || "#78A9FF", watts: null };
-      });
-    }
+    if (config.edition === "pro" && primarySensor) comparisonSettings().forEach(function (setting) {
+      var sensor = catalogue[setting.sensorId];
+      if (!sensor || sensor.type !== "power" || sensor.id === primarySensor.id) return;
+      tracked[sensor.id] = { sensor: sensor, color: setting.color || "#78A9FF", watts: null };
+    });
   }
 
   async function choosePrimarySensor() {
     var requested = selectedPrimaryId();
-    if (requested && catalogue[requested]) return catalogue[requested];
+    if (requested) return catalogue[requested] || { id: requested, missing: true };
     var defaultId = await ask("getDefaultSensorId", ["power", "total-power-draw"]);
     if (defaultId && catalogue[String(defaultId)]) return catalogue[String(defaultId)];
     var ids = Object.keys(catalogue);
@@ -472,10 +441,9 @@
     try {
       var plugin = sensorPlugin();
       if (!plugin) {
-        if (isPreview()) {
-          activatePreviewDemo();
-        } else {
-          breakContinuity();
+        if (isPreview()) activatePreviewDemo();
+        else {
+          stopPolling(); breakContinuity();
           enterState("unavailable", "iCUE sensor service unavailable", "The meter will reconnect automatically. No missing interval is estimated.");
         }
         return;
@@ -484,44 +452,42 @@
       connectSensorEvents(plugin);
       var found = await discoverCatalogue();
       if (!found) {
-        breakContinuity();
+        stopPolling(); breakContinuity();
         enterState("unavailable", "iCUE sensor service unavailable", "The meter will reconnect automatically. No missing interval is estimated.");
         return;
       }
+
+      var requested = selectedPrimaryId();
       if (!Object.keys(found).length) {
-        primary = null;
-        tracked = {};
-        breakContinuity();
-        enterState("empty", "No power sensors found", "PC Power Meter can only measure power sensors that iCUE exposes on this hardware.");
+        primary = null; tracked = {}; stopPolling(); breakContinuity();
+        if (requested) enterState("disconnected", "Selected power sensor unavailable", "The selected iCUE power sensor is not connected right now. The meter will resume it automatically without filling the gap.");
+        else enterState("empty", "No power sensors found", "PC Power Meter can only measure power sensors that iCUE exposes on this hardware.");
         return;
       }
+
       var chosen = await choosePrimarySensor();
+      if (chosen && chosen.missing) {
+        primary = null; tracked = {}; stopPolling(); breakContinuity();
+        enterState("disconnected", "Selected power sensor unavailable", "The selected iCUE power sensor is not connected right now. The meter will resume it automatically without switching to another sensor.");
+        return;
+      }
       if (!chosen) {
+        primary = null; tracked = {}; stopPolling();
         enterState("empty", "Choose a power sensor", "Select an iCUE power sensor in widget settings.");
         return;
       }
+
       var previousId = primary ? primary.id : "";
       setTrackedSensors(chosen);
       if (!session || session.sensorId !== chosen.id || previousId !== chosen.id) loadSession(chosen.id);
       document.body.setAttribute("data-panel-state", "ready");
       renderSensorIdentity();
       startPolling();
-    } finally {
-      scanning = false;
-    }
+    } finally { scanning = false; }
   }
 
   function activatePreviewDemo() {
-    var demo = {
-      id: "preview-power",
-      connected: true,
-      type: "power",
-      kind: "total-power-draw",
-      deviceName: "Preview PC",
-      sensorName: "Total Power Draw",
-      displayName: "Preview PC • Total Power Draw",
-      units: "W"
-    };
+    var demo = { id: "preview-power", connected: true, type: "power", kind: "total-power-draw", deviceName: "Preview PC", sensorName: "Total Power Draw", displayName: "Preview PC • Total Power Draw", units: "W" };
     catalogue = { "preview-power": demo };
     setTrackedSensors(demo);
     if (!session || session.sensorId !== demo.id) session = newSession(demo.id, Date.now() - 7000);
@@ -560,23 +526,17 @@
     var average = session ? math.averageWatts(session.energyWh, session.measuredMs) : null;
     var energy = math.formatEnergy(session ? session.energyWh : 0);
     var peak = session ? session.peakW : null;
-    setText("nowValue", math.formatWatts(current));
-    setText("nowUnit", current === null ? "" : "W");
-    setText("averageValue", math.formatWatts(average));
-    setText("averageUnit", average === null ? "" : "W");
-    setText("energyValue", energy.value);
-    setText("energyUnit", energy.unit);
-    setText("peakValue", math.formatWatts(peak));
-    setText("peakUnit", peak === null ? "" : "W");
-
+    setText("nowValue", math.formatWatts(current)); setText("nowUnit", current === null ? "" : "W");
+    setText("averageValue", math.formatWatts(average)); setText("averageUnit", average === null ? "" : "W");
+    setText("energyValue", energy.value); setText("energyUnit", energy.unit);
+    setText("peakValue", math.formatWatts(peak)); setText("peakUnit", peak === null ? "" : "W");
     if (config.edition === "pro") {
       var rate = Math.max(0, Number(getIcueProperty("electricityRate", 0.15)) || 0);
       var cost = math.costForEnergy(session ? session.energyWh : 0, rate);
       var symbol = String(getIcueProperty("currencySymbol", "$"));
       setText("costValue", cost === null ? "—" : symbol + cost.toFixed(cost < 10 ? 3 : 2));
       var today = math.formatEnergy(todayEnergyWh());
-      setText("todayValue", today.value);
-      setText("todayUnit", today.unit);
+      setText("todayValue", today.value); setText("todayUnit", today.unit);
       var threshold = Math.max(0, Number(getIcueProperty("highPowerThreshold", 0)) || 0);
       document.body.setAttribute("data-threshold", threshold > 0 && current !== null && current >= threshold ? "high" : "normal");
     }
@@ -594,14 +554,8 @@
   function renderGraph() {
     var svg = byId("powerGraph");
     if (!svg) return;
-    var now = Date.now();
-    var windowMs = graphWindowMs();
-    var minT = now - windowMs;
-    var ids = Object.keys(tracked);
-    var all = [];
-    ids.forEach(function (id) {
-      (graphSeries[id] || []).forEach(function (sample) { if (sample.t >= minT) all.push(sample); });
-    });
+    var now = Date.now(), minT = now - graphWindowMs(), ids = Object.keys(tracked), all = [];
+    ids.forEach(function (id) { (graphSeries[id] || []).forEach(function (sample) { if (sample.t >= minT) all.push(sample); }); });
     var maxW = Math.max(100, all.reduce(function (max, sample) { return Math.max(max, sample.w); }, 0) * 1.12);
     var markup = '<line class="gridline" x1="0" y1="94" x2="1000" y2="94"></line><line class="gridline" x1="0" y1="187" x2="1000" y2="187"></line>';
     ids.forEach(function (id, index) {
@@ -609,24 +563,23 @@
       if (!samples.length) return;
       var item = tracked[id];
       var color = item && item.color ? item.color : (index === 0 ? String(getIcueProperty("graphColor", "#2BE86A")) : "#78A9FF");
-      var d = pathForSamples(samples, minT, now, maxW);
-      markup += '<path class="series ' + (id === (primary && primary.id) ? "is-primary" : "") + '" data-sensor="' + id.replace(/"/g, "") + '" d="' + d + '" style="stroke:' + color.replace(/"/g, "") + '"></path>';
+      markup += '<path class="series ' + (id === (primary && primary.id) ? "is-primary" : "") + '" data-sensor="' + id.replace(/"/g, "") + '" d="' + pathForSamples(samples, minT, now, maxW) + '" style="stroke:' + color.replace(/"/g, "") + '"></path>';
     });
     svg.innerHTML = markup;
     setText("graphScale", "0 – " + math.formatWatts(maxW) + " W");
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]; });
   }
 
   function renderComparisons() {
     var board = byId("comparisonBoard");
     if (!board || config.edition !== "pro") return;
     var ids = Object.keys(tracked).filter(function (id) { return !primary || id !== primary.id; });
-    if (!ids.length) {
-      board.innerHTML = '<div class="comparison-empty">Add comparison power sensors in iCUE settings.</div>';
-      return;
-    }
+    if (!ids.length) { board.innerHTML = '<div class="comparison-empty">Add comparison power sensors in iCUE settings.</div>'; return; }
     board.innerHTML = ids.map(function (id) {
-      var item = tracked[id];
-      var sensor = item.sensor;
+      var item = tracked[id], sensor = item.sensor;
       return '<article class="comparison-card"><span class="compare-dot" style="background:' + String(item.color || "#78A9FF") + '"></span><div class="compare-copy"><b>' + escapeHtml(sensor.displayName || sensorDisplayName(sensor)) + '</b><span>' + escapeHtml(scopeLabel(sensor).replace(" • MEASURED", "")) + '</span></div><strong>' + math.formatWatts(item.watts) + '<small>' + (item.watts === null ? "" : " W") + '</small></strong></article>';
     }).join("");
   }
@@ -636,37 +589,20 @@
     var el = byId("historySummary");
     if (!el) return;
     var history = storeRead("history", []);
-    if (!Array.isArray(history) || !history.length) {
-      el.textContent = "No previous sessions yet";
-      return;
-    }
-    var last = history[0];
-    var e = math.formatEnergy(last.energyWh);
-    var avg = math.averageWatts(last.energyWh, last.measuredMs);
+    if (!Array.isArray(history) || !history.length) { el.textContent = "No previous sessions yet"; return; }
+    var last = history[0], e = math.formatEnergy(last.energyWh), avg = math.averageWatts(last.energyWh, last.measuredMs);
     el.textContent = "LAST SESSION  " + e.value + " " + e.unit + "  •  AVG " + math.formatWatts(avg) + " W";
   }
 
-  function escapeHtml(value) {
-    return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
-    });
-  }
-
   function renderAll() {
-    renderMetrics();
-    renderGraph();
-    renderComparisons();
-    renderHistory();
+    renderMetrics(); renderGraph(); renderComparisons(); renderHistory();
     setHidden("dashboard", document.body.getAttribute("data-panel-state") !== "ready");
     setHidden("statePanel", document.body.getAttribute("data-panel-state") === "ready");
     setHidden("infoOverlay", !infoOpen);
   }
 
   function bindUi() {
-    var info = byId("infoButton");
-    var close = byId("closeInfo");
-    var reset = byId("resetSession");
-    var pro = byId("proLink");
+    var info = byId("infoButton"), close = byId("closeInfo"), reset = byId("resetSession"), pro = byId("proLink");
     if (info) info.addEventListener("click", function () { infoOpen = true; renderAll(); });
     if (close) close.addEventListener("click", function () { infoOpen = false; renderAll(); });
     if (reset) reset.addEventListener("click", function () { resetSession(); infoOpen = false; });
@@ -683,9 +619,7 @@
   function boot() {
     applySlot();
     document.body.setAttribute("data-edition", config.edition || "lite");
-    applySettings();
-    bindUi();
-    scanSensors();
+    applySettings(); bindUi(); scanSensors();
     clearInterval(reconcileTimer);
     reconcileTimer = setInterval(function () { scheduleScan(0); }, 15000);
     window.addEventListener("resize", function () { applySlot(); renderAll(); });
@@ -697,9 +631,7 @@
     getPrimary: function () { return primary ? JSON.parse(JSON.stringify(primary)) : null; },
     getCatalogue: function () { return JSON.parse(JSON.stringify(catalogue)); },
     getTracked: function () { return JSON.parse(JSON.stringify(tracked)); },
-    forceScan: scanSensors,
-    resetSession: resetSession,
-    breakContinuity: breakContinuity
+    forceScan: scanSensors, resetSession: resetSession, breakContinuity: breakContinuity
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
