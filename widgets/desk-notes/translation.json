@@ -1,0 +1,22 @@
+{
+  "en": {"translation": {
+    "Desk Notes Lite":"Desk Notes Lite",
+    "Board Title":"Board Title",
+    "Notes":"Notes",
+    "Note Theme":"Note Theme",
+    "Font Size":"Font Size",
+    "Text Color":"Text Color",
+    "Accent Color":"Accent Color",
+    "Background Color":"Background Color",
+    "Background Transparency":"Background Transparency",
+    "Layout":"Layout",
+    "Appearance":"Appearance",
+    "Midnight":"Midnight",
+    "Paper":"Paper",
+    "Sage":"Sage",
+    "Ocean":"Ocean",
+    "Plum":"Plum",
+    "Amber":"Amber",
+    "One line becomes one entry. Start a line with [ ] to make it a tappable checklist item. Lite shows up to 8 entries.":"One line becomes one entry. Start a line with [ ] to make it a tappable checklist item. Lite shows up to 8 entries."
+  }}
+}
