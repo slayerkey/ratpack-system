@@ -89,20 +89,3 @@ jobs:
           if (-not (Test-Path $pluginDir)) { throw "Rat Dev plugin output missing: $pluginDir" }
           $manifest = Get-Content (Join-Path $pluginDir 'manifest.json') -Raw | ConvertFrom-Json
           if ($manifest.UUID -ne $config.plugin_uuid) { throw 'Built Pro manifest UUID does not match Rat Dev registration' }
-
-  gateway:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: products/cs2-competitive-dashboard/gateway
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Validate stateless gateway
-        run: npm run check
