@@ -9,6 +9,13 @@ on:
       - 'tools/art/rat_art.py'
       - 'tools/art/assets/ratpack-icon-transparent.png'
       - '.github/workflows/cs2-dashboard-art.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'products/cs2-competitive-dashboard/art/**'
+      - 'tools/art/rat_art.py'
+      - 'tools/art/assets/ratpack-icon-transparent.png'
+      - '.github/workflows/cs2-dashboard-art.yml'
   workflow_dispatch:
 
 permissions:
