@@ -57,5 +57,4 @@ if /I "%~1"=="dev-open" (
   if errorlevel 1 exit /b 1
   exit /b 0
 )
-%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat.ps1" %*
-exit /b %ERRORLEVEL%
+%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat.ps1" %* & if errorlevel 1 (exit /b 1) else (exit /b 0)
