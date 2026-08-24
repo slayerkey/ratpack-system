@@ -2,8 +2,8 @@
   "id": "cs2-competitive-dashboard-pro",
   "name": "CS2 Competitive Dashboard Pro",
   "type": "plugin",
-  "status": "building",
-  "workflow_state": "BUILDING",
+  "status": "built",
+  "workflow_state": "TESTING",
   "price_usd": 9.99,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
@@ -14,21 +14,29 @@
   "node_runtime": "20",
   "validation": "products/cs2-competitive-dashboard/VALIDATION.md",
   "plan": "products/cs2-competitive-dashboard/PLAN.md",
+  "qa": "products/cs2-competitive-dashboard/QA.md",
+  "release": "products/cs2-competitive-dashboard/RELEASE.md",
+  "gateway": "products/cs2-competitive-dashboard/gateway",
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
   "commercial_gates": [
-    "Leetify paid-distribution, caching, attribution and quota clarification before Leetify-backed features are listed as production-ready",
-    "FACEIT production developer terms and gateway credentials confirmed before live provider calls ship"
+    "Official unmodified Leetify Data Provided by Leetify dark-background asset is required before production Leetify-backed features are enabled",
+    "Leetify production developer key and current guidelines must be honored before Leetify-backed features ship",
+    "FACEIT production developer key must remain server-side before live provider calls ship"
   ],
   "release_gate": [
     "shared source builds Pro and Lite deterministically",
     "unit and fixture tests pass",
+    "production dependency audit passes",
     "manifest validation",
     "official Elgato CLI validation",
     "official .streamDeckPlugin packaging",
+    "Pro/Lite release-policy checks",
     "property inspector setup/error-state QA",
     "GSI installer custom-library fixtures",
-    "real normal-player CS2 GSI payload spike",
-    "external provider commercial gates cleared for listed Pro features",
-    "physical Stream Deck smoke test where required"
+    "stateless provider gateway tests",
+    "production provider deployment and attribution gate",
+    "real normal-player CS2 GSI payload smoke test",
+    "physical Stream Deck smoke test where required",
+    "final deterministic Rat Art"
   ]
 }
