@@ -18,15 +18,16 @@ async function deleteConfirmedExistingDraft(target) {
   await target.waitForTimeout(2500);
 
   const matches = target.getByText(prod.name,{exact:true});
-  const count = await matches.count();
-  if (!count) return 'none';
-  if (count > 1) {
-    stopRetrying('More than one Maker Console product matches ' + prod.name + '. Rat Ship will not guess which listing is safe to replace.');
+  const visibleIndexes = [];
+  for (let i = 0; i < await matches.count(); i++) {
+    if (await matches.nth(i).isVisible().catch(() => false)) visibleIndexes.push(i);
+  }
+  if (!visibleIndexes.length) return 'none';
+  if (visibleIndexes.length > 1) {
+    stopRetrying('More than one visible Maker Console product matches ' + prod.name + '. Rat Ship will not guess which listing is safe to replace.');
   }
 
-  const nameNode = matches.first();
-  if (!await visible(nameNode)) return 'none';
-
+  const nameNode = matches.nth(visibleIndexes[0]);
   const proof = await nameNode.evaluate(el => {
     const statuses = /\\b(draft|pending review|in review|under review|submitted|approved|published|rejected|suspended|archived|live)\\b/i;
     let node = el;
@@ -110,7 +111,7 @@ async function deleteConfirmedExistingDraft(target) {
   source = replaceOnce(
     source,
     `  } else {\n    editing = await openExisting(page);\n  }\n\n  if (editing) {`,
-    `  } else {\n    const existing = await deleteConfirmedExistingDraft(page);\n    editing = existing === 'none' ? false : false;\n  }\n\n  if (editing) {`,
+    `  } else {\n    await deleteConfirmedExistingDraft(page);\n    editing = false;\n  }\n\n  if (editing) {`,
     'fresh-run existing product handling'
   );
 
