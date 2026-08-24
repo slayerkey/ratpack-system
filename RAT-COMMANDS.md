@@ -47,7 +47,7 @@ The first time the local Maker Console profile is used, Elgato may require you t
 
 ## `rat dev <slug>`
 
-This is the normal one-command local development updater for Stream Deck plugins that need a real local host application to test.
+This is the normal one command local development updater for Stream Deck plugins that need a real local host application to test.
 
 Examples:
 
@@ -59,25 +59,28 @@ rat dev valorant-tracker
 What it does:
 
 1. Fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout.
-2. Prefers `origin/product/<slug>` for products developed inside RatPack. Products registered as external repositories automatically fetch their configured repository and development ref instead.
-3. Reuses a development checkout under:
+2. Reads the product's registered Stream Deck plugin UUID before creating the development checkout.
+3. Stops and unlinks any previous development or manually installed copy, with retries while Windows releases plugin files.
+4. Prefers `origin/product/<slug>` for products developed inside RatPack. Products registered as external repositories automatically fetch their configured repository and development ref instead.
+5. Reuses a development checkout under:
 
 ```text
 out\dev\worktrees\<slug>
 ```
 
-RatPack-native products use detached worktrees. Registered external products use a reusable local clone in the same location.
+RatPack native products use detached worktrees. Registered external products use a reusable local clone in the same location.
 
-4. Installs plugin dependencies only when needed.
-5. Runs the plugin build and automated tests declared by the product.
-6. Runs the official Elgato Stream Deck CLI validator.
-7. Removes the previously linked development copy of the same plugin.
-8. Links the fresh plugin into Stream Deck developer mode and restarts it.
-9. Opens the product's local status page when `rat-dev.json` declares one.
+6. Installs plugin dependencies only when needed.
+7. Runs the plugin build and automated tests declared by the product.
+8. Runs the official Elgato Stream Deck CLI validator.
+9. Links the fresh plugin into Stream Deck developer mode and restarts it.
+10. Opens the product's local status page when `rat-dev.json` declares one.
 
-Normal iteration should not use Downloads, hand-copied ZIP folders, or manually installed development packages. Product-specific local state stays inside the normal Stream Deck application or the ignored RatPack `out` directory.
+If Rat Dev fails, it automatically opens the product's local development folder so logs or generated files are immediately available for inspection.
 
-`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`. That file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
+Normal iteration should not use Downloads, hand copied ZIP folders, or manually installed development packages. Product specific local state stays inside the normal Stream Deck application or the ignored RatPack `out` directory.
+
+`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`. The registration should include `plugin_uuid` so Rat Dev can clean up an older installed copy before the first development worktree exists. The file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
 
 The first run may install the official `@elgato/cli` once. Current Stream Deck CLI development requires Node.js 24 or newer.
 
@@ -97,6 +100,18 @@ Use this if you want to know whether your local RatPack checkout is clean and cu
 Prints the main command cheat sheet in the terminal.
 
 ## Optional commands
+
+### `rat dev-open <slug>`
+
+Opens the reusable local development folder for a product without rebuilding or reinstalling it.
+
+Example:
+
+```text
+rat dev-open discord-bridge
+```
+
+Use this only when you actually want to inspect the generated plugin or local development files. Successful `rat dev` runs do not open Explorer automatically because there should normally be nothing to install by hand.
 
 ### `rat kit <slug>`
 
