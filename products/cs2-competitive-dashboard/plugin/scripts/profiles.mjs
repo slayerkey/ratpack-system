@@ -119,7 +119,7 @@ export async function generateBundledProfiles(build) {
   await mkdir(profilesDir, { recursive: true });
 
   const registrations = [];
-  const kinds = build.flavor === "pro" ? ["competitive", "live"] : ["lite"];
+  const kinds = build.flavor === "pro" ? ["competitive", "live"] : ["starter"];
 
   for (const device of PROFILE_DEVICES) {
     for (const kind of kinds) {
@@ -148,7 +148,7 @@ export async function generateBundledProfiles(build) {
 
 function layoutActions(build, kind, device) {
   const capacity = device.columns * device.rows;
-  const source = kind === "lite"
+  const source = kind === "starter"
     ? LITE_ITEMS
     : kind === "live"
       ? chooseByCapacity(capacity, LIVE_6, LIVE_8, LIVE_15, LIVE_XL)
