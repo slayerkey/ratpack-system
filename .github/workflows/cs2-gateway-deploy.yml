@@ -1,0 +1,73 @@
+name: Deploy CS2 Provider Gateway
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate gateway
+        working-directory: products/cs2-competitive-dashboard/gateway
+        run: npm run check
+
+      - name: Require official Leetify attribution asset before production provider enablement
+        shell: bash
+        run: |
+          test -f products/cs2-competitive-dashboard/plugin/static/ui/leetify-provided-dark.svg || {
+            echo "Missing official unmodified Data Provided by Leetify dark-background SVG."
+            echo "Download it from Leetify's developer-guidelines asset folder and commit it as:"
+            echo "products/cs2-competitive-dashboard/plugin/static/ui/leetify-provided-dark.svg"
+            exit 1
+          }
+
+  deploy:
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: cs2-provider-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy stateless Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: products/cs2-competitive-dashboard/gateway
+          wranglerVersion: '4'
+          command: deploy
+          secrets: |
+            FACEIT_API_KEY
+            STEAM_WEB_API_KEY
+            LEETIFY_API_KEY
+        env:
+          FACEIT_API_KEY: ${{ secrets.FACEIT_API_KEY }}
+          STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
+          LEETIFY_API_KEY: ${{ secrets.LEETIFY_API_KEY }}
+
+      - name: Verify deployed health endpoint
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        shell: bash
+        run: |
+          test -n "$DEPLOYMENT_URL"
+          echo "Gateway deployed: $DEPLOYMENT_URL"
+          curl --fail --silent --show-error --retry 3 "$DEPLOYMENT_URL/health"
+
+      - name: Record deployment URL
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: echo "CS2_GATEWAY_URL=$DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
