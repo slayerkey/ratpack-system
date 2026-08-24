@@ -13,6 +13,8 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $ShipToolRoot = Join-Path $RepoRoot "tools\ship"
 $MakerProfile = Join-Path $env:LOCALAPPDATA "PackRat\maker-console-profile"
+$RunnerUnavailablePrefix = "[RATSHIP_RUNNER_UNAVAILABLE]"
+$script:ForceLocalShip = $false
 
 function Require-Command {
     param([string]$Name, [string]$Hint)
@@ -147,6 +149,7 @@ function Show-Help {
     Write-Host "BATCH EXAMPLE" -ForegroundColor Green
     Write-Host "  rat ship weather-timeline-pro weather-timeline snake desk-notes"
     Write-Host "  Batch mode continues to later products if one product fails, then prints a failure summary."
+    Write-Host "  If GitHub cannot start a hosted runner, Rat Ship automatically uses the same canonical build/package/SHIP_KIT pipeline locally for the rest of that queue."
     Write-Host ""
     Write-Host "OPTIONAL" -ForegroundColor DarkGray
     Write-Host "  rat kit <slug> [slug...]     Build and download fresh ship kits without opening Maker Console."
@@ -211,6 +214,16 @@ function Wait-RatShipRun {
                     return
                 }
 
+                $stepCount = 0
+                foreach ($job in @($run.jobs)) {
+                    if ($null -ne $job.steps) {
+                        $stepCount += @($job.steps).Count
+                    }
+                }
+                if ($stepCount -eq 0) {
+                    throw "$RunnerUnavailablePrefix GitHub Actions ended before any runner step executed for run $RunId. This is a hosted-runner/account-usage failure, not a product validation failure."
+                }
+
                 Write-Host "Rat Ship workflow failed. Showing failed logs..." -ForegroundColor Red
                 & gh run view $RunId --log-failed | Out-Host
                 throw "Rat Ship run $RunId finished with conclusion '$($run.conclusion)'."
@@ -240,29 +253,60 @@ function Wait-RatShipRun {
     }
 }
 
+function Build-ShipKitLocally {
+    param([string]$WidgetSlug)
+
+    $dest = Join-Path $RepoRoot "out\ship\$WidgetSlug"
+    $helper = Join-Path $PSScriptRoot "rat-ship-local.ps1"
+    if (-not (Test-Path $helper)) {
+        throw "Local Rat Ship helper not found: $helper"
+    }
+
+    Write-Host "Using local Rat Ship pipeline for '$WidgetSlug'." -ForegroundColor Yellow
+    & $helper -WidgetSlug $WidgetSlug -Destination $dest
+    return $dest
+}
+
 function Download-ShipKit {
     param([string]$WidgetSlug)
     Sync-Main
-    Assert-GitHubAuth
-    $runId = Get-NewShipRun $WidgetSlug
-    Write-Host "Watching Rat Ship run $runId..." -ForegroundColor Cyan
-    Wait-RatShipRun -RunId $runId
 
-    $dest = Join-Path $RepoRoot "out\ship\$WidgetSlug"
-    if (Test-Path $dest) {
-        Remove-Item $dest -Recurse -Force
-    }
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Invoke-GhCommand -GhArgs @("run", "download", $runId, "--name", "rat-ship-$WidgetSlug", "--dir", $dest)
-
-    $submission = Join-Path $dest "submission.json"
-    $widgetPackage = Get-ChildItem -Path $dest -Filter *.icuewidget -File | Select-Object -First 1
-    if (-not (Test-Path $submission) -or -not $widgetPackage) {
-        throw "Rat Ship completed but the expected marketplace kit is incomplete in $dest"
+    if ($script:ForceLocalShip) {
+        return Build-ShipKitLocally $WidgetSlug
     }
 
-    Write-Host "Rat Ship kit is ready at:`n$dest" -ForegroundColor Green
-    return $dest
+    try {
+        Assert-GitHubAuth
+        $runId = Get-NewShipRun $WidgetSlug
+        Write-Host "Watching Rat Ship run $runId..." -ForegroundColor Cyan
+        Wait-RatShipRun -RunId $runId
+
+        $dest = Join-Path $RepoRoot "out\ship\$WidgetSlug"
+        if (Test-Path $dest) {
+            Remove-Item $dest -Recurse -Force
+        }
+        New-Item -ItemType Directory -Force -Path $dest | Out-Null
+        Invoke-GhCommand -GhArgs @("run", "download", $runId, "--name", "rat-ship-$WidgetSlug", "--dir", $dest)
+
+        $submission = Join-Path $dest "submission.json"
+        $widgetPackage = Get-ChildItem -Path $dest -Filter *.icuewidget -File | Select-Object -First 1
+        if (-not (Test-Path $submission) -or -not $widgetPackage) {
+            throw "Rat Ship completed but the expected marketplace kit is incomplete in $dest"
+        }
+
+        Write-Host "Rat Ship kit is ready at:`n$dest" -ForegroundColor Green
+        return $dest
+    }
+    catch {
+        $message = $_.Exception.Message
+        if ($message.StartsWith($RunnerUnavailablePrefix, [System.StringComparison]::Ordinal)) {
+            $script:ForceLocalShip = $true
+            Write-Host "GitHub did not execute a single workflow step. Switching this product and the remainder of the queue to local canonical Rat Ship." -ForegroundColor Yellow
+            Write-Host "This avoids repeatedly creating doomed Actions runs while preserving CORSAIR validate/package, Rat Art, SHIP_KIT invariants, and Maker Console automation." -ForegroundColor DarkGray
+            return Build-ShipKitLocally $WidgetSlug
+        }
+        throw
+    }
 }
 
 function Ensure-MakerConsoleRuntime {
