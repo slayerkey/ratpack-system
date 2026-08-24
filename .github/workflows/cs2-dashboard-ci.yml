@@ -8,6 +8,7 @@ on:
       - 'products/cs2-competitive-dashboard/**'
       - 'products/cs2-competitive-dashboard-pro.json'
       - 'products/cs2-competitive-dashboard-lite.json'
+      - 'plugins/cs2-competitive-dashboard/**'
       - '.github/workflows/cs2-dashboard-ci.yml'
   pull_request:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - 'products/cs2-competitive-dashboard/**'
       - 'products/cs2-competitive-dashboard-pro.json'
       - 'products/cs2-competitive-dashboard-lite.json'
+      - 'plugins/cs2-competitive-dashboard/**'
       - '.github/workflows/cs2-dashboard-ci.yml'
   workflow_dispatch:
 
@@ -59,6 +61,34 @@ jobs:
           name: cs2-competitive-dashboard-streamdeck-packages
           path: products/cs2-competitive-dashboard/plugin/dist/*.streamDeckPlugin
           if-no-files-found: error
+
+  rat-dev-registration:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build through Rat Dev shim
+        run: npm --prefix plugins/cs2-competitive-dashboard run build
+
+      - name: Test through Rat Dev shim
+        run: npm --prefix plugins/cs2-competitive-dashboard test
+
+      - name: Verify Pro development target
+        shell: pwsh
+        run: |
+          $config = Get-Content plugins/cs2-competitive-dashboard/rat-dev.json -Raw | ConvertFrom-Json
+          if ($config.type -ne 'streamdeck-plugin') { throw 'Rat Dev type mismatch' }
+          if ($config.plugin_uuid -ne 'com.packrat.cs2-competitive-dashboard-pro') { throw 'Rat Dev UUID mismatch' }
+          $pluginDir = Join-Path 'plugins/cs2-competitive-dashboard' $config.plugin_dir
+          if (-not (Test-Path $pluginDir)) { throw "Rat Dev plugin output missing: $pluginDir" }
+          $manifest = Get-Content (Join-Path $pluginDir 'manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.UUID -ne $config.plugin_uuid) { throw 'Built Pro manifest UUID does not match Rat Dev registration' }
 
   gateway:
     runs-on: ubuntu-latest
