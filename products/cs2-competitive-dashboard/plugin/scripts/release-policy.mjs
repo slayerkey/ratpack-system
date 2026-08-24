@@ -29,7 +29,8 @@ const gatewayMatch = providerConfig.match(/PRO_GATEWAY_BASE_URL\s*=\s*\"([^\"]*)
 assert(gatewayMatch, "Could not inspect PRO_GATEWAY_BASE_URL");
 if (gatewayMatch[1]) {
   await access("static/ui/leetify-provided-dark.svg");
-  const pi = await readFile("static/ui/property-inspector.html", "utf8");
+  await access(path.join(proDir, "ui", "leetify-provided-dark.svg"));
+  const pi = await readFile(path.join(proDir, "ui", "property-inspector.html"), "utf8");
   assert(pi.includes("leetify-provided-dark.svg"), "Live Leetify builds must render the official unmodified attribution asset");
   assert(pi.includes("view-leetify"), "Live Leetify builds must include View on Leetify");
 }
