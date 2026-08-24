@@ -121,11 +121,24 @@ function Resolve-Source {
 }
 
 function Remove-ExistingCheckout {
-    & git -C $RepoRoot worktree remove --force $Worktree *> $null
+    # The dev slot can be either a real RatPack git worktree or a standalone clone
+    # for an externally registered product. Calling `git worktree remove` on the
+    # standalone clone aborts PowerShell under ErrorActionPreference=Stop, so clear
+    # the filesystem checkout first and let `worktree prune` discard any stale
+    # RatPack worktree metadata afterward.
     if (Test-Path $Worktree) {
+        Write-Host "Clearing stale local development checkout..." -ForegroundColor DarkGray
         Remove-Item $Worktree -Recurse -Force
     }
-    & git -C $RepoRoot worktree prune *> $null
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $RepoRoot worktree prune *> $null
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
 }
 
 function Sync-RatPackWorktree {
