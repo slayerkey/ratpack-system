@@ -25,10 +25,10 @@ out/
 *.log
 
 # Generated XENEON widget outputs
-widgets/desk-notes-lite.icuewidget
-widgets/desk-notes-pro.icuewidget
-widgets/desk-notes/index.html
-widgets/desk-notes-pro/index.html
+# tools/xeneon/inline.py writes the flattened shipping entry point here.
+# The official CORSAIR packager writes transient packages into widgets/.
+widgets/*/index.html
+widgets/*.icuewidget
 
 # OS and editor files
 .DS_Store
