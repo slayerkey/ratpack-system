@@ -25,6 +25,7 @@ for rel in required:
         errors.append(f"missing required file: {rel}")
 
 product_index = ROOT / "products/index.json"
+product_count = None
 if product_index.is_file():
     try:
         payload = json.loads(product_index.read_text(encoding="utf-8"))
@@ -32,6 +33,7 @@ if product_index.is_file():
         if not isinstance(products, list):
             errors.append("products/index.json: products must be a list")
         else:
+            product_count = len(products)
             ids = []
             allowed_types = {"profile", "plugin", "widget", "icons", "idea"}
             for i, product in enumerate(products):
@@ -47,8 +49,10 @@ if product_index.is_file():
                     errors.append(f"products/index.json: unsupported type {product.get('type')!r} for {product.get('id')}")
             if len(ids) != len(set(ids)):
                 errors.append("products/index.json: duplicate product ids")
-            if len(products) != 88:
-                errors.append(f"products/index.json: expected migrated snapshot of 88 products, found {len(products)}")
+            # 88 is the preserved migration baseline, not a permanent ceiling.
+            # New canonical products should grow the roster without breaking context CI.
+            if len(products) < 88:
+                errors.append(f"products/index.json: migrated baseline requires at least 88 products, found {len(products)}")
     except Exception as exc:
         errors.append(f"products/index.json could not be parsed: {exc}")
 
@@ -82,4 +86,4 @@ if errors:
 print("PASS")
 print(f"root={ROOT}")
 print(f"files={sum(1 for p in ROOT.rglob('*') if p.is_file())}")
-print("products=88")
+print(f"products={product_count if product_count is not None else 'unknown'}")
