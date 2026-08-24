@@ -42,11 +42,11 @@ function cleanMap(map?: string): string {
 function sourceState(source: string, status: OnlineSourceStatus, message?: string): DisplayValue | undefined {
   switch (status) {
     case "ready": return undefined;
-    case "not_configured": return { label: source, value: "SETUP", subtitle: "ADD STEAM", tone: "warn" };
+    case "not_configured": return { label: source, value: "SETUP", subtitle: "ADD API KEY", tone: "warn" };
     case "loading": return { label: source, value: "LOADING", tone: "muted" };
     case "not_found": return { label: source, value: "NOT FOUND", subtitle: message, tone: "warn" };
     case "private": return { label: source, value: "PRIVATE", subtitle: message, tone: "warn" };
-    case "rate_limited": return { label: source, value: "LIMITED", subtitle: "TRY LATER", tone: "warn" };
+    case "rate_limited": return { label: source, value: "LIMITED", subtitle: "YOUR API KEY", tone: "warn" };
     case "commercial_gate": return { label: source, value: "UNAVAILABLE", subtitle: "PROVIDER GATE", tone: "warn" };
     case "offline": return { label: source, value: "OFFLINE", subtitle: "API", tone: "danger" };
     case "unavailable": return { label: source, value: "UNAVAILABLE", subtitle: message ?? "OPEN SETUP", tone: "muted" };
