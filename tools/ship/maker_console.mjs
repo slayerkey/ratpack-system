@@ -11,7 +11,10 @@ const RUNTIME = join(RUNTIME_DIR, 'maker_console_runtime.mjs');
 
 mkdirSync(RUNTIME_DIR, { recursive: true });
 const playwrightUrl = import.meta.resolve('playwright');
-const source = readFileSync(CORE, 'utf8');
+// Git may materialize the core with CRLF on Windows. Runtime patches intentionally
+// operate on canonical LF text so exact compatibility guards behave identically on
+// Windows and CI instead of failing on checkout line endings.
+const source = readFileSync(CORE, 'utf8').replace(/\r\n?/g, '\n');
 const patched = patchMakerConsoleSource(source, { repoRoot: ROOT, playwrightUrl });
 writeFileSync(RUNTIME, patched, 'utf8');
 
