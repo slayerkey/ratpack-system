@@ -50,6 +50,37 @@ function Resolve-IcueWidgetCli {
     $script:IcueWidgetCliCmd = $null
 }
 
+function Invoke-IcueWidgetCliUtf8 {
+    param([string[]]$Arguments)
+
+    $oldConsoleEncoding = [Console]::OutputEncoding
+    $oldCodePage = $null
+    $exitCode = 0
+    try {
+        if ($env:OS -eq "Windows_NT") {
+            $codePageText = (& chcp.com 2>$null | Out-String)
+            if ($codePageText -match '(\d+)\s*$') {
+                $oldCodePage = [int]$Matches[1]
+            }
+            & chcp.com 65001 *> $null
+        }
+
+        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        & $IcueWidgetCliCmd @Arguments
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        [Console]::OutputEncoding = $oldConsoleEncoding
+        if ($oldCodePage) {
+            & chcp.com $oldCodePage *> $null
+        }
+    }
+
+    if ($exitCode -ne 0) {
+        throw "CORSAIR iCUE widget CLI failed with exit code $exitCode."
+    }
+}
+
 function Ensure-LocalDependencies {
     if ($env:RATPACK_LOCAL_SHIP_DEPS_READY -eq "1") {
         Resolve-IcueWidgetCli
@@ -191,10 +222,10 @@ try {
             throw "Canonical local build changed tracked widgets/$WidgetSlug files. Commit the generated shipping output before Rat Ship so the local fallback cannot ship uncommitted drift."
         }
 
-        Invoke-LocalStep "official CORSAIR validation" { & $IcueWidgetCliCmd validate "widgets/$WidgetSlug" }
+        Invoke-LocalStep "official CORSAIR validation" { Invoke-IcueWidgetCliUtf8 @("validate", "widgets/$WidgetSlug") }
 
         $packageStarted = Get-Date
-        Invoke-LocalStep "official CORSAIR package" { & $IcueWidgetCliCmd package "widgets/$WidgetSlug" }
+        Invoke-LocalStep "official CORSAIR package" { Invoke-IcueWidgetCliUtf8 @("package", "widgets/$WidgetSlug") }
         $pkg = Get-ChildItem -Path (Join-Path $RepoRoot "widgets") -Filter *.icuewidget -File |
             Where-Object { $_.LastWriteTime -ge $packageStarted.AddSeconds(-2) } |
             Sort-Object LastWriteTime -Descending |
