@@ -19,11 +19,39 @@ permissions:
   contents: read
 
 jobs:
+  resolve-slug:
+    name: Resolve widget slug
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.resolve.outputs.slug }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve slug
+        id: resolve
+        shell: bash
+        env:
+          DISPATCH_SLUG: ${{ inputs.slug }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            slug="$(python tools/xeneon/resolve_slug.py --slug "$DISPATCH_SLUG")"
+          else
+            slug="$(python tools/xeneon/resolve_slug.py --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA")"
+          fi
+          echo "Resolved XENEON slug: $slug"
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
   validate-package:
     name: Official CLI validate and package
+    needs: resolve-slug
     runs-on: windows-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,10 +112,10 @@ jobs:
 
   streamspell:
     name: StreamSpell packaged preview
-    needs: validate-package
+    needs: [resolve-slug, validate-package]
     runs-on: ubuntu-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
       STREAMSPELL_URL: http://127.0.0.1:8090/
     steps:
       - name: Checkout
@@ -104,17 +132,49 @@ jobs:
           name: xeneon-${{ env.WIDGET_SLUG }}-package
           path: artifacts/package
 
-      - name: Install and audit Playwright
+      - name: Install and audit browser test dependencies
         run: |
           rm -rf /tmp/ratpack-playwright-audit
           mkdir -p /tmp/ratpack-playwright-audit
           cd /tmp/ratpack-playwright-audit
           npm init -y >/dev/null 2>&1
-          npm install --save-dev playwright@1.62.1
+          npm install --save-dev playwright@1.62.1 ws@8.21.3
           npm audit --audit-level=high
           cd "$GITHUB_WORKSPACE"
-          npm install --no-save playwright@1.62.1
+          npm install --no-save playwright@1.62.1 ws@8.21.3
           npx playwright install --with-deps chromium
+
+      - name: Run optional packaged network smoke
+        shell: bash
+        run: |
+          smoke="widgets/_src/${WIDGET_SLUG}/network-smoke.mjs"
+          if [[ ! -f "$smoke" ]]; then
+            echo "No packaged network smoke declared for ${WIDGET_SLUG}; skipping."
+            exit 0
+          fi
+          rm -rf artifacts/network-smoke
+          mkdir -p artifacts/network-smoke/package
+          python - <<'PY'
+          import os, pathlib, zipfile
+          slug = os.environ['WIDGET_SLUG']
+          package = pathlib.Path('artifacts/package') / f'{slug}.icuewidget'
+          out = pathlib.Path('artifacts/network-smoke/package')
+          with zipfile.ZipFile(package) as archive:
+              archive.extractall(out)
+          entry = out / 'index.html'
+          if not entry.exists():
+              raise SystemExit(f'packaged widget is missing {entry}')
+          PY
+          node "$smoke" "artifacts/network-smoke/package/index.html" "artifacts/network-smoke"
+
+      - name: Upload packaged network smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-network-smoke
+          path: artifacts/network-smoke/
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Start StreamSpell community builder locally
         run: |

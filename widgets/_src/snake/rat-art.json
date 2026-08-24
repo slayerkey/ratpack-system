@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "hero": {
+    "subtitle": "Classic Snake, built for the Edge."
+  },
+  "showcase": {
+    "title": "Use the whole display.",
+    "subtitle": "A touch-first board shaped around XENEON Edge, not a stretched phone game.",
+    "shot": "XL_H.png"
+  },
+  "features": {
+    "title": "Simple rules. Better fit.",
+    "subtitle": "Everything a great Snake game needs, with nothing running in the background.",
+    "shot": "M_V.png",
+    "items": [
+      ["Touch first", "Swipe anywhere on the board or use the four large edge controls."],
+      ["Local best", "High score and a paused run stay on this PC between iCUE sessions."],
+      ["Gets faster", "Ten speed levels raise the pressure without changing the rules."],
+      ["Zero upkeep", "No account, network feed, API key or helper application."]
+    ]
+  },
+  "settings": {
+    "title": "Four OLED-friendly themes.",
+    "subtitle": "Change the mood without sacrificing board clarity.",
+    "panels": [
+      {"label": "Matrix", "file": "VARIANT_MATRIX.png"},
+      {"label": "Ice", "file": "VARIANT_ICE.png"},
+      {"label": "Ember", "file": "VARIANT_EMBER.png"},
+      {"label": "Mono", "file": "VARIANT_MONO.png"}
+    ],
+    "tags": "Matrix   •   Ice   •   Ember   •   Mono   •   optional touch guides"
+  },
+  "sizes": {
+    "title": "Eight boards, not one stretched board.",
+    "subtitle": "Every official XENEON size and orientation gets its own grid geometry.",
+    "footer": "S, M, L and XL   •   horizontal + vertical   •   8 tuned layouts"
+  }
+}

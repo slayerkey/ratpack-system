@@ -1,22 +1,30 @@
 # RatPack command cheat sheet
 
-You only need to remember three commands for normal use.
+You only need to remember a few commands for normal use.
 
-## `rat ship <slug>`
+## `rat ship <slug> [slug...]`
 
-This is the main command.
+This is the main release command.
 
-Example:
+Single product:
 
 ```text
-rat ship now-playing
+rat ship helldivers
 ```
 
-What it does:
+Multiple products in one queue:
+
+```text
+rat ship weather-timeline-pro weather-timeline snake desk-notes
+```
+
+Batch mode processes products sequentially so one authenticated Maker Console browser profile is never driven by two submissions at the same time. If one product fails, Rat Ship records that failure, continues the remaining queue, and prints a failure summary at the end.
+
+What it does for each product:
 
 1. Switches the local checkout to the latest `main`.
 2. Triggers the Rat Ship GitHub Actions workflow.
-3. Runs the canonical build, validation, package, Rat Art, and ship kit pipeline in GitHub.
+3. Runs the canonical build, validation, official package, Rat Art, and ship kit pipeline in GitHub.
 4. Waits for the workflow to finish.
 5. Replaces the old local output for that product.
 6. Downloads the fresh ship kit into:
@@ -25,9 +33,107 @@ What it does:
 out\ship\<slug>
 ```
 
-7. Opens that folder in Explorer.
+7. Reuses the local Rat Ship Playwright runtime instead of reinstalling it inside every ship kit.
+8. Opens Maker Console with the persistent local PackRat browser profile.
+9. Reuses the existing Maker Console login when the session is still valid.
+10. Fills the product draft from the canonical ship kit.
+11. Uploads the official widget package and Rat Art.
+12. Sets marketplace metadata, release notes, price, and auto publish policy.
+13. Uploads gallery media in the canonical marketplace order.
+14. Submits the product.
 
-For normal marketplace work, manually upload the files from that folder. The Playwright Maker Console bridge is optional and is not required by `rat ship`.
+### Gallery order
+
+The XENEON marketplace sequence is intentionally:
+
+1. Cover / hero
+2. Feature and value breakdown
+3. Main product showcase / highest value feature
+4. Settings, interaction, or alternate state
+5. Slot size compatibility
+
+The cover is separate from the gallery. Rat Ship uploads the four gallery images as one ordered FileList when Maker Console exposes a multi file input. If Maker Console only exposes a single file uploader, Rat Ship uses the compatibility ordering needed to preserve the final visible gallery sequence.
+
+### Crash and recovery behavior
+
+Recoverable Maker Console or Chromium failures are retried with saved resume state up to three times.
+
+Rat Ship does not blindly retry a draft whose irreversible state is wrong. For example, if a paid product is found in a Maker Console draft or listing whose monetization is already locked to Free, Rat Ship stops immediately and explains that the incorrect draft must be removed before recreating it.
+
+On a local Maker Console failure Rat Ship creates:
+
+```text
+out\ship\<slug>\log.zip
+```
+
+The ZIP contains the recovery screenshots, error text, state, and any page diagnostics. Rat Ship also opens Explorer with the recovery ZIP selected so it is easy to drag into a support or debugging chat.
+
+Authentication is local only. Maker Console cookies and session state stay under:
+
+```text
+%LOCALAPPDATA%\PackRat\maker-console-profile
+```
+
+GitHub Actions never receives Maker Console cookies, passwords, browser profile data, or session tokens.
+
+The first time the local Maker Console profile is used, Elgato may require you to sign in manually in the browser window. After that, the persistent profile should normally reuse the session until Elgato expires it.
+
+## `rat dev <slug>`
+
+This is the normal one command local development updater for products that need a real Windows host application or XENEON Edge to test.
+
+Examples:
+
+```text
+rat dev discord-bridge
+rat dev discord-panel
+rat dev valorant-tracker
+```
+
+Rat Dev first fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout. It prefers `origin/product/<slug>` during active development and reuses an ignored development checkout under:
+
+```text
+out\dev\worktrees\<slug>
+```
+
+### Stream Deck plugins
+
+For a Stream Deck plugin Rat Dev:
+
+1. Reads the registered plugin UUID before creating the development checkout.
+2. Stops and unlinks any previous development or manually installed copy, with retries while Windows releases plugin files.
+3. Installs dependencies only when needed.
+4. Runs the product build and automated tests.
+5. Runs the official Elgato Stream Deck CLI validator.
+6. Links the fresh plugin into Stream Deck developer mode and restarts it.
+7. Opens the product's local status page when `rat-dev.json` declares one.
+
+A Stream Deck plugin opts in with `plugins/<slug>/rat-dev.json`. The registration should include `plugin_uuid` so Rat Dev can clean up an older installed copy before the first development worktree exists. The file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
+
+### XENEON Edge widgets
+
+For a XENEON widget Rat Dev automatically detects `widgets/_src/<slug>` and:
+
+1. Reuses the same ignored detached development worktree.
+2. Runs the widget's local `verify.mjs` regression suite when one is present.
+3. Regenerates the canonical flattened shipping widget with `tools/xeneon/inline.py`.
+4. Runs the official CORSAIR widget validator.
+5. Packages the widget with the official CORSAIR CLI.
+6. Copies the fresh package to:
+
+```text
+out\dev\packages\<slug>\<slug>.icuewidget
+```
+
+7. Opens the `.icuewidget` package so iCUE can import it for the physical XENEON Edge smoke test.
+
+The final iCUE import confirmation is intentionally left to the user because it is a host UI action. Everything before that is regenerated from canonical GitHub source by the command.
+
+If Rat Dev fails, it automatically opens the product's local development folder so logs or generated files are immediately available for inspection.
+
+Normal iteration should not use Downloads, hand copied ZIP folders, or manually installed development source folders. Product specific local state stays inside the host application or the ignored RatPack `out` directory.
+
+The first Stream Deck run may install the official `@elgato/cli` once. Current Stream Deck development requires Node.js 24 or newer. XENEON development uses the pinned official `icuewidget-cli@0.4.47` through `npx`.
 
 ## `rat status`
 
@@ -36,15 +142,43 @@ Shows:
 * local repo path
 * current branch
 * latest commit
-* whether local files have changed
+* whether local files changed
 
 Use this if you want to know whether your local RatPack checkout is clean and current.
 
 ## `rat help`
 
-Prints the command cheat sheet in the terminal.
+Prints the main command cheat sheet in the terminal.
 
 ## Optional commands
+
+### `rat dev-open <slug>`
+
+Opens the reusable local development folder for a product without rebuilding or reinstalling it.
+
+Example:
+
+```text
+rat dev-open discord-bridge
+```
+
+Use this only when you actually want to inspect the generated plugin or local development files. Successful `rat dev` runs do not open Explorer automatically because there should normally be nothing to install by hand.
+
+### `rat kit <slug> [slug...]`
+
+Runs the fresh Rat Ship GitHub pipeline and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
+
+This is useful when you specifically want the files only.
+
+### `rat stage <slug> [slug...]`
+
+Runs the same fresh Rat Ship process, launches Maker Console, fills the listing, uploads the package and media, and stops before the final Submit action.
+
+Use this when you want to inspect the finished Maker Console draft manually.
+
+### `rat submit <slug> [slug...]`
+
+Alias for `rat ship`.
 
 ### `rat update`
 
@@ -54,23 +188,13 @@ Fetches GitHub and fast forwards the current branch if the local worktree is cle
 
 Switches to `main` and pulls the latest canonical RatPack.
 
-### `rat stage <slug>`
-
-Runs the same fresh Rat Ship process and then launches the optional local Maker Console Playwright bridge without final submission.
-
-### `rat submit <slug>`
-
-Runs the same fresh Rat Ship process and then launches the optional authenticated Maker Console Playwright submission bridge.
-
-Use this only if you want browser automation. Manual upload through `rat ship` is fully supported.
-
 ### `rat open`
 
 Opens the RatPack repo folder in Explorer.
 
 ### `rat doctor`
 
-Checks Git, Node, npm, GitHub CLI, GitHub authentication, and local repo state.
+Checks Git, Node, npm, GitHub CLI, GitHub authentication, repo state, and whether the persistent Maker Console profile exists.
 
 # Local layout
 
@@ -86,9 +210,27 @@ Generated output stays inside:
 C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out
 ```
 
-`out/` is ignored by Git, so generated marketplace kits do not clutter source control or the Downloads folder.
+`out/` is ignored by Git, so generated marketplace kits and development worktrees do not clutter source control or the Downloads folder.
 
-The Maker Console browser profile, if you ever use the optional Playwright bridge, stays outside the repo under:
+Development worktrees and external development clones live under:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\worktrees
+```
+
+Development XENEON packages live under:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\packages
+```
+
+The shared local Rat Ship browser runtime lives in:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\tools\ship
+```
+
+The Maker Console browser profile stays outside the repo under:
 
 ```text
 %LOCALAPPDATA%\PackRat\maker-console-profile

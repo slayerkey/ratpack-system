@@ -9,6 +9,7 @@ on:
       - 'tools/art/**'
       - 'tools/xeneon/**'
       - 'tools/ship/**'
+      - 'tools/local/rat.ps1'
       - 'skills/rat-ship/**'
       - '.github/workflows/rat-ship-xeneon.yml'
   workflow_dispatch:
@@ -22,10 +23,37 @@ permissions:
   contents: read
 
 jobs:
+  resolve-slug:
+    name: Resolve widget slug
+    runs-on: ubuntu-latest
+    outputs:
+      slug: ${{ steps.resolve.outputs.slug }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve slug
+        id: resolve
+        shell: bash
+        env:
+          DISPATCH_SLUG: ${{ inputs.slug }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            slug="$(python tools/xeneon/resolve_slug.py --slug "$DISPATCH_SLUG")"
+          else
+            slug="$(python tools/xeneon/resolve_slug.py --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA")"
+          fi
+          echo "Resolved XENEON slug: $slug"
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+
   ship-kit:
+    needs: resolve-slug
     runs-on: windows-latest
     env:
-      WIDGET_SLUG: ${{ github.event_name == 'workflow_dispatch' && inputs.slug || 'now-playing' }}
+      WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
       RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
       RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
     steps:
@@ -38,6 +66,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
+      - name: Validate local Rat command syntax and batch parsing
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/local/rat.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Host $_.Message }
+            throw 'tools/local/rat.ps1 has PowerShell syntax errors'
+          }
+          & pwsh -NoLogo -NoProfile -File tools/local/rat.ps1 help weather-timeline-pro weather-timeline smoke-third-slug
+          if ($LASTEXITCODE -ne 0) { throw 'rat.ps1 did not accept multiple slug arguments' }
 
       - name: Install deterministic ship dependencies
         shell: pwsh
@@ -92,10 +133,13 @@ jobs:
         shell: pwsh
         run: |
           $kit = "artifacts/ship/$env:WIDGET_SLUG/SHIP_KIT"
+          $source = Get-Content "widgets/_src/$env:WIDGET_SLUG/submission.json" -Raw | ConvertFrom-Json
           $sub = Get-Content "$kit/submission.json" -Raw | ConvertFrom-Json
-          if ($sub.type -ne 'widget') { throw 'submission type must be widget' }
-          if ($sub.price_usd -ne 9.99) { throw 'unexpected price' }
-          if ($sub.name -ne 'Now Playing Panel') { throw 'unexpected name' }
+          if ($source.type -ne 'widget' -or $sub.type -ne 'widget') { throw 'submission type must be widget' }
+          if ($sub.slug -ne $env:WIDGET_SLUG) { throw 'submission slug mismatch' }
+          if ($sub.name -ne $source.name) { throw 'submission name mismatch' }
+          if ([decimal]$sub.price_usd -ne [decimal]$source.price_usd) { throw 'submission price mismatch' }
+          if ($sub.version -ne $source.version) { throw 'submission version mismatch' }
           if (-not (Test-Path "$kit/$env:WIDGET_SLUG.icuewidget")) { throw 'missing official widget package' }
           foreach ($f in @('01_search_icon.png','02_cover.png','03_gallery_01.png','04_gallery_02.png','05_gallery_03.png','06_gallery_04.png')) {
             if (-not (Test-Path "$kit/$f")) { throw "missing $f" }
