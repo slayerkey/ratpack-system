@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,7 @@ export const HOOK_EVENTS = [
 export const HOOK_URL = "http://127.0.0.1:19741/hook";
 export const HOOK_HEADER = "X-PackRat-Claude-Auto-Queue";
 const TOKEN_PREFIX = "v1:";
+const MAX_SETTINGS_WRITE_ATTEMPTS = 4;
 
 function defaultSettingsPath() {
   return path.join(os.homedir(), ".claude", "settings.json");
@@ -118,6 +119,12 @@ function secureTokenEqual(expected, received) {
   return timingSafeEqual(a, b);
 }
 
+function parseSettings(raw) {
+  if (raw === null) return {};
+  const parsed = JSON.parse(raw);
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
 export class IntegrationManager {
   constructor(settingsPath = defaultSettingsPath()) {
     this.settingsPath = settingsPath;
@@ -125,22 +132,50 @@ export class IntegrationManager {
     this.hookToken = null;
   }
 
-  async readSettings() {
+  async readSettingsSnapshot() {
     try {
       const raw = await readFile(this.settingsPath, "utf8");
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
+      return { raw, settings: parseSettings(raw) };
     } catch (error) {
-      if (error?.code === "ENOENT") return {};
+      if (error?.code === "ENOENT") return { raw: null, settings: {} };
       throw error;
     }
   }
 
-  async writeSettings(settings) {
+  async readSettings() {
+    return (await this.readSettingsSnapshot()).settings;
+  }
+
+  async readRawOrNull() {
+    try {
+      return await readFile(this.settingsPath, "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      throw error;
+    }
+  }
+
+  async writeSettingsIfUnchanged(settings, expectedRaw) {
     await mkdir(path.dirname(this.settingsPath), { recursive: true });
-    const temp = `${this.settingsPath}.packrat-${process.pid}-${Date.now()}.tmp`;
+    const temp = `${this.settingsPath}.packrat-${process.pid}-${Date.now()}-${randomBytes(4).toString("hex")}.tmp`;
     await writeFile(temp, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
-    await rename(temp, this.settingsPath);
+    try {
+      const currentRaw = await this.readRawOrNull();
+      if (currentRaw !== expectedRaw) return false;
+      await rename(temp, this.settingsPath);
+      return true;
+    } finally {
+      await rm(temp, { force: true }).catch(() => {});
+    }
+  }
+
+  async mutateSettings(mutator) {
+    for (let attempt = 0; attempt < MAX_SETTINGS_WRITE_ATTEMPTS; attempt += 1) {
+      const snapshot = await this.readSettingsSnapshot();
+      const next = mutator(snapshot.settings);
+      if (await this.writeSettingsIfUnchanged(next, snapshot.raw)) return next;
+    }
+    throw new Error("Claude settings changed repeatedly while PackRat was updating them. Try again after the other settings change finishes.");
   }
 
   async backupOnce() {
@@ -203,19 +238,15 @@ export class IntegrationManager {
   }
 
   async connect() {
-    const settings = await this.readSettings();
     await this.backupOnce();
     const token = generateHookToken();
-    const next = addPackRatHooks(settings, token);
-    await this.writeSettings(next);
+    await this.mutateSettings((settings) => addPackRatHooks(settings, token));
     this.hookToken = token;
     return this.status();
   }
 
   async disconnect() {
-    const settings = await this.readSettings();
-    const next = removePackRatHooks(settings);
-    await this.writeSettings(next);
+    await this.mutateSettings((settings) => removePackRatHooks(settings));
     this.hookToken = null;
     return this.status();
   }

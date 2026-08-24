@@ -125,3 +125,32 @@ test("a restarted manager recovers the installed hook token without exposing it 
   assert.equal(status.secureHookAuth, true);
   assert.equal(Object.hasOwn(status, "hookToken"), false);
 });
+
+test("connect retries instead of overwriting a concurrent Claude settings edit", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "claude-settings-race-"));
+  const settingsPath = path.join(dir, ".claude", "settings.json");
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(path.dirname(settingsPath), { recursive: true }));
+  await writeFile(settingsPath, JSON.stringify({ theme: "dark" }), "utf8");
+
+  const manager = new IntegrationManager(settingsPath);
+  const originalWrite = manager.writeSettingsIfUnchanged.bind(manager);
+  let injected = false;
+  manager.writeSettingsIfUnchanged = async (settings, expectedRaw) => {
+    if (!injected) {
+      injected = true;
+      await writeFile(
+        settingsPath,
+        JSON.stringify({ theme: "dark", concurrentSetting: "preserve-me" }),
+        "utf8"
+      );
+    }
+    return originalWrite(settings, expectedRaw);
+  };
+
+  const status = await manager.connect();
+  assert.equal(status.connected, true);
+  const finalSettings = JSON.parse(await readFile(settingsPath, "utf8"));
+  assert.equal(finalSettings.concurrentSetting, "preserve-me");
+  assert.equal(finalSettings.theme, "dark");
+  assert.equal(hasPackRatHooks(finalSettings), true);
+});
