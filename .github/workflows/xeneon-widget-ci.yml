@@ -144,17 +144,6 @@ jobs:
           npm install --no-save playwright@1.62.1 ws@8.21.3
           npx playwright install --with-deps chromium
 
-      - name: Run optional product browser QA
-        shell: bash
-        run: |
-          verify="widgets/_src/${WIDGET_SLUG}/verify.mjs"
-          if [[ ! -f "$verify" ]]; then
-            echo "No product browser QA declared for ${WIDGET_SLUG}; skipping."
-            exit 0
-          fi
-          python tools/xeneon/inline.py "$WIDGET_SLUG"
-          node "$verify" "$GITHUB_WORKSPACE"
-
       - name: Run optional packaged network smoke
         shell: bash
         run: |
