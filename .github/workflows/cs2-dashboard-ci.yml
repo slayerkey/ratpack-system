@@ -56,3 +56,20 @@ jobs:
           name: cs2-competitive-dashboard-streamdeck-packages
           path: products/cs2-competitive-dashboard/plugin/dist/*.streamDeckPlugin
           if-no-files-found: error
+
+  gateway:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/cs2-competitive-dashboard/gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate stateless gateway
+        run: npm run check

@@ -1,0 +1,9 @@
+{
+  "name": "packrat-cs2-provider-gateway",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-08-23",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  }
+}
