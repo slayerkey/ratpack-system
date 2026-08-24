@@ -43,11 +43,12 @@ if (CHECK_KIT) {
 const LOG = join(KIT,'log');
 mkdirSync(LOG,{recursive:true});
 const STATE = join(LOG,'state.json');
-const state = RESUME && existsSync(STATE) ? JSON.parse(readFileSync(STATE,'utf8')) : {done:[],uploaded:[],detailsSelections:[],detailsProof:[]};
+const state = RESUME && existsSync(STATE) ? JSON.parse(readFileSync(STATE,'utf8')) : {done:[],uploaded:[],detailsSelections:[],detailsProof:[],pricingProof:null};
 state.done ||= [];
 state.uploaded ||= [];
 state.detailsSelections ||= [];
 state.detailsProof ||= [];
+state.pricingProof ||= null;
 const save = () => writeFileSync(STATE, JSON.stringify(state,null,2));
 const done = id => state.done.includes(id);
 const mark = id => { if(!done(id)) state.done.push(id); save(); };
@@ -159,6 +160,25 @@ async function editorLooksLikeMedia(page){
   const body=((await page.locator('body').innerText().catch(()=>''))||'').toLowerCase();
   return body.includes('thumbnail') || body.includes('gallery') || body.includes('cover image');
 }
+async function finalReviewReady(page){
+  const submit=page.getByRole('button',{name:/^submit$/i}).first();
+  const auto=page.getByRole('checkbox',{name:/automatically publish/i}).or(page.getByRole('switch',{name:/automatically publish/i})).first();
+  return await visible(submit) && await visible(auto);
+}
+async function ensureFinalReview(page){
+  page=await livePage(context,page);
+  if(await finalReviewReady(page)) return page;
+  for(let i=0;i<8;i++){
+    const advanced=await clickIfVisible(page,/^(next|continue)$/i);
+    if(!advanced)break;
+    page=await livePage(context,page);
+    if(await finalReviewReady(page))return page;
+  }
+  await snap(page,'final-review-missing');
+  const buttons=await page.getByRole('button').allTextContents().catch(()=>[]);
+  writeFileSync(join(LOG,'final-review-buttons.json'),JSON.stringify(buttons,null,2));
+  throw new Error('Rat Ship could not reach the Maker Console Submit for review page while resuming. See final-review-missing screenshot and final-review-buttons.json.');
+}
 async function enterExistingEditor(page){
   for(const re of [/continue editing/i,/edit draft/i,/resume draft/i,/continue setup/i,/edit product/i,/^edit$/i]){
     if(await clickIfVisible(page,re)) return true;
@@ -247,22 +267,35 @@ async function configureDetails(page){
   if(prod.price_usd>0){
     const paid=page.getByRole('radio',{name:/^paid$/i}).or(page.getByRole('button',{name:/^paid$/i})).first();
     await paid.waitFor({state:'visible',timeout:10000});
-    const paidBefore=semanticSelection(await selectionSnapshot(paid));
+    const paidBeforeSnapshot=await selectionSnapshot(paid);
+    const paidBefore=semanticSelection(paidBeforeSnapshot);
     if(paidBefore!==true)await paid.click();
     await page.waitForTimeout(350);
-    const paidAfter=semanticSelection(await selectionSnapshot(paid));
-    if(paidAfter===false)throw new Error('paid pricing did not stay selected');
+    const paidAfterSnapshot=await selectionSnapshot(paid);
+    const paidAfter=semanticSelection(paidAfterSnapshot);
+    if(paidAfter===false || (paidAfter===null && JSON.stringify(paidBeforeSnapshot)===JSON.stringify(paidAfterSnapshot)))throw new Error('paid pricing did not stay selected');
     const price=page.getByLabel(/price/i).or(page.locator('input[type="number"],input[inputmode="decimal"]')).or(page.locator('input:not([type=checkbox]):not([type=file]):not([readonly]):visible')).first();
     await price.waitFor({state:'visible',timeout:10000});
     await price.fill(String(prod.price_usd));
     const back=Number(await price.inputValue());
     if(back!==Number(prod.price_usd))throw new Error(`price mismatch ${back}`);
+    state.pricingProof={mode:'paid',value:back,expected:Number(prod.price_usd),controlBefore:paidBeforeSnapshot,controlAfter:paidAfterSnapshot};
+    save();
     console.log(`Price: $${Number(prod.price_usd).toFixed(2)}`);
   } else {
     const free=page.getByRole('radio',{name:/^free$/i}).or(page.getByRole('button',{name:/^free$/i})).first();
-    await free.click();
+    await free.waitFor({state:'visible',timeout:10000});
+    const freeBeforeSnapshot=await selectionSnapshot(free);
+    const freeBefore=semanticSelection(freeBeforeSnapshot);
+    if(freeBefore!==true)await free.click();
+    await page.waitForTimeout(350);
+    const freeAfterSnapshot=await selectionSnapshot(free);
+    const freeAfter=semanticSelection(freeAfterSnapshot);
+    if(freeAfter===false || (freeAfter===null && JSON.stringify(freeBeforeSnapshot)===JSON.stringify(freeAfterSnapshot)))throw new Error('free pricing did not stay selected');
+    state.pricingProof={mode:'free',value:0,expected:0,controlBefore:freeBeforeSnapshot,controlAfter:freeAfterSnapshot};
+    save();
   }
-  writeFileSync(join(LOG,'details-selection-proof.json'),JSON.stringify({selections:state.detailsSelections,proof:state.detailsProof},null,2));
+  writeFileSync(join(LOG,'details-selection-proof.json'),JSON.stringify({selections:state.detailsSelections,proof:state.detailsProof,pricing:state.pricingProof},null,2));
   await snap(page,'details-before-continue');
   await click(page,/^continue$/i);
 }
@@ -315,6 +348,13 @@ if(editing){
     await step(page,'4-details','Set category, dashboard sizes, orientation, language and price',async()=>{await configureDetails(page);});
   } else if(await editorLooksLikeMedia(page)){
     mark('4-details');
+  } else if(await finalReviewReady(page)){
+    mark('4-details');
+    mark('5-media');
+    mark('6-gallery');
+    mark('6-continue');
+    mark('7-notes');
+    mark('8-autopublish');
   } else {
     await snap(page,'resume-unknown');
     const buttons=await page.getByRole('button').allTextContents().catch(()=>[]);
@@ -345,23 +385,26 @@ await step(page,'6-continue','Continue past media',async()=>{for(let i=0;i<6;i++
 await step(page,'7-notes','Verify version and set release notes',async()=>{page=await livePage(context,page);const body=await page.locator('body').innerText();if(!body.includes(prod.version))throw new Error(`summary does not show version ${prod.version}`);const notes=page.getByLabel(/release notes|what.s new/i).or(page.getByRole('textbox',{name:/release|notes/i})).or(page.locator('[contenteditable="true"]')).first();const text=readFileSync(join(KIT,'PASTE_release_notes.txt'),'utf8').trim();await proseMirror(page,notes,text);});
 await step(page,'8-autopublish','Enable auto publish',async()=>{const cb=page.getByRole('checkbox',{name:/automatically publish/i}).or(page.getByRole('switch',{name:/automatically publish/i})).first();await cb.waitFor({state:'visible',timeout:10000});const on=async()=>await cb.isChecked().catch(async()=>await cb.getAttribute('aria-checked')==='true');if(!await on())await cb.click();if(!await on())throw new Error('auto publish did not enable');});
 
-page=await livePage(context,page);await snap(page,'final');
+page=await ensureFinalReview(await livePage(context,page));await snap(page,'final');
 if(!SUBMIT){console.log(`STAGED: ${prod.name}. Nothing submitted. Re-run with --resume --submit after review.`);await context.close();process.exit(0);}
 if(state.uploaded.length!==media.slice(2).length)throw new Error('gallery is incomplete, refusing submit');
 const summary=await page.locator('body').innerText();
 if(!summary.includes(prod.name)||!summary.includes(prod.version))throw new Error('summary name/version mismatch, refusing submit');
 if(prod.price_usd>0){
-  const expected=Number(prod.price_usd).toFixed(2);
-  if(/\bfree\b/i.test(summary)&&!summary.includes(expected))throw new Error('summary shows Free for a paid product, refusing submit');
-  if(!summary.includes(expected)&&!/\bpaid\b/i.test(summary))throw new Error(`summary does not prove paid pricing at $${expected}, refusing submit`);
-}
-if(/dashboard sizes?/i.test(summary)){
-  for(const size of prod.marketplace_dashboard_sizes){
-    if(!summary.toLowerCase().includes(String(size).toLowerCase()))throw new Error(`summary is missing dashboard size ${size}, refusing submit`);
+  const expected=Number(prod.price_usd);
+  if(!state.pricingProof||state.pricingProof.mode!=='paid'||Number(state.pricingProof.value)!==expected){
+    throw new Error(`details step does not prove paid pricing at $${expected.toFixed(2)}, refusing submit`);
   }
+} else if(!state.pricingProof||state.pricingProof.mode!=='free'){
+  throw new Error('details step does not prove free pricing, refusing submit');
 }
-if(prod.marketplace_recommended_orientation&&/recommended orientation/i.test(summary)&&!summary.toLowerCase().includes(String(prod.marketplace_recommended_orientation).toLowerCase())){
-  throw new Error(`summary is missing recommended orientation ${prod.marketplace_recommended_orientation}, refusing submit`);
+for(const size of prod.marketplace_dashboard_sizes){
+  const key=`size:${String(size).toLowerCase()}`;
+  if(!state.detailsSelections.includes(key))throw new Error(`details step does not prove dashboard size ${size}, refusing submit`);
+}
+if(prod.marketplace_recommended_orientation){
+  const key=`orientation:${String(prod.marketplace_recommended_orientation).toLowerCase()}`;
+  if(!state.detailsSelections.includes(key))throw new Error(`details step does not prove recommended orientation ${prod.marketplace_recommended_orientation}, refusing submit`);
 }
 const cb=page.getByRole('checkbox',{name:/automatically publish/i}).or(page.getByRole('switch',{name:/automatically publish/i})).first();const ap=await cb.isChecked().catch(async()=>await cb.getAttribute('aria-checked')==='true');if(!ap)throw new Error('auto publish is off, refusing submit');
 const btn=page.getByRole('button',{name:/^submit$/i}).first();await btn.waitFor({state:'visible',timeout:15000});await btn.click();await page.waitForTimeout(8000);await snap(page,'after-submit');console.log(`SUBMITTED: ${prod.name} | ${page.url()}`);await context.close();
