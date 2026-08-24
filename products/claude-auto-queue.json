@@ -9,13 +9,16 @@
   "platform": "Elgato Stream Deck / Claude Code",
   "source": "plugins/claude-auto-queue",
   "plugin_uuid": "com.packrat.claude-auto-queue",
+  "minimum_claude_code_version": "2.1.163",
+  "automated_feasibility": "PASS",
+  "automated_tests": 19,
   "release_gate": [
-    "supported Claude hook fixture suite",
-    "queue persistence and six-continuation safety tests",
-    "official Stream Deck CLI validation",
-    "authenticated Windows Claude Code same-session host spike",
-    "premium profile and deterministic key-art QA after technical GO"
+    "19-test supported Claude hook, security, session targeting and persistence suite: PASS",
+    "official Stream Deck CLI validation: PASS",
+    "RatPack context CI: PASS",
+    "authenticated Windows Claude Code same-session host spike: REQUIRED",
+    "premium profile and deterministic key-art QA after technical GO: DEFERRED"
   ],
   "final_boundary": "authenticated local Claude Code session plus physical Stream Deck host smoke test",
-  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI."
+  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, and a six-continuation safety cap."
 }
