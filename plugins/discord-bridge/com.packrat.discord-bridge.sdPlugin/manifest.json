@@ -17,7 +17,7 @@
         }
       ],
       "SupportedInMultiActions": false,
-      "Tooltip": "Shows PackRat Discord Panel bridge status. Press to refresh the configured voice channel.",
+      "Tooltip": "Shows PackRat Discord Panel bridge status. Press to authorize or refresh Discord voice.",
       "UserTitleEnabled": true,
       "UUID": "com.packrat.discord-bridge.status"
     }
@@ -42,6 +42,6 @@
     "MinimumVersion": "7.5"
   },
   "UUID": "com.packrat.discord-bridge",
-  "Version": "0.2.0.0",
+  "Version": "0.3.0.0",
   "CategoryIcon": "imgs/category/icon"
 }
