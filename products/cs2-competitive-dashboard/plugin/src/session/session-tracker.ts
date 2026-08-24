@@ -48,7 +48,7 @@ export class SessionTracker {
   }
 
   ingest(live: LiveState): SessionMetrics {
-    const activePhase = live.mapPhase === "live" || live.mapPhase === "warmup" || live.mapPhase === "intermission";
+    const activePhase = live.mapPhase === "live" || live.mapPhase === "intermission";
     const gameOver = live.mapPhase === "gameover";
 
     if (!this.current && activePhase) {
@@ -60,6 +60,7 @@ export class SessionTracker {
 
       if (gameOver && !this.current.finalized) {
         this.finalizeMatch(live, this.current);
+        this.current = undefined;
       }
     }
 
@@ -112,7 +113,7 @@ export class SessionTracker {
   }
 
   private updateMatch(live: LiveState, match: MatchAccumulator): void {
-    if (match.team === "UNKNOWN" && live.playerTeam !== "UNKNOWN") {
+    if (live.playerTeam !== "UNKNOWN" && live.playerTeam !== "SPECTATOR") {
       match.team = live.playerTeam;
     }
 
@@ -139,9 +140,7 @@ export class SessionTracker {
   }
 
   private finalizeMatch(live: LiveState, match: MatchAccumulator): void {
-    if (match.roundNumber !== undefined) {
-      this.commitRound(match);
-    }
+    if (match.roundNumber !== undefined) this.commitRound(match);
 
     match.finalized = true;
     this.completed.matches += 1;
