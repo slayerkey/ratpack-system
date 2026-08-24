@@ -51,11 +51,9 @@ jobs:
           command: deploy
           secrets: |
             FACEIT_API_KEY
-            STEAM_WEB_API_KEY
             LEETIFY_API_KEY
         env:
           FACEIT_API_KEY: ${{ secrets.FACEIT_API_KEY }}
-          STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
           LEETIFY_API_KEY: ${{ secrets.LEETIFY_API_KEY }}
 
       - name: Verify deployed health endpoint
