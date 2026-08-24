@@ -30,6 +30,7 @@ export async function prepare(page, context) {
   await page.addInitScript(({ sensors, mode }) => {
     globalThis.uniqueId = 'rat-art-power';
     globalThis.powerSensor = mode === 'empty' ? '' : 'total';
+    globalThis.graphWindow = 30;
     globalThis.textColor = '#F4F6F8';
     globalThis.accentColor = '#2BE86A';
     globalThis.graphColor = '#2BE86A';
@@ -47,11 +48,12 @@ export async function prepare(page, context) {
         const now = Date.now();
         const isZero = mode === 'zero';
         const isHigh = mode === 'high';
+        const normalSeedWh = 837.1683333333333;
         localStorage.setItem('rat-art-power:pc-power-meter:session', JSON.stringify({
           sensorId: 'total',
           startedAt: now - 2 * 3600000,
           lastSeenAt: now - 1000,
-          energyWh: isZero ? 0 : (isHigh ? 25000 : 840),
+          energyWh: isZero ? 0 : (isHigh ? 25000 : (mode === 'normal' ? normalSeedWh : 840)),
           measuredMs: isZero ? 0 : 7200000,
           peakW: isZero ? 0 : (isHigh ? 12500 : 517),
           samples: isZero ? 1 : 7200,
@@ -140,11 +142,29 @@ async function waitForPanel(page, expected) {
   }
 }
 
+async function seedBaseGraph(page) {
+  const values = [330, 360, 410, 385, 455, 517, 470, 430, 412];
+  await page.evaluate(trace => {
+    const originalNow = Date.now;
+    const base = originalNow();
+    try {
+      trace.forEach((watts, index) => {
+        Date.now = () => base - (trace.length - 1 - index) * 3000;
+        globalThis.__powerFixture.setValue('total', watts);
+      });
+    } finally {
+      Date.now = originalNow;
+    }
+  }, values);
+  await page.waitForTimeout(80);
+}
+
 export async function ready(page, context) {
   if (context.variant?.mode === 'empty') { await waitForPanel(page, 'empty'); return; }
   if (context.variant?.mode === 'unavailable') { await waitForPanel(page, 'unavailable'); return; }
   await waitForPanel(page, 'ready');
   await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
+  if (!context.variant) await seedBaseGraph(page);
   if (context.variant?.mode === 'info') {
     await page.locator('#infoButton').click();
     await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden, null, { timeout: 3000 });
@@ -161,6 +181,7 @@ export async function assert(page, context) {
     energy: document.getElementById('energyValue')?.textContent?.trim() || '',
     energyUnit: document.getElementById('energyUnit')?.textContent?.trim() || '',
     scope: document.getElementById('scopeLabel')?.textContent?.trim() || '',
+    graphPaths: document.querySelectorAll('#powerGraph path.series').length,
     overlayHidden: document.getElementById('infoOverlay')?.hidden,
     primary: globalThis.PackRatPowerMeterTest?.getPrimary?.() || null,
     catalogue: globalThis.PackRatPowerMeterTest?.getCatalogue?.() || {},
@@ -185,6 +206,7 @@ export async function assert(page, context) {
     throw new Error(`duplicate power sensor labels were not disambiguated: ${JSON.stringify(report.catalogue)}`);
   }
 
+  if (!context.variant && report.graphPaths < 1) throw new Error(`rolling graph did not render a series: ${JSON.stringify(report)}`);
   if (context.variant?.mode === 'zero' && report.now !== '0.00') throw new Error(`zero reading failed: ${JSON.stringify(report)}`);
   if (context.variant?.mode === 'high' && report.now !== '12,500') throw new Error(`high power reading failed: ${JSON.stringify(report)}`);
   if (context.variant?.mode === 'info' && report.overlayHidden) throw new Error('info overlay did not open');
