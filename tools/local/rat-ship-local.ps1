@@ -77,6 +77,21 @@ function Ensure-LocalDependencies {
     Write-Host "Local Rat Ship: shared Pillow, Playwright, Chromium, and CORSAIR CLI are ready for the rest of this queue." -ForegroundColor DarkGray
 }
 
+function Remove-GeneratedWidgetOutputs {
+    $widgetsRoot = Join-Path $RepoRoot "widgets"
+    $generatedIndex = Join-Path $shippingDir "index.html"
+    if (Test-Path $generatedIndex) {
+        $relativeIndex = "widgets/$WidgetSlug/index.html"
+        & git -C $RepoRoot ls-files --error-unmatch -- $relativeIndex *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Remove-Item $generatedIndex -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Get-ChildItem -Path $widgetsRoot -Filter *.icuewidget -File -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
 if ($WidgetSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
     throw "Invalid XENEON widget slug: $WidgetSlug"
 }
@@ -89,6 +104,7 @@ if (-not (Test-Path $sourceDir) -or -not (Test-Path $shippingDir) -or -not (Test
 }
 
 Ensure-LocalDependencies
+Remove-GeneratedWidgetOutputs
 
 if (Test-Path $WorkRoot) { Remove-Item $WorkRoot -Recurse -Force }
 if (Test-Path $Destination) { Remove-Item $Destination -Recurse -Force }
@@ -163,6 +179,7 @@ try {
     }
 }
 finally {
+    Remove-GeneratedWidgetOutputs
     Pop-Location
 }
 
