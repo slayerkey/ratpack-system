@@ -4,9 +4,9 @@ Date: 2026-08-24
 
 ## Automated release evidence
 
-The shared Pro/Lite source passed clean GitHub Actions validation on prior release-candidate commits. The current customer-owned provider-key refactor adds direct provider fixtures and Rat Dev registration coverage. GitHub Actions is currently returning zero-step runner failures across unrelated workflows, so the newest branch commit must be rerun once runners execute normally before it is called a green release candidate.
+The shared Pro/Lite source is current with RatPack `main` and the customer-owned provider-key architecture has now passed a clean GitHub Actions release gate after the repository became public. The latest successful run includes TypeScript, provider fixtures, dependency audit, Pro/Lite builds, official Elgato validation, packaging, and the Rat Dev registration path.
 
-Automated checks cover or are intended to cover:
+Automated checks cover:
 
 * TypeScript typecheck
 * CS2 normal-player GSI normalization fixtures
