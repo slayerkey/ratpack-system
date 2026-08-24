@@ -1,14 +1,12 @@
 /* PackRat Discord Panel live transport.
  *
- * The XENEON widget talks only to the PackRat Discord Bridge on loopback.
- * The companion owns the official Discord StreamKit page and sends a small,
- * normalized voice snapshot to this widget. No Discord token or secret enters
- * the XENEON package.
+ * The XENEON widget talks only to the loopback PackRat Discord Bridge.
+ * The Stream Deck companion owns Discord IPC and Discord StreamKit RPC.
+ * No Discord token or client secret enters the XENEON package.
  */
 
 var BRIDGE_URL = "ws://127.0.0.1:17483";
 var BRIDGE_RECONNECT_MS = 3000;
-var bridgeConfiguredSignature = "";
 var bridgeLastSnapshot = null;
 
 function findMember(userId) {
@@ -70,18 +68,6 @@ function setSpeaking(userId, speaking) {
   }
 }
 
-function bridgeSettings() {
-  return {
-    guildId: String(getIcueProperty("discordServerId", "") || "").replace(/\D/g, ""),
-    channelId: String(getIcueProperty("discordVoiceChannelId", "") || "").replace(/\D/g, ""),
-    channelLabel: String(getIcueProperty("discordChannelLabel", "Discord Voice") || "Discord Voice").trim() || "Discord Voice"
-  };
-}
-
-function validDiscordId(value) {
-  return /^\d{5,24}$/.test(String(value || ""));
-}
-
 function sendBridge(value) {
   if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return false;
   try {
@@ -90,27 +76,6 @@ function sendBridge(value) {
   } catch (error) {
     return false;
   }
-}
-
-function configureBridge(force) {
-  var cfg = bridgeSettings();
-  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
-    bridgeConfiguredSignature = "";
-    model.channel = null;
-    model.members = [];
-    setState("setup");
-    return false;
-  }
-  var signature = cfg.guildId + ":" + cfg.channelId + ":" + cfg.channelLabel;
-  if (!force && signature === bridgeConfiguredSignature) return true;
-  if (!sendBridge({
-    command: "configure-streamkit",
-    guildId: cfg.guildId,
-    channelId: cfg.channelId,
-    channelLabel: cfg.channelLabel
-  })) return false;
-  bridgeConfiguredSignature = signature;
-  return true;
 }
 
 function applyBridgeChannel(channel, speakingMap) {
@@ -170,12 +135,6 @@ function applyBridgeSnapshot(snapshot) {
     if (typeof snapshot.voice.deaf === "boolean") model.voice.deaf = snapshot.voice.deaf;
   }
 
-  var cfg = bridgeSettings();
-  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
-    setState("setup");
-    return;
-  }
-
   if (!snapshot.bridge || snapshot.bridge.listening !== true) {
     setState("disconnected");
     return;
@@ -187,24 +146,25 @@ function applyBridgeSnapshot(snapshot) {
   }
 
   var streamkit = snapshot.streamkit || {};
-  if (streamkit.stage === "failed" || streamkit.stage === "browser-exited") {
+  if (streamkit.stage === "failed") {
     setState("auth-failed");
     return;
   }
 
-  if (streamkit.stage !== "ready" || !streamkit.pageReady) {
+  if (!snapshot.discord.authenticated) {
     model.channel = null;
     model.members = [];
     setState("authorization");
     return;
   }
 
-  applyBridgeChannel(snapshot.channel || {
-    id: cfg.channelId,
-    guild_id: cfg.guildId,
-    name: cfg.channelLabel,
-    voice_states: []
-  }, snapshot.speaking || {});
+  if (!snapshot.channel) {
+    setChannel(null);
+    renderControls();
+    return;
+  }
+
+  applyBridgeChannel(snapshot.channel, snapshot.speaking || {});
   renderControls();
 }
 
@@ -218,7 +178,6 @@ function installBridgeSocket(socket) {
   socket.addEventListener("close", function () {
     if (rpcSocket !== socket) return;
     rpcSocket = null;
-    bridgeConfiguredSignature = "";
     if (!fixtureMode) {
       setState("disconnected");
       scheduleReconnect();
@@ -227,7 +186,7 @@ function installBridgeSocket(socket) {
   socket.addEventListener("error", function () {
     if (rpcSocket === socket) setState("disconnected");
   });
-  configureBridge(true);
+  sendBridge({ command: "refresh" });
 }
 
 function scheduleReconnect() {
@@ -240,13 +199,8 @@ function scheduleReconnect() {
 
 async function startLiveConnection() {
   if (fixtureMode) return;
-  var cfg = bridgeSettings();
-  if (!validDiscordId(cfg.guildId) || !validDiscordId(cfg.channelId)) {
-    setState("setup");
-    return;
-  }
   if (rpcSocket && rpcSocket.readyState === WebSocket.OPEN) {
-    configureBridge(false);
+    sendBridge({ command: "refresh" });
     return;
   }
   setState("disconnected");
@@ -281,8 +235,7 @@ async function beginAuthorization() {
     await startLiveConnection();
     return;
   }
-  configureBridge(true);
-  sendBridge({ command: "refresh" });
+  sendBridge({ command: model.state === "authorization" ? "authorize" : "refresh" });
 }
 
 async function setSelfVoice(field, nextValue) {
@@ -293,20 +246,14 @@ async function setSelfVoice(field, nextValue) {
   }
   if (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN) return;
   sendBridge({ command: field === "mute" ? "mute" : "deafen", value: Boolean(nextValue) });
-  model.voice[field] = Boolean(nextValue);
-  renderControls();
 }
 
-/* Existing UI functions were written around the old Discord RPC transport.
- * Override only the transport-specific copy/avatar assumptions so the visual
- * product and eight-size layout remain unchanged.
- */
 stateCopy = function () {
-  if (model.state === "setup") return ["Discord channel setup required", "Add your Discord Server ID and Voice Channel ID in widget settings.", true];
+  if (model.state === "setup") return ["Starting Discord Panel", "The PackRat Discord Bridge will connect automatically.", true];
   if (model.state === "disconnected") return ["PackRat Discord Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
-  if (model.state === "authorization") return ["Connecting to Discord voice", "The companion is loading this channel through Discord StreamKit.", true];
-  if (model.state === "auth-failed") return ["Discord voice source needs attention", "Press Refresh. If it persists, check the bridge status page.", true];
-  return ["No one in this voice channel", "The panel will update automatically when members appear.", false];
+  if (model.state === "authorization") return ["Discord authorization required", "Tap Connect Discord once, then approve the Discord prompt.", true];
+  if (model.state === "auth-failed") return ["Discord authorization needs attention", "Tap Connect Discord to retry. The bridge status page has the exact error.", true];
+  return ["Not in a voice channel", "Join any Discord voice channel and the panel will follow automatically.", false];
 };
 
 avatarUrl = function (raw) {
