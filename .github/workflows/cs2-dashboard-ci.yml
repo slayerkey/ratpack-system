@@ -41,6 +41,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Audit shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Typecheck fixtures and build both flavors
         run: npm run check
 
