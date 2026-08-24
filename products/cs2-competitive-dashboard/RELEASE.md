@@ -72,13 +72,21 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 4. Launch or restart CS2.
 5. For Premier, Competitive, and FACEIT account data, add your Steam profile URL or SteamID once.
 
+**No API keys are required from customers.** PackRat owns the provider integration. Steam vanity/profile resolution also works without a Steam Web API key.
+
 Steam and CS2 are auto-detected for normal installations. A manual path override is available only for unusual library layouts.
 
 ### Trust / privacy copy
 
 Live CS2 Game State Integration is received on your own PC through a localhost-only listener. Raw GSI gameplay data is not sent to the PackRat provider gateway.
 
-Competitive account lookups send only the Steam identity needed for the requested public/provider-backed stats. Provider credentials remain server-side.
+Competitive account lookups send only the Steam identity needed for the requested public/provider-backed stats. Provider credentials remain server-side and customers never need to create or paste provider API keys.
+
+### Provider attribution copy
+
+Competitive values sourced from Leetify are **Data Provided by Leetify**. The required official Leetify attribution and `View on Leetify` link are shown wherever those provider-backed values are exposed. PackRat is not affiliated with or sponsored by Leetify.
+
+FACEIT values are retrieved through PackRat's FACEIT developer application. PackRat is not affiliated with or sponsored by FACEIT.
 
 ### Important accuracy copy
 
@@ -102,6 +110,7 @@ Initial release of CS2 Competitive Dashboard Pro.
 - configurable dynamic key displays
 - explicit setup, offline, private-profile and rate-limit states
 - localhost-only authenticated GSI listener
+- no customer API keys required
 
 ## Lite listing
 
