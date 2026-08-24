@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Actions": [
+    {
+      "Controllers": [
+        "Keypad"
+      ],
+      "Icon": "imgs/actions/status/icon",
+      "Name": "Bridge Status",
+      "States": [
+        {
+          "Image": "imgs/actions/status/key",
+          "ShowTitle": true,
+          "Title": "Discord\nBridge",
+          "TitleAlignment": "bottom",
+          "TitleColor": "#FFFFFF"
+        }
+      ],
+      "SupportedInMultiActions": false,
+      "Tooltip": "Shows Discord IPC and XENEON bridge status. Press to connect or authorize.",
+      "UserTitleEnabled": true,
+      "UUID": "com.packrat.discord-bridge.status"
+    }
+  ],
+  "Author": "PackRat 🐀",
+  "Category": "PackRat Discord Bridge",
+  "CodePath": "bin/plugin.js",
+  "Description": "Local Discord voice bridge for PackRat Discord Voice Panel on XENEON EDGE.",
+  "Icon": "imgs/plugin/icon",
+  "Name": "PackRat Discord Bridge",
+  "Nodejs": {
+    "Version": "24"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "7.5"
+  },
+  "UUID": "com.packrat.discord-bridge",
+  "Version": "0.1.0.4",
+  "CategoryIcon": "imgs/category/icon"
+}
