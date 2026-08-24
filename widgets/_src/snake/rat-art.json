@@ -9,14 +9,14 @@
     "shot": "XL_H.png"
   },
   "features": {
-    "title": "Simple rules. Better fit.",
-    "subtitle": "Everything a great Snake game needs, with nothing running in the background.",
+    "title": "Everything you want from Snake.",
+    "subtitle": "Fast to understand, satisfying to replay, and actually designed for the XENEON Edge.",
     "shot": "M_V.png",
     "items": [
-      ["Touch first", "Swipe anywhere on the board or use the four large edge controls."],
-      ["Local best", "High score and a paused run stay on this PC between iCUE sessions."],
-      ["Gets faster", "Ten speed levels raise the pressure without changing the rules."],
-      ["Zero upkeep", "No account, network feed, API key or helper application."]
+      ["Built for the Edge", "Eight tuned horizontal and vertical boards keep the game readable across every official XENEON size."],
+      ["Natural touch controls", "Swipe anywhere on the board or use the large edge controls when you want more deliberate turns."],
+      ["Difficulty keeps climbing", "Ten speed levels steadily raise the pressure as your run gets longer."],
+      ["Pick up where you left off", "Your local best score and a paused run persist between iCUE sessions."]
     ]
   },
   "settings": {
