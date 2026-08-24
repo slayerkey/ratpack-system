@@ -1,46 +1,68 @@
 # PackRat Discord Bridge
 
-Development companion for the PackRat Discord Voice Panel on XENEON EDGE.
+Development companion for the PackRat Discord Voice Panel on XENEON Edge.
 
-## Architecture
+## Current feasibility architecture
 
-Discord Desktop -> documented native Discord IPC -> Stream Deck plugin -> loopback-only PackRat bridge on `127.0.0.1:17483` -> XENEON widget.
+Discord Desktop stays the user's normal voice client.
 
-The bridge never sends Discord voice state to PackRat servers. The local HTTP and WebSocket bridge rejects non-local web origins. No Discord Client Secret is embedded in the plugin.
+The companion uses two local paths:
+
+1. A lightweight native Discord IPC handshake confirms that Discord Desktop is running.
+2. The official Discord StreamKit voice overlay is loaded as a top-level page in a hidden Microsoft Edge process. The companion reads the rendered roster and speaking state locally through Edge DevTools and forwards only normalized voice display data over the PackRat loopback bridge on `127.0.0.1:17483`.
+
+The XENEON widget never receives Discord OAuth tokens, cookies, or a Discord Client Secret.
+
+Mute and deafen controls use Discord's Windows global shortcuts through the companion instead of requesting the restricted `rpc.voice.write` scope.
+
+## Why this transport exists
+
+The original native Discord RPC feasibility spike proved the named-pipe transport but Discord rejected `rpc.voice.read` and `rpc.voice.write` with `invalid_scope` before returning an authorization code. Those scopes are approval gated for this application.
+
+The StreamKit feasibility path keeps the product name and UI unchanged while testing whether Discord's official voice overlay can supply the roster and speaker signal without those restricted application scopes.
 
 ## Stream Deck key states
 
-The Bridge Status action uses its own key title for normal operational state. It intentionally does not use Stream Deck's warning triangle for expected states.
+The Bridge Status action communicates normal state through its own title and does not use Stream Deck's warning triangle for expected states.
 
-Possible titles include:
+Typical titles:
 
 - `Open Discord`
-- `Discord Starting`
-- `Press to Authorize`
-- `Authorize in Discord`
-- `Finishing Setup`
-- `Discord Approval`
-- `Auth Blocked`
-- `Auth Failed`
+- `Setup on XENEON`
+- `Voice Starting`
+- `Voice Needs Help`
 - `Discord Ready`
-- the current voice channel name after authentication
-
-Manual Stream Deck title editing remains enabled, so the property panel does not show `Title disabled`.
+- configured channel name
 
 ## Local development
 
 Do not download ZIPs for normal iteration.
 
-From the canonical RatPack checkout run:
-
 ```text
 rat dev discord-bridge
 ```
 
-The command fetches `origin/product/discord-bridge`, materializes it under `out/dev`, builds and tests the plugin, validates it with the official Stream Deck CLI, links the plugin into Stream Deck, restarts it, and opens the local state page.
+Rat Dev fetches `origin/product/discord-bridge`, builds it, runs tests, validates it with the official Stream Deck CLI, replaces the linked development copy, restarts it, and opens:
 
-Generated local development files stay under the ignored RatPack `out` directory.
+```text
+http://127.0.0.1:17483/state
+```
 
-## Current authorization experiment
+The XENEON side can be built and opened for iCUE import with:
 
-Build `0.1.0.4` uses Discord RPC `AUTHORIZE` over the already-proven native IPC connection. The one remaining feasibility question is whether the resulting code can be exchanged safely without embedding a confidential Discord Client Secret. General public release also requires Discord approval for the restricted `rpc.voice.read` and `rpc.voice.write` scopes.
+```text
+rat dev discord-panel
+```
+
+Generated development files stay under the ignored RatPack `out` directory.
+
+## Current physical gate
+
+Configure a Discord Server ID and Voice Channel ID in the Discord Panel widget settings, then verify on the real XENEON Edge:
+
+- StreamKit reaches `stage: ready`
+- roster appears
+- speaking users highlight and promote correctly
+- Mute toggles Discord
+- Deafen toggles Discord
+- no external PackRat service is required
