@@ -12,7 +12,7 @@ Manifest author: `PackRat 🐀`
 
 Version: `0.2.0`
 
-Current state: live transport pivot implemented. Awaiting physical XENEON Edge feasibility proof with the StreamKit companion path.
+Current state: automatic current-channel loopback transport implemented. Awaiting the real StreamKit public RPC companion feasibility result and physical XENEON Edge smoke test.
 
 ## Previous layout proof retained
 
@@ -49,48 +49,63 @@ Touch target measurements from that gate:
 
 Recent activity remains intentionally hidden on S, M, and L and visible on both XL compositions. XL roster rendering uses two columns.
 
-## New live transport implementation
+## Current live transport implementation
 
 PASS by implementation review: the widget no longer attempts Discord OAuth or direct Discord localhost WebSocket RPC.
 
 PASS by implementation review: live transport is only `ws://127.0.0.1:17483` to the PackRat Discord Bridge.
 
-PASS by implementation review: Server ID, Voice Channel ID, and optional Channel Label are configurable through iCUE properties.
+PASS by implementation review: the fixed Server ID and Voice Channel ID settings from the abandoned overlay fallback have been removed.
 
-PASS by implementation review: settings changes are sent to the companion automatically without reloading the widget.
+PASS by implementation review: an unauthenticated bridge snapshot puts the panel in a deliberate Connect Discord state.
 
-PASS by implementation review: companion snapshots are normalized into the existing roster model rather than redesigning the UI around StreamKit markup.
+PASS by implementation review: after companion authentication, the widget consumes the companion's current selected voice channel automatically.
 
-PASS by implementation review: speaking state still uses the existing promotion and 900 ms hold behavior.
+PASS by implementation review: current roster snapshots are normalized into the existing member model rather than redesigning the UI.
 
-PASS by implementation review: mute and deafen touch actions send local bridge commands rather than restricted Discord RPC commands.
+PASS by implementation review: speaking changes retain speaker promotion and the 900 ms hold behavior.
 
-PASS by implementation review: no Discord token, cookie, Client Secret, or browser credential exists in widget source.
+PASS by implementation review: mute and deafen touch actions send only loopback commands to the companion; the XENEON widget never holds Discord credentials.
 
-## Current physical gate
+PASS by implementation review: leaving voice produces a calm not-in-voice state instead of an error.
 
-Use the canonical commands:
+PASS by implementation review: the local `verify.mjs` rejects regressions back to fixed-channel configuration or direct Discord OAuth/RPC.
+
+## Canonical local test path
+
+First prove the companion:
 
 ```text
 rat dev discord-bridge
+```
+
+A successful companion must reach `discord.authenticated: true` and `streamkit.stage: ready`, then automatically populate its current channel after joining Discord voice.
+
+Then run:
+
+```text
 rat dev discord-panel
 ```
 
-The second command builds the canonical flattened widget, runs the official CORSAIR validator, packages it with the official CORSAIR CLI, stores the package under `out/dev/packages/discord-panel`, and opens it for iCUE import.
+Rat Dev runs `verify.mjs`, rebuilds the flattened widget with `tools/xeneon/inline.py`, runs the official CORSAIR validator, packages with the official CORSAIR CLI, stores the package under `out/dev/packages/discord-panel`, and opens it for iCUE import.
 
-Then configure the Server ID and Voice Channel ID in the widget and prove:
+## Physical XENEON gate
 
-1. widget connects to the local companion from the real iCUE/XENEON runtime
-2. StreamKit helper reaches ready state
-3. real member names populate the roster
-4. real speaking changes animate and reorder correctly
-5. avatars render when available, with initials fallback remaining valid
-6. Mute touch toggles Discord while Discord is in the background
-7. Deafen touch toggles Discord while Discord is in the background
-8. bridge and widget reconnect after host restarts
+Prove on real iCUE/XENEON:
+
+1. widget connects to the loopback companion
+2. current Discord channel name appears automatically
+3. real member names and avatars populate the roster
+4. member joins/leaves update without reloading the widget
+5. real speaking changes animate and reorder correctly
+6. Mute touch changes the actual Discord mute state
+7. Deafen touch changes the actual Discord deafen state
+8. changing Discord voice channels changes the panel automatically
+9. leaving voice returns to the idle state
+10. bridge and widget reconnect after host restarts
 
 ## Release gates after live feasibility
 
-If the physical spike passes, rerun the complete eight-size browser suite against the new transport fixtures, regenerate the flattened shipping HTML, run official CORSAIR validation/package, StreamSpell packaged verification, Rat Art, and Rat Ship before calling this a release candidate.
+After the physical spike passes, rerun the complete eight-size browser suite against final loopback fixtures, regenerate the flattened shipping HTML, run official CORSAIR validation/package, StreamSpell packaged verification, Rat Art, and Rat Ship.
 
-The configured-channel limitation must be represented honestly in marketplace copy unless automatic current-channel following is added later.
+The companion itself also needs its final official Stream Deck SDK migration, release packaging, and a policy/terms review for the chosen Discord authorization identity before this can be called a release candidate.
