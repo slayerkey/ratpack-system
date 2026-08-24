@@ -12,6 +12,11 @@ const expectedLiteActions = ["live", "status"].map((id) => `com.packrat.cs2-comp
 assertEqualSet(proManifest.Actions.map((action) => action.UUID), expectedProActions, "Pro action surface");
 assertEqualSet(liteManifest.Actions.map((action) => action.UUID), expectedLiteActions, "Lite action surface");
 
+validateProfileRegistrations(proManifest, "pro");
+validateProfileRegistrations(liteManifest, "lite");
+await validateProfileArchives(proDir, proManifest, "pro");
+await validateProfileArchives(liteDir, liteManifest, "lite");
+
 const liteConfig = await readFile(path.join(liteDir, "ui", "build-config.js"), "utf8");
 for (const metric of ["score", "health", "money", "map"]) assert(liteConfig.includes(`\"${metric}\"`), `Lite missing allowed metric ${metric}`);
 for (const forbidden of ["kills", "deaths", "adr", "hs", "record", "premier", "current-map-rank", "elo", "recent-record"]) {
@@ -52,7 +57,91 @@ for (const dir of [proDir, liteDir]) {
   }
 }
 
-console.log("Release policy OK: Pro/Lite feature gates and customer-owned provider key architecture passed.");
+console.log("Release policy OK: Pro/Lite feature gates, bundled profiles, and customer-owned provider key architecture passed.");
+
+function validateProfileRegistrations(manifest, flavor) {
+  const profiles = manifest.Profiles ?? [];
+  const expectedDeviceTypes = [0, 1, 2, 7, 9];
+  const expectedCount = flavor === "pro" ? expectedDeviceTypes.length * 2 : expectedDeviceTypes.length;
+  assert(profiles.length === expectedCount, `${flavor} profile registration count ${profiles.length} != ${expectedCount}`);
+
+  for (const deviceType of expectedDeviceTypes) {
+    const matching = profiles.filter((profile) => profile.DeviceType === deviceType);
+    const expectedForDevice = flavor === "pro" ? 2 : 1;
+    assert(matching.length === expectedForDevice, `${flavor} DeviceType ${deviceType} profile count ${matching.length} != ${expectedForDevice}`);
+  }
+
+  for (const profile of profiles) {
+    assert(profile.AutoInstall === true, `${flavor} profile ${profile.Name} must auto install`);
+    assert(profile.DontAutoSwitchWhenInstalled === true, `${flavor} profile ${profile.Name} must not hijack the active profile`);
+    assert(profile.Readonly === false, `${flavor} profile ${profile.Name} must remain editable`);
+    assert(typeof profile.Name === "string" && profile.Name.startsWith("profiles/"), `${flavor} profile path must live under profiles/`);
+    if (flavor === "pro") {
+      assert(profile.Name.includes("-competitive-") || profile.Name.includes("-live-"), `Pro profile ${profile.Name} must declare competitive or live layout`);
+    } else {
+      assert(profile.Name.includes("-lite-"), `Lite profile ${profile.Name} must be the starter layout`);
+    }
+  }
+}
+
+async function validateProfileArchives(root, manifest, flavor) {
+  const allowedLiteMetrics = new Set(["score", "health", "money", "map"]);
+  for (const registration of manifest.Profiles ?? []) {
+    const file = path.join(root, `${registration.Name}.streamDeckProfile`);
+    const entries = readStoredZip(await readFile(file));
+    const rootManifestEntry = [...entries.keys()].find((name) => /\.sdProfile\/manifest\.json$/.test(name) && !name.includes("/Profiles/"));
+    const pageManifestEntry = [...entries.keys()].find((name) => /\.sdProfile\/Profiles\/[^/]+\/manifest\.json$/.test(name));
+    assert(rootManifestEntry, `${flavor} profile ${registration.Name} missing root manifest`);
+    assert(pageManifestEntry, `${flavor} profile ${registration.Name} missing page manifest`);
+
+    const rootManifest = JSON.parse(entries.get(rootManifestEntry).toString("utf8"));
+    const pageManifest = JSON.parse(entries.get(pageManifestEntry).toString("utf8"));
+    assert(rootManifest.Version === "2.0", `${flavor} profile ${registration.Name} must use profile format 2.0`);
+    assert(Array.isArray(rootManifest.Pages?.Pages) && rootManifest.Pages.Pages.length === 1, `${flavor} profile ${registration.Name} must contain one deterministic page`);
+
+    const controller = pageManifest.Controllers?.find((candidate) => candidate.Type === "Keypad");
+    assert(controller, `${flavor} profile ${registration.Name} missing Keypad controller`);
+    const actions = Object.values(controller.Actions ?? {});
+    assert(actions.length > 0, `${flavor} profile ${registration.Name} must contain actions`);
+
+    for (const action of actions) {
+      assert(action.UUID?.startsWith(`com.packrat.cs2-competitive-dashboard-${flavor}.`), `${flavor} profile ${registration.Name} contains foreign action ${action.UUID}`);
+      if (flavor === "lite") {
+        const family = action.UUID.split(".").at(-1);
+        assert(family === "live" || family === "status", `Lite profile ${registration.Name} exposes Pro family ${family}`);
+        if (family === "live") assert(allowedLiteMetrics.has(action.Settings?.metric), `Lite profile ${registration.Name} exposes Pro metric ${action.Settings?.metric}`);
+      }
+    }
+
+    if (flavor === "pro" && registration.Name.includes("-competitive-")) {
+      assert(actions.some((action) => action.UUID.endsWith(".competitive")), `Pro competitive profile ${registration.Name} missing Competitive action`);
+      assert(actions.some((action) => action.UUID.endsWith(".faceit")), `Pro competitive profile ${registration.Name} missing FACEIT action`);
+    }
+    if (flavor === "pro" && registration.Name.includes("-live-")) {
+      assert(actions.some((action) => action.UUID.endsWith(".live")), `Pro live profile ${registration.Name} missing Live action`);
+      assert(actions.some((action) => action.UUID.endsWith(".status")), `Pro live profile ${registration.Name} missing Status action`);
+    }
+  }
+}
+
+function readStoredZip(buffer) {
+  const entries = new Map();
+  let offset = 0;
+  while (offset + 4 <= buffer.length && buffer.readUInt32LE(offset) === 0x04034b50) {
+    const compression = buffer.readUInt16LE(offset + 8);
+    const size = buffer.readUInt32LE(offset + 18);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    assert(compression === 0, "Bundled profile ZIP entries must use deterministic store mode");
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = buffer.subarray(nameStart, nameStart + nameLength).toString("utf8");
+    entries.set(name, buffer.subarray(dataStart, dataStart + size));
+    offset = dataStart + size;
+  }
+  assert(entries.size >= 2, "Bundled profile archive did not expose expected local ZIP entries");
+  return entries;
+}
 
 function assert(condition, message) {
   if (!condition) throw new Error(`Release policy failed: ${message}`);
