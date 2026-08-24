@@ -31,12 +31,12 @@ button { font: inherit; color: inherit; }
 .board-tab.is-active { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 13%, var(--card)); }
 .header-actions { display: flex; gap: calc(var(--u) * 1.1); }
 .header-button { width: var(--touch); padding: 0; font-size: calc(var(--title) * .43); }
-#notesGrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--u) * 48)), 1fr)); gap: var(--gap); align-content: stretch; overflow: hidden; }
+#notesGrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--u) * 48)), 1fr)); gap: var(--gap); align-content: stretch; grid-auto-rows: minmax(0, 1fr); overflow: hidden; }
 .note-card { min-width: 0; min-height: 0; border: 1px solid color-mix(in srgb, var(--text) 11%, transparent); border-radius: var(--radius); background: linear-gradient(145deg, color-mix(in srgb, var(--card) calc(var(--surface-alpha) * 100%), transparent), color-mix(in srgb, var(--card-2) calc(var(--surface-alpha) * 100%), transparent)); padding: calc(var(--u) * 2.2); display: flex; flex-direction: column; overflow: hidden; box-shadow: inset 0 1px 0 color-mix(in srgb, white 4%, transparent); }
 .card-heading { display: flex; gap: calc(var(--u) * 1.2); align-items: center; margin: 0 calc(var(--u) * .4) calc(var(--u) * 1.2); min-height: calc(var(--u) * 4.5); }
 .card-title { font-size: calc(var(--meta) * 1.12); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .category-pill { margin-left: auto; max-width: 48%; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: calc(var(--u) * .55) calc(var(--u) * 1.3); font-size: calc(var(--meta) * .78); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.note-list { min-height: 0; display: grid; grid-auto-rows: minmax(calc(var(--touch) * .82), 1fr); gap: calc(var(--u) * .75); overflow: hidden; }
+.note-list { min-height: 0; flex: 1 1 auto; display: grid; grid-auto-rows: minmax(calc(var(--touch) * .82), 1fr); gap: calc(var(--u) * .75); overflow: hidden; }
 .note-item { width: 100%; min-width: 0; min-height: calc(var(--touch) * .82); border: 0; border-radius: calc(var(--radius) * .66); background: transparent; display: grid; grid-template-columns: calc(var(--u) * 5.8) minmax(0, 1fr) auto; align-items: center; gap: calc(var(--u) * 1.4); padding: calc(var(--u) * .8) calc(var(--u) * 1.2); text-align: left; }
 .note-item.is-check { cursor: pointer; }
 .note-item.is-check:active { background: color-mix(in srgb, var(--accent) 10%, transparent); }

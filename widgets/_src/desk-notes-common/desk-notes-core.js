@@ -20,7 +20,10 @@
     sage: { card: '#14211d', card2: '#1b2c27', ink: '#f1f5f2', muted: '#9eb2aa', accent: '#8ed7ae' },
     ocean: { card: '#101d2a', card2: '#15283a', ink: '#f4f8fc', muted: '#9db4c7', accent: '#74c6ff' },
     plum: { card: '#211728', card2: '#2c1d35', ink: '#fbf5ff', muted: '#baa6c4', accent: '#d7a6ff' },
-    amber: { card: '#241d12', card2: '#312718', ink: '#fff8eb', muted: '#c4b18d', accent: '#ffc86b' }
+    amber: { card: '#241d12', card2: '#312718', ink: '#fff8eb', muted: '#c4b18d', accent: '#ffc86b' },
+    slate: { card: '#171a20', card2: '#20242b', ink: '#f5f7fa', muted: '#a8b0bb', accent: '#a8c7fa' },
+    rose: { card: '#28181e', card2: '#351f27', ink: '#fff5f7', muted: '#c2a5ad', accent: '#ff9fb8' },
+    teal: { card: '#102322', card2: '#17302f', ink: '#f0fbfa', muted: '#9ebdb9', accent: '#75e1d2' }
   };
 
   function getProp(name, fallback) {
@@ -312,8 +315,8 @@
   function visibleEntryLimit() {
     var w = Math.max(1, innerWidth || 840), h = Math.max(1, innerHeight || 344);
     if (!cfg.pro) return cfg.maxEntries || 8;
-    if (h < 450) return 10;
-    if (w < 760 && h < 900) return 12;
+    if (h < 450) return 8;
+    if (w < 760 && h < 900) return 10;
     if (w > 1500 || h > 1200) return cfg.maxEntries || 16;
     return 14;
   }
