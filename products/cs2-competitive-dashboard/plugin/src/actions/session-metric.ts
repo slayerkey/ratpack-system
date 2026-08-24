@@ -43,7 +43,7 @@ export class SessionMetricActionBase extends SingletonAction<SessionSettings> {
 
   private async refreshAll(): Promise<void> {
     await Promise.all([...this.visible].map(async (action) => {
-      const settings = await action.getSettings<SessionSettings>();
+      const settings = await action.getSettings() as SessionSettings;
       await this.render(action, this.metricFrom(settings));
     }));
   }

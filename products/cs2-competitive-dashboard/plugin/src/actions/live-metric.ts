@@ -47,7 +47,7 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
 
   private async refreshAll(): Promise<void> {
     await Promise.all([...this.visible].map(async (action) => {
-      const settings = await action.getSettings<MetricSettings>();
+      const settings = await action.getSettings() as MetricSettings;
       await this.render(action, this.metricFrom(settings));
     }));
   }
