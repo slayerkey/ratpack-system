@@ -83,6 +83,11 @@ function Test-ReusableCheckout {
 
     if (-not (Test-Path $Worktree -PathType Container)) { return $false }
 
+    if ($Config -and $Config.plugin_dir) {
+        $manifestPath = Join-Path (Join-Path $Worktree ([string]$Config.plugin_dir)) "manifest.json"
+        if (-not (Test-Path $manifestPath -PathType Leaf)) { return $false }
+    }
+
     $gitMarker = Join-Path $Worktree ".git"
     if ($Config -and $Config.repository) {
         if (-not (Test-Path $gitMarker -PathType Container)) { return $false }
@@ -143,8 +148,8 @@ function Remove-StaleCheckout {
             if ($attempt -lt 8) {
                 Write-Host "Windows is still releasing the old development folder. Retrying..." -ForegroundColor DarkGray
                 if ($Cli -and $Uuid) {
-                    [void](Invoke-StreamDeckCli -Cli $Cli -Arguments @("stop", $Uuid))
-                    [void](Invoke-StreamDeckCli -Cli $Cli -Arguments @("unlink", "-d", $Uuid))
+                    [void](Invoke-StreamDeckCli -Cli $cli -Arguments @("stop", $Uuid))
+                    [void](Invoke-StreamDeckCli -Cli $cli -Arguments @("unlink", "-d", $Uuid))
                 }
             }
         }
