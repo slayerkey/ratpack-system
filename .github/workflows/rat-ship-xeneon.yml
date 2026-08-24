@@ -9,6 +9,7 @@ on:
       - 'tools/art/**'
       - 'tools/xeneon/**'
       - 'tools/ship/**'
+      - 'tools/local/rat.ps1'
       - 'skills/rat-ship/**'
       - '.github/workflows/rat-ship-xeneon.yml'
   workflow_dispatch:
@@ -65,6 +66,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
+      - name: Validate local Rat command syntax and batch parsing
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/local/rat.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Host $_.Message }
+            throw 'tools/local/rat.ps1 has PowerShell syntax errors'
+          }
+          & pwsh -NoLogo -NoProfile -File tools/local/rat.ps1 help weather-timeline-pro weather-timeline smoke-third-slug
+          if ($LASTEXITCODE -ne 0) { throw 'rat.ps1 did not accept multiple slug arguments' }
 
       - name: Install deterministic ship dependencies
         shell: pwsh
