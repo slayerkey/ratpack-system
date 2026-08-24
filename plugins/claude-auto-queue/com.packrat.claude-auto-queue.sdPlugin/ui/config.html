@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Claude Auto Queue</title>
+  <link rel="stylesheet" href="pi.css">
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">PACKRAT</div>
+      <h1>Claude Auto Queue</h1>
+      <p>Queue the next job without interrupting what Claude is already doing.</p>
+    </section>
+
+    <section class="card setup">
+      <div>
+        <h2>Claude Code Integration</h2>
+        <p class="help">Open the local setup page to connect supported Claude Code hooks and run the feasibility checks.</p>
+      </div>
+      <button id="openSetup" type="button">Open Local Setup</button>
+    </section>
+
+    <section id="promptCard" class="card hidden">
+      <h2>Queue Prompt</h2>
+      <label for="label">Key label</label>
+      <input id="label" type="text" maxlength="18" placeholder="RUN TESTS">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" rows="7" maxlength="10000" placeholder="Run the test suite and fix any failures."></textarea>
+      <div class="help">Pressing this key stores the prompt locally. Claude receives it only after the current turn finishes.</div>
+    </section>
+
+    <section id="controlCard" class="card hidden">
+      <h2>Queue Control</h2>
+      <label for="operation">Operation</label>
+      <select id="operation">
+        <option value="remove-next">Remove next</option>
+        <option value="rotate">Move next to end</option>
+        <option value="clear">Clear queue</option>
+      </select>
+    </section>
+
+    <section class="privacy">
+      <strong>Local by design</strong>
+      <p>Queued prompts stay on this computer. PackRat does not read or modify Claude credentials and does not upload your prompts.</p>
+    </section>
+  </main>
+  <script src="pi.js"></script>
+</body>
+</html>
