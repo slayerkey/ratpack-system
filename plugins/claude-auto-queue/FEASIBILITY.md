@@ -2,7 +2,7 @@
 
 ## Current gate
 
-**Automated feasibility: PASS.** The hardened spike passes Windows build, **19/19 deterministic regression tests**, the official Elgato Stream Deck validator, and the RatPack context checks.
+**Automated feasibility: PASS.** The hardened spike passes Windows build, **20/20 deterministic regression tests**, the official Elgato Stream Deck validator, and the RatPack context checks.
 
 **Interactive host feasibility: REQUIRED.** Do not merge or start final Marketplace polish until the signed-in Windows Claude Code same-session handoff is proven on a real user session.
 
@@ -44,9 +44,11 @@ The local setup API binds only to `127.0.0.1`, requires its canonical Host heade
 
 PackRat keeps a first-change recovery backup of Claude settings. Hook connect/disconnect writes are atomic and retry if another process edits `~/.claude/settings.json` during PackRat's update window, so concurrent settings changes are merged rather than knowingly overwritten.
 
+Queued prompts are capped at **9,000 characters** so PackRat's factual Stop feedback wrapper remains comfortably below Claude Code's 10,000-character `additionalContext` spill behavior. The wrapper describes the queued text as a user-authored next request rather than masquerading as an out-of-band system command.
+
 ## Deterministic automated acceptance — PASS
 
-The 19-test Windows fixture suite proves:
+The 20-test Windows fixture suite proves:
 
 1. Claude version output is parsed and compared numerically.
 2. Claude Code versions below 2.1.163 are rejected for Auto Queue integration.
@@ -59,14 +61,15 @@ The 19-test Windows fixture suite proves:
 9. A concurrent Claude settings edit is preserved by retrying and merging the PackRat hook change.
 10. The local server accepts only its canonical localhost Host header.
 11. Local setup mutations require JSON and reject cross-site browser requests.
-12. A queued prompt is emitted only at a Stop boundary.
-13. Background work prevents queue dequeue.
-14. Six automatic continuations are allowed and item seven remains queued.
-15. A fresh manual turn resets the continuation budget.
-16. Permission and StopFailure states are explicit.
-17. Multiple sessions never cause an arbitrary target guess.
-18. Explicit session binding routes queued work only to the selected Claude session.
-19. Queue state survives plugin/service restart.
+12. A queued prompt is emitted only at a Stop boundary using factual user-authored context.
+13. Overlong queued prompts are rejected before PackRat approaches Claude's `additionalContext` spill threshold.
+14. Background work prevents queue dequeue.
+15. Six automatic continuations are allowed and item seven remains queued.
+16. A fresh manual turn resets the continuation budget.
+17. Permission and StopFailure states are explicit.
+18. Multiple sessions never cause an arbitrary target guess.
+19. Explicit session binding routes queued work only to the selected Claude session.
+20. Queue state survives plugin/service restart.
 
 The clean Windows CI gate also builds the Stream Deck plugin and passes `streamdeck validate` with the official Elgato CLI.
 
