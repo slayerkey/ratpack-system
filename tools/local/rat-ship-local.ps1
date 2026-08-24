@@ -25,7 +25,7 @@ function Invoke-LocalStep {
         [scriptblock]$Command
     )
     Write-Host "Local Rat Ship: $Label..." -ForegroundColor DarkGray
-    & $Command
+    & $Command | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "Local Rat Ship failed during '$Label' with exit code $LASTEXITCODE."
     }
