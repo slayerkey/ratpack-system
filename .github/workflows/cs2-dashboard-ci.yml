@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   plugin:
@@ -35,24 +35,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: products/cs2-competitive-dashboard/plugin/package-lock.json
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Commit generated dependency lock
-        if: github.event_name == 'push' && github.ref_name == 'product/cs2-competitive-dashboard' && github.actor != 'github-actions[bot]'
-        working-directory: .
-        shell: pwsh
-        run: |
-          if (git status --porcelain -- products/cs2-competitive-dashboard/plugin/package-lock.json) {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add products/cs2-competitive-dashboard/plugin/package-lock.json
-            git commit -m "build: lock CS2 dashboard dependencies"
-            git push origin HEAD:product/cs2-competitive-dashboard
-          } else {
-            Write-Host "Dependency lock already current."
-          }
+      - name: Install locked dependencies
+        run: npm ci
 
       - name: Typecheck fixtures and build both flavors
         run: npm run check
