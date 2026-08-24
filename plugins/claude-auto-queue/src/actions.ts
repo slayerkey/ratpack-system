@@ -23,9 +23,15 @@ type QueueSettings = {
   operation?: "remove-next" | "clear" | "rotate";
 };
 
+const service: any = runtime.service;
+const renderPromptKey = renderQueuePrompt as (
+  label?: string,
+  feedback?: { ok?: boolean; text?: string } | null
+) => string;
+
 async function paintStatusKey(key: KeyAction<QueueSettings>, settings: QueueSettings) {
-  const session = runtime.service.getDisplaySession(settings?.sessionId ?? null);
-  const label = runtime.service.getProjectLabel(session);
+  const session = service.getDisplaySession(settings?.sessionId ?? null);
+  const label = service.getProjectLabel(session);
   await key.setImage(keyImage(renderStatus(session, label)));
 }
 
@@ -33,7 +39,7 @@ async function paintStatusKey(key: KeyAction<QueueSettings>, settings: QueueSett
 export class ClaudeStatusAction extends SingletonAction<QueueSettings> {
   constructor() {
     super();
-    runtime.service.subscribe(() => void this.paintAll());
+    service.subscribe(() => void this.paintAll());
     setInterval(() => void this.paintAll(), 1000).unref();
   }
 
@@ -63,7 +69,7 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
     if (!ev.action.isKey()) return;
     const settings = ev.payload.settings ?? {};
     await ev.action.setImage(
-      keyImage(renderQueuePrompt(settings.label || "QUEUE PROMPT"))
+      keyImage(renderPromptKey(settings.label || "QUEUE PROMPT"))
     );
   }
 
@@ -71,7 +77,7 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
     if (!ev.action.isKey()) return;
     const settings = ev.payload.settings ?? {};
     await ev.action.setImage(
-      keyImage(renderQueuePrompt(settings.label || "QUEUE PROMPT"))
+      keyImage(renderPromptKey(settings.label || "QUEUE PROMPT"))
     );
   }
 
@@ -79,10 +85,10 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
     const settings = ev.payload.settings ?? {};
     const prompt = settings.prompt?.trim() || "Continue with the next logical implementation step.";
     try {
-      const item = await runtime.service.enqueue(prompt, settings.sessionId ?? null);
+      const item = await service.enqueue(prompt, settings.sessionId ?? null);
       await ev.action.setImage(
         keyImage(
-          renderQueuePrompt(settings.label || "QUEUE PROMPT", {
+          renderPromptKey(settings.label || "QUEUE PROMPT", {
             ok: true,
             text: `QUEUED #${item.position}`
           })
@@ -92,7 +98,7 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
     } catch (error) {
       await ev.action.setImage(
         keyImage(
-          renderQueuePrompt(settings.label || "QUEUE PROMPT", {
+          renderPromptKey(settings.label || "QUEUE PROMPT", {
             ok: false,
             text: "SELECT SESSION"
           })
@@ -104,7 +110,7 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
     setTimeout(async () => {
       try {
         await ev.action.setImage(
-          keyImage(renderQueuePrompt(settings.label || "QUEUE PROMPT"))
+          keyImage(renderPromptKey(settings.label || "QUEUE PROMPT"))
         );
       } catch {
         // Key may have disappeared.
@@ -117,7 +123,7 @@ export class QueuePromptAction extends SingletonAction<QueueSettings> {
 export class NextPromptAction extends SingletonAction<QueueSettings> {
   constructor() {
     super();
-    runtime.service.subscribe(() => void this.paintAll());
+    service.subscribe(() => void this.paintAll());
   }
 
   override async onWillAppear(ev: WillAppearEvent<QueueSettings>): Promise<void> {
@@ -136,7 +142,7 @@ export class NextPromptAction extends SingletonAction<QueueSettings> {
   }
 
   private async paint(key: KeyAction<QueueSettings>, settings: QueueSettings): Promise<void> {
-    const session = runtime.service.getDisplaySession(settings.sessionId ?? null);
+    const session = service.getDisplaySession(settings.sessionId ?? null);
     await key.setImage(keyImage(renderNext(session)));
   }
 }
@@ -159,9 +165,9 @@ export class QueueControlAction extends SingletonAction<QueueSettings> {
     const settings = ev.payload.settings ?? {};
     const operation = settings.operation ?? "remove-next";
     try {
-      if (operation === "clear") await runtime.service.clearQueue(settings.sessionId ?? null);
-      else if (operation === "rotate") await runtime.service.moveNextToEnd(settings.sessionId ?? null);
-      else await runtime.service.removeNext(settings.sessionId ?? null);
+      if (operation === "clear") await service.clearQueue(settings.sessionId ?? null);
+      else if (operation === "rotate") await service.moveNextToEnd(settings.sessionId ?? null);
+      else await service.removeNext(settings.sessionId ?? null);
       await ev.action.showOk();
     } catch {
       await ev.action.showAlert();
