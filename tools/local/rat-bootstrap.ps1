@@ -29,12 +29,12 @@ function Remove-KnownGeneratedArtifacts {
         Where-Object { $_.Name -ne "_src" -and $_.Name -notlike "_*" } |
         ForEach-Object {
             $index = Join-Path $_.FullName "index.html"
-            if (-not (Test-Path $index)) { return }
-
-            $relative = "widgets/$($_.Name)/index.html"
-            & git -C $RepoRoot ls-files --error-unmatch -- $relative *> $null
-            if ($LASTEXITCODE -ne 0) {
-                Remove-Item $index -Force -ErrorAction SilentlyContinue
+            if (Test-Path $index) {
+                $relative = "widgets/$($_.Name)/index.html"
+                & git -C $RepoRoot ls-files --error-unmatch -- $relative *> $null
+                if ($LASTEXITCODE -ne 0) {
+                    Remove-Item $index -Force -ErrorAction SilentlyContinue
+                }
             }
         }
 }
