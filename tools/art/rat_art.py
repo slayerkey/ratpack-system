@@ -27,6 +27,9 @@ DEVICE = ASSET_DIR / "xeneon-edge-straight.png"
 DEVICE_QUAD = ASSET_DIR / "xeneon-edge-straight.quad"
 RAT = ASSET_DIR / "ratpack-icon-transparent.png"
 SLOT_ORDER = ["S_H", "S_V", "M_H", "M_V", "L_H", "L_V", "XL_H", "XL_V"]
+CONTENT_DIVIDER_Y = 690
+CONTENT_FOOTER_TEXT_Y = 744
+MARKETPLACE_ORDER = ["1-hero.png", "3-features.png", "2-showcase.png", "4-settings.png", "5-sizes.png"]
 
 
 def fail(msg: str) -> None:
@@ -143,16 +146,20 @@ def header(canvas: Image.Image, title: str, subtitle: str | None = None) -> int:
     return 176
 
 
-def packrat_signature(canvas: Image.Image, y: int = 892) -> None:
+def draw_content_divider(canvas: Image.Image) -> None:
     draw = ImageDraw.Draw(canvas)
-    label = "PACKRAT"
-    font = resolve_font(23, True)
-    text_box = draw.textbbox((0, 0), label, font=font)
-    text_width = text_box[2] - text_box[0]
-    icon_size = 42
-    gap = 13
-    total_width = icon_size + gap + text_width
-    x = (W - total_width) // 2
+    draw.line((170, CONTENT_DIVIDER_Y, W - 170, CONTENT_DIVIDER_Y), fill=(80, 95, 108, 120), width=1)
+
+
+def packrat_signature(canvas: Image.Image, y: int = 892) -> None:
+    """Render the footer brand mark as the PackRat icon only.
+
+    Marketplace artwork intentionally avoids repeating the PACKRAT wordmark in
+    the footer. Product/platform text may still appear elsewhere when useful.
+    """
+    draw = ImageDraw.Draw(canvas)
+    icon_size = 46
+    x = (W - icon_size) // 2
 
     if RAT.exists():
         rat = Image.open(RAT).convert("RGBA")
@@ -164,15 +171,13 @@ def packrat_signature(canvas: Image.Image, y: int = 892) -> None:
             (max(1, int(rat.width * scale)), max(1, int(rat.height * scale))),
             Image.Resampling.LANCZOS,
         )
-        glow = Image.new("RGBA", (72, 72), (0, 0, 0, 0))
+        glow = Image.new("RGBA", (76, 76), (0, 0, 0, 0))
         glow_draw = ImageDraw.Draw(glow)
-        glow_draw.ellipse((10, 10, 62, 62), fill=(*ACCENT, 24))
-        canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(12)), (x - 15, y - 36))
-        canvas.alpha_composite(rat, (x + (icon_size - rat.width) // 2, y - rat.height // 2))
+        glow_draw.ellipse((10, 10, 66, 66), fill=(*ACCENT, 24))
+        canvas.alpha_composite(glow.filter(ImageFilter.GaussianBlur(12)), (W // 2 - 38, y - 38))
+        canvas.alpha_composite(rat, ((W - rat.width) // 2, y - rat.height // 2))
     else:
-        draw.ellipse((x + 9, y - 12, x + 33, y + 12), fill=(*ACCENT, 180))
-
-    draw.text((x + icon_size + gap, y), label, font=font, fill=(*MUTED, 235), anchor="lm")
+        draw.ellipse((x + 10, y - 13, x + 36, y + 13), fill=(*ACCENT, 180))
 
 
 def footer(
@@ -318,26 +323,28 @@ def settings(shots: Path, out: Path, section: dict[str, Any]) -> None:
     box_width = min(390, (1640 - gap * (len(panels) - 1)) // len(panels))
     total = box_width * len(panels) + gap * (len(panels) - 1)
     x = (W - total) // 2
+    panel_top = 285
+    label_y = 610
     for panel_meta in panels:
         if not isinstance(panel_meta, dict):
             fail("each settings.panels entry must be an object")
         label = require_text(panel_meta.get("label"), "settings panel label")
         file_name = require_text(panel_meta.get("file"), "settings panel file")
-        panel = framed_shot(shots / file_name, (box_width, 280))
-        canvas.alpha_composite(panel, (x + (box_width - panel.width) // 2, 315))
+        panel = framed_shot(shots / file_name, (box_width, 250))
+        canvas.alpha_composite(panel, (x + (box_width - panel.width) // 2, panel_top))
         draw.text(
-            (x + box_width // 2, 620),
+            (x + box_width // 2, label_y),
             label,
             font=resolve_font(25, True),
             fill=(*WHITE, 255),
             anchor="mm",
         )
         x += box_width + gap
+    draw_content_divider(canvas)
     tags = section.get("tags")
     if isinstance(tags, str) and tags.strip():
-        draw.line((170, 690, W - 170, 690), fill=(80, 95, 108, 120), width=1)
         tag_font = fit_font(draw, tags, 1500, 23, 17, bold=False)
-        draw.text((W // 2, 740), tags, font=tag_font, fill=(*MUTED, 255), anchor="mm")
+        draw.text((W // 2, CONTENT_FOOTER_TEXT_Y), tags, font=tag_font, fill=(*MUTED, 255), anchor="mm")
     footer(canvas)
     canvas.convert("RGB").save(out / "4-settings.png", quality=96)
 
@@ -350,45 +357,39 @@ def sizes(shots: Path, out: Path, section: dict[str, Any]) -> None:
     header(canvas, title, subtitle)
     draw = ImageDraw.Draw(canvas)
     specs = [
-        ("S slot", "S_H.png", 300, 230),
-        ("M slot", "M_V.png", 255, 390),
-        ("L slot", "L_H.png", 390, 230),
-        ("XL slot", "XL_H.png", 450, 230),
+        ("S slot", "S_H.png", 300, 210),
+        ("M slot", "M_V.png", 255, 300),
+        ("L slot", "L_H.png", 390, 210),
+        ("XL slot", "XL_H.png", 450, 210),
     ]
     gap = 35
     widths = [spec[2] for spec in specs]
     total = sum(widths) + gap * 3
     x = (W - total) // 2
-    base = 300
+    base = 285
+    visual_band = 300
+    label_y = 640
     for label, file_name, max_width, max_height in specs:
         panel = framed_shot(shots / file_name, (max_width, max_height))
-        py = base + (390 - panel.height) // 2
+        py = base + (visual_band - panel.height) // 2
         canvas.alpha_composite(panel, (x + (max_width - panel.width) // 2, py))
         draw.text(
-            (x + max_width // 2, 720),
+            (x + max_width // 2, label_y),
             label,
             font=resolve_font(24, True),
             fill=(*WHITE, 255),
             anchor="mm",
         )
         x += max_width + gap
+    draw_content_divider(canvas)
     footer_font = fit_font(draw, footer_text, 1500, 21, 16, bold=False)
-    draw.text((W // 2, 770), footer_text, font=footer_font, fill=(*MUTED, 255), anchor="mm")
+    draw.text((W // 2, CONTENT_FOOTER_TEXT_Y), footer_text, font=footer_font, fill=(*MUTED, 255), anchor="mm")
     footer(canvas)
     canvas.convert("RGB").save(out / "5-sizes.png", quality=96)
 
 
 def contact_sheet(out: Path, name: str) -> None:
-    files = [
-        out / f"{index}-{file_name}.png"
-        for index, file_name in [
-            (1, "hero"),
-            (2, "showcase"),
-            (3, "features"),
-            (4, "settings"),
-            (5, "sizes"),
-        ]
-    ]
+    files = [out / file_name for file_name in MARKETPLACE_ORDER]
     thumb_width, thumb_height = 768, 384
     sheet = Image.new("RGB", (1600, 1320), (7, 9, 12))
     draw = ImageDraw.Draw(sheet)
@@ -446,12 +447,14 @@ def render_xeneon(slug: str, shots: Path, out: Path) -> None:
     contact_sheet(out, name)
 
     report = {
-        "schema_version": 2,
+        "schema_version": 3,
         "slug": slug,
         "image_generation": "disabled",
         "renderer": "tools/art/rat_art.py",
         "product_config": str(config_path.relative_to(ROOT)).replace("\\", "/"),
         "product_config_sha256": sha(config_path),
+        "marketplace_order": MARKETPLACE_ORDER,
+        "footer_branding": "logo-only",
         "outputs": {
             path.name: {"size": Image.open(path).size, "sha256": sha(path)}
             for path in sorted(out.glob("*.png"))
