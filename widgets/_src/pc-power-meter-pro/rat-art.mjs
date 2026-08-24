@@ -49,7 +49,7 @@ export async function prepare(page, context) {
         const isZero = mode === 'zero';
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:session', JSON.stringify({
           sensorId: 'total', startedAt: now - 2 * 3600000, lastSeenAt: now - 1000,
-          energyWh: isZero ? 0 : (mode === 'high' ? 25000 : (mode === 'normal' ? 823.01 : 840)),
+          energyWh: isZero ? 0 : (mode === 'high' ? 25000 : 840),
           measuredMs: isZero ? 0 : 7200000,
           peakW: isZero ? 0 : (mode === 'high' ? 12500 : 517),
           samples: isZero ? 1 : 7200,
