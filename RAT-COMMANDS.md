@@ -1,6 +1,6 @@
 # RatPack command cheat sheet
 
-You only need to remember three commands for normal use.
+You only need to remember a few commands for normal use.
 
 ## `rat ship <slug>`
 
@@ -45,6 +45,39 @@ GitHub Actions never receives Maker Console cookies, passwords, browser profile 
 
 The first time the local Maker Console profile is used, Elgato may require you to sign in manually in the browser window. After that, the persistent profile should normally reuse the session until Elgato expires it.
 
+## `rat dev <slug>`
+
+This is the normal one-command local development updater for Stream Deck plugins that need a real local host application to test.
+
+Example:
+
+```text
+rat dev discord-bridge
+```
+
+What it does:
+
+1. Fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout.
+2. Prefers `origin/product/<slug>` while a product is in development, then falls back to `origin/main` after the plugin is merged.
+3. Reuses a detached development worktree under:
+
+```text
+out\dev\worktrees\<slug>
+```
+
+4. Installs plugin dependencies only when needed.
+5. Runs the plugin build and automated tests declared by the product.
+6. Runs the official Elgato Stream Deck CLI validator.
+7. Removes the previously linked development copy of the same plugin.
+8. Links the fresh plugin into Stream Deck developer mode and restarts it.
+9. Opens the product's local status page when `rat-dev.json` declares one.
+
+Normal iteration should not use Downloads, hand-copied ZIP folders, or manually installed development packages. Product-specific local state stays inside the normal Stream Deck application or the ignored RatPack `out` directory.
+
+`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`.
+
+The first run may install the official `@elgato/cli` once. Current Stream Deck CLI development requires Node.js 24 or newer.
+
 ## `rat status`
 
 Shows:
@@ -58,7 +91,7 @@ Use this if you want to know whether your local RatPack checkout is clean and cu
 
 ## `rat help`
 
-Prints the command cheat sheet in the terminal.
+Prints the main command cheat sheet in the terminal.
 
 ## Optional commands
 
@@ -66,7 +99,7 @@ Prints the command cheat sheet in the terminal.
 
 Runs the fresh Rat Ship GitHub pipeline and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
 
-This is the old `rat ship` behavior and is useful when you specifically want the files only.
+This is useful when you specifically want the files only.
 
 ### `rat stage <slug>`
 
@@ -108,7 +141,13 @@ Generated output stays inside:
 C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out
 ```
 
-`out/` is ignored by Git, so generated marketplace kits do not clutter source control or the Downloads folder.
+`out/` is ignored by Git, so generated marketplace kits and development worktrees do not clutter source control or the Downloads folder.
+
+Development worktrees live under:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\worktrees
+```
 
 The shared local Rat Ship browser runtime lives in:
 
