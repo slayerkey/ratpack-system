@@ -17,6 +17,14 @@
   "qa": "products/cs2-competitive-dashboard/QA.md",
   "release": "products/cs2-competitive-dashboard/RELEASE.md",
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
+  "bundled_profiles": {
+    "value_proposition": "Pro includes separate ready-to-use Competitive and Live Match layouts instead of requiring manual key-by-key setup",
+    "layouts": ["Competitive", "Live Match"],
+    "device_types": ["Stream Deck", "Stream Deck Mini", "Stream Deck XL", "Stream Deck +", "Stream Deck Neo"],
+    "auto_install": true,
+    "auto_switch_on_install": false,
+    "editable": true
+  },
   "customer_api_keys_required": true,
   "customer_api_key_scope": {
     "leetify": "required for Leetify-backed Premier and Competitive features",
@@ -37,6 +45,7 @@
   ],
   "release_gate": [
     "shared source builds Pro and Lite deterministically",
+    "bundled Pro Competitive and Live Match profiles pass profile-policy checks",
     "unit and fixture tests pass",
     "direct customer-key provider tests pass",
     "production dependency audit passes",
@@ -46,6 +55,7 @@
     "Pro/Lite release-policy checks",
     "property inspector provider-key setup/error-state QA",
     "GSI installer custom-library fixtures",
+    "real bundled profile import smoke test on Stream Deck",
     "real customer-owned Leetify and FACEIT key smoke test",
     "real normal-player CS2 GSI payload smoke test",
     "physical Stream Deck smoke test where required",
