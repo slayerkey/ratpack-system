@@ -17,12 +17,12 @@ This spike deliberately does **not** claim access to Claude Code's private inter
 The spike is intentionally limited to documented Claude Code integration surfaces:
 
 - HTTP hooks written into the user's normal `~/.claude/settings.json` hook configuration.
-- `UserPromptSubmit` to identify a fresh manual turn and reset the automatic continuation budget.
+- `UserPromptSubmit` to identify a fresh manual turn, establish the authoritative `session_id`, and reset the automatic continuation budget.
 - `Stop` with `hookSpecificOutput.additionalContext` to continue the same conversation with the next PackRat queued prompt.
 - `PermissionRequest`, `Notification`, `PermissionDenied`, `PostToolUse`, and `PostToolUseFailure` for attention-state transitions.
 - `StopFailure` for explicit API, authentication, rate-limit, overload, billing, and related failure states.
 - `TaskCreated` and `TaskCompleted` only as optional display enrichment.
-- `claude agents --json` as a read-only reconciliation source for live session identity and waiting state.
+- `claude agents --json` only as best-effort, read-only reconciliation for discoverability and display enrichment. Hook `session_id` remains authoritative because agent-view coverage and waiting-state fidelity can vary by Claude Code version.
 
 Claude Code **2.1.163 or newer** is required. The local setup page refuses to connect the PackRat hooks on older or unparseable versions because the product depends on supported Stop-hook `additionalContext` continuation.
 
@@ -80,9 +80,9 @@ This is the one boundary a clean CI runner cannot prove because it requires an a
 After `rat dev claude-auto-queue` links the spike plugin:
 
 1. Open one normal Claude Code session in a safe test project.
-2. Open `http://127.0.0.1:19741/` and verify the exact Claude version is shown as compatible and the session appears.
+2. Open `http://127.0.0.1:19741/` and verify the exact Claude version is shown as compatible. A session may already appear through best-effort agent discovery, but that is **not** a requirement.
 3. Press **Connect Claude Code**. Existing `~/.claude/settings.json` content must remain intact.
-4. Start a normal Claude turn.
+4. Start a normal Claude turn. Verify the local page receives a `UserPromptSubmit` hook and the exact session now appears. This hook-learned `session_id` is the authoritative target.
 5. While Claude is visibly working, enqueue two harmless follow-ups, for example `Reply with exactly: AUTO QUEUE STEP 1` and `Reply with exactly: AUTO QUEUE STEP 2`.
 6. Do not type into Claude again. The first queued task must begin when the current turn stops, and the second must follow it in the **same conversation/session**.
 7. Verify the queue count moves `2 -> 1 -> 0` and status progresses `WORKING -> WORKING -> FINISHED`.
