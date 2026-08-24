@@ -29,7 +29,8 @@ if (!existsSync(submissionPath)) throw new Error('SHIP_KIT/submission.json is re
 const prod = JSON.parse(readFileSync(submissionPath, 'utf8'));
 if (prod.slug !== slug || prod.type !== 'widget') throw new Error('submission metadata does not match requested widget');
 
-const media = ['01_search_icon.png','02_cover.png','03_gallery_01.png','04_gallery_02.png','05_gallery_03.png','06_gallery_04.png'];
+const galleryFiles = ['03_gallery_01.png','04_gallery_02.png','05_gallery_03.png','06_gallery_04.png'];
+const media = ['01_search_icon.png','02_cover.png',...galleryFiles];
 const required = ['PASTE_description.txt','PASTE_release_notes.txt',...media];
 const missing = required.filter(f => !existsSync(join(KIT, f)));
 const packages = readdirSync(KIT).filter(f => /\.icuewidget$/i.test(f));
@@ -43,17 +44,19 @@ if (missing.length) throw new Error(`SHIP_KIT preflight failed:\n${missing.join(
 if (CHECK_KIT) {
   console.log(`RAT SHIP KIT PASS: ${prod.name} ${prod.version} | $${prod.price_usd}`);
   console.log(`package: ${packages[0]}`);
+  console.log(`gallery order: ${galleryFiles.join(' -> ')}`);
   process.exit(0);
 }
 
 const LOG = join(KIT, 'log');
 const LOG_ZIP = join(KIT, 'log.zip');
+const NO_RETRY = join(LOG, 'NO_RETRY.txt');
 mkdirSync(LOG, { recursive: true });
 
 const STATE = join(LOG, 'state.json');
 const state = RESUME && existsSync(STATE)
   ? JSON.parse(readFileSync(STATE, 'utf8'))
-  : { done: [], uploaded: [], detailsSelections: [], detailsProof: [], pricingProof: null, listboxProof: [] };
+  : { done: [], uploaded: [], detailsSelections: [], detailsProof: [], pricingProof: null, listboxProof: [], galleryProof: null };
 
 state.done ||= [];
 state.uploaded ||= [];
@@ -61,6 +64,7 @@ state.detailsSelections ||= [];
 state.detailsProof ||= [];
 state.pricingProof ||= null;
 state.listboxProof ||= [];
+state.galleryProof ||= null;
 
 const save = () => writeFileSync(STATE, JSON.stringify(state, null, 2));
 const done = id => state.done.includes(id);
@@ -83,6 +87,11 @@ function zipRecoveryLog() {
   const command = `Compress-Archive -Path '${LOG.replace(/'/g, "''")}\\*' -DestinationPath '${LOG_ZIP.replace(/'/g, "''")}' -Force`;
   const result = spawnSync(ps, ['-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-Command', command], { windowsHide: true, encoding: 'utf8' });
   return result.status === 0 && existsSync(LOG_ZIP) ? LOG_ZIP : null;
+}
+
+function stopRetrying(reason) {
+  writeFileSync(NO_RETRY, `${reason}\n`, 'utf8');
+  throw new Error(reason);
 }
 
 async function captureFailure(error) {
@@ -196,12 +205,16 @@ async function step(id, label, fn) {
   await snap(page, id);
 }
 
-async function namedControl(target, name) {
+async function namedControl(target, name, allowText = false) {
   const escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(`^${escaped}$`, 'i');
   for (const role of ['checkbox','radio','switch','button']) {
     const control = target.getByRole(role,{name:re}).first();
     if (await visible(control)) return control;
+  }
+  if (allowText) {
+    const text = target.getByText(re,{exact:true}).first();
+    if (await visible(text)) return text;
   }
   return null;
 }
@@ -289,6 +302,7 @@ function optionCandidates(value) {
 }
 
 async function inspectListboxes(target) {
+  await target.keyboard.press('Escape').catch(() => {});
   const triggers = target.locator('button[aria-haspopup="listbox"]');
   const out = [];
   for (let i = 0; i < await triggers.count(); i++) {
@@ -308,6 +322,7 @@ async function inspectListboxes(target) {
 }
 
 async function selectListboxValue(target, label, requested) {
+  await target.keyboard.press('Escape').catch(() => {});
   const candidates = optionCandidates(requested);
   const triggers = target.locator('button[aria-haspopup="listbox"]');
 
@@ -352,6 +367,7 @@ async function selectListboxValue(target, label, requested) {
 
   if (!targetTrigger) throw new Error(`Maker Console no longer offers ${label.toLowerCase()}: ${requested}`);
 
+  await targetTrigger.scrollIntoViewIfNeeded().catch(() => {});
   await targetTrigger.click();
   await target.waitForTimeout(250);
 
@@ -366,7 +382,11 @@ async function selectListboxValue(target, label, requested) {
 
   const escaped = actual.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   await target.getByRole('option',{name:new RegExp(`^${escaped}$`,'i')}).first().click();
-  await target.waitForTimeout(450);
+  await target.waitForTimeout(250);
+  // Maker Console currently leaves some listboxes open even after selecting the
+  // checked option. Always close it before locating pricing controls below it.
+  await target.keyboard.press('Escape').catch(() => {});
+  await target.waitForTimeout(250);
 
   const after = ((await targetTrigger.textContent()) || '').replace(/\s+/g,' ').trim();
   if (after.toLowerCase() !== actual.toLowerCase()) {
@@ -381,10 +401,16 @@ async function selectListboxValue(target, label, requested) {
 }
 
 async function configurePrice(target) {
+  await target.keyboard.press('Escape').catch(() => {});
+  const monetization = target.getByText(/^monetization$/i).first();
+  if (await monetization.count()) await monetization.scrollIntoViewIfNeeded().catch(() => {});
+  await target.waitForTimeout(250);
+
   if (prod.price_usd > 0) {
     const paid = await namedControl(target, 'Paid');
     if (!paid) throw new Error('paid pricing control not found');
 
+    await paid.scrollIntoViewIfNeeded().catch(() => {});
     const before = await selectionSnapshot(paid);
     if (semanticSelection(before) !== true) await paid.click();
     await target.waitForTimeout(350);
@@ -410,6 +436,7 @@ async function configurePrice(target) {
   const free = await namedControl(target, 'Free');
   if (!free) throw new Error('free pricing control not found');
 
+  await free.scrollIntoViewIfNeeded().catch(() => {});
   const before = await selectionSnapshot(free);
   if (semanticSelection(before) !== true) await free.click();
   await target.waitForTimeout(350);
@@ -572,10 +599,64 @@ async function countGallery(target) {
 
 async function galleryInput(target) {
   const chosen = await chooseFileInput(target,'gallery');
-  if (chosen) return chosen.locator;
+  if (chosen) return chosen;
   const old = target.locator('input[type="file"][accept*="mp4"]').first();
-  if (await old.count()) return old;
+  if (await old.count()) {
+    return { locator:old, index:-1, info:{multiple:(await old.getAttribute('multiple')) !== null, method:'legacy'} };
+  }
   return null;
+}
+
+async function uploadGallery(target) {
+  const pending = galleryFiles.filter(file => !state.uploaded.includes(file));
+  if (!pending.length) {
+    mark('6-gallery');
+    return;
+  }
+
+  const input = await galleryInput(target);
+  if (!input) await mediaDiagnostic(target,'gallery upload input not found');
+
+  const before = await countGallery(target);
+  if (before == null) throw new Error('cannot verify gallery count');
+
+  const isMultiple = Boolean(input.info?.multiple);
+  if (isMultiple && state.uploaded.length === 0) {
+    // Upload the complete marketplace sequence as one FileList. Maker Console
+    // preserves FileList order more reliably than four separate append actions.
+    await input.locator.setInputFiles(pending.map(file => join(KIT,file)),{timeout:60000});
+    await target.waitForTimeout(4500);
+    const after = await countGallery(target);
+    if (after !== before + pending.length) {
+      await mediaDiagnostic(target,`gallery batch invariant failed: ${before} -> ${after}, expected +${pending.length}`);
+    }
+    state.uploaded.push(...pending);
+    state.galleryProof = {mode:'ordered-batch',files:[...pending],before,after};
+    save();
+    await snap(target,'gallery-ordered-batch');
+    mark('6-gallery');
+    return;
+  }
+
+  // Single-file uploaders commonly prepend the newest card. Upload in reverse so
+  // the visible final gallery is still 01, 02, 03, 04. Resume keeps prior proof.
+  const uploadOrder = isMultiple ? pending : [...pending].reverse();
+  for (const file of uploadOrder) {
+    const currentInput = await galleryInput(target);
+    if (!currentInput) await mediaDiagnostic(target,'gallery upload input disappeared during upload');
+    const countBefore = await countGallery(target);
+    await currentInput.locator.setInputFiles(join(KIT,file),{timeout:60000});
+    await target.waitForTimeout(2500);
+    const countAfter = await countGallery(target);
+    if (countAfter !== countBefore + 1) throw new Error(`gallery invariant failed for ${file}: ${countBefore} -> ${countAfter}`);
+    if (!state.uploaded.includes(file)) state.uploaded.push(file);
+    save();
+    await snap(target,`gallery-${file}`);
+  }
+
+  state.galleryProof = {mode:isMultiple?'individual-append':'reverse-for-prepend',files:[...galleryFiles],uploadOrder};
+  save();
+  mark('6-gallery');
 }
 
 async function editorLooksLikeDetails(target) {
@@ -588,6 +669,27 @@ async function editorLooksLikeMedia(target) {
   if (await target.locator('input[type="file"]').count()) return true;
   const body = ((await target.locator('body').innerText().catch(() => '')) || '').toLowerCase();
   return body.includes('thumbnail') || body.includes('gallery') || body.includes('cover image');
+}
+
+async function lockedMonetization(target) {
+  const body = ((await target.locator('body').innerText().catch(() => '')) || '').replace(/\s+/g,' ');
+  if (!/Monetization/i.test(body) || !/can't switch between paid and free after submitting the product/i.test(body)) return null;
+  const section = body.match(/Monetization(.{0,500})/i)?.[1] || body;
+  if (/\bPaid\b/i.test(section) && !/\bFree\b/i.test(section)) return 'paid';
+  if (/\bFree\b/i.test(section)) return 'free';
+  return 'locked';
+}
+
+async function rejectUnsafeLockedDraft(target) {
+  const locked = await lockedMonetization(target);
+  if (!locked) return;
+
+  const expected = Number(prod.price_usd) > 0 ? 'paid' : 'free';
+  await snap(target,'locked-monetization');
+  const reason = locked === expected
+    ? `Existing ${prod.name} product is already past the creation wizard with monetization locked to ${locked}. Rat Ship will not guess how to resume this incomplete draft. Delete the incomplete Maker Console draft/listing and run Rat Ship again.`
+    : `Existing ${prod.name} product has monetization locked to ${locked}, but submission.json requires ${expected}${expected === 'paid' ? ` at $${Number(prod.price_usd).toFixed(2)}` : ''}. Delete the incorrect Maker Console draft/listing and run Rat Ship again.`;
+  stopRetrying(reason);
 }
 
 async function finalReviewReady(target) {
@@ -657,6 +759,7 @@ async function run() {
     page = await livePage();
     await enterExistingEditor(page);
     page = await livePage();
+    await rejectUnsafeLockedDraft(page);
 
     if (await editorLooksLikeDetails(page)) {
       await step('4-details','Set category, dashboard sizes, orientation, language and price',async() => configureDetails(page));
@@ -701,29 +804,8 @@ async function run() {
   }
 
   await step('5-media','Upload icon and cover',async() => setIconAndCover(page));
-
-  for (const file of media.slice(2)) {
-    if (RESUME && state.uploaded.includes(file)) continue;
-    page = await livePage();
-
-    const before = await countGallery(page);
-    if (before == null) throw new Error('cannot verify gallery count');
-
-    const input = await galleryInput(page);
-    if (!input) await mediaDiagnostic(page,'gallery upload input not found');
-
-    await input.setInputFiles(join(KIT,file),{timeout:60000});
-    await page.waitForTimeout(2500);
-
-    const after = await countGallery(page);
-    if (after !== before + 1) throw new Error(`gallery invariant failed for ${file}: ${before} -> ${after}`);
-
-    state.uploaded.push(file);
-    save();
-    await snap(page,`gallery-${file}`);
-  }
-
-  mark('6-gallery');
+  page = await livePage();
+  await uploadGallery(page);
 
   await step('6-continue','Continue past media',async() => {
     for (let i=0;i<6;i++) {
@@ -763,7 +845,10 @@ async function run() {
     return 0;
   }
 
-  if (state.uploaded.length !== media.slice(2).length) throw new Error('gallery is incomplete, refusing submit');
+  if (state.uploaded.length !== galleryFiles.length) throw new Error('gallery is incomplete, refusing submit');
+  if (!state.galleryProof || JSON.stringify(state.galleryProof.files) !== JSON.stringify(galleryFiles)) {
+    throw new Error('gallery order is not proven, refusing submit');
+  }
 
   const summary = await page.locator('body').innerText();
   if (!summary.includes(prod.name) || !summary.includes(prod.version)) throw new Error('summary name/version mismatch, refusing submit');
@@ -784,7 +869,7 @@ async function run() {
 
   if (prod.marketplace_recommended_orientation) {
     const key = `orientation:${String(prod.marketplace_recommended_orientation).toLowerCase()}`;
-    if (!state.detailsSelections.includes(key)) throw new Error(`details step does not prove recommended orientation ${prod.marketplace_recommended_orientation}, refusing submit`);
+    if (!state.detailsSelections.includes(key)) throw new Error(`details step does not prove recommended orientation ${prod.marketplace_recommended_orientation}`);
   }
 
   const checkbox = page.getByRole('checkbox',{name:/automatically publish/i}).or(page.getByRole('switch',{name:/automatically publish/i})).first();
