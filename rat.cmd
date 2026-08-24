@@ -4,8 +4,28 @@ if /I "%~1"=="dev" (
     echo Usage: rat dev ^<slug^>
     exit /b 2
   )
+  %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-preflight.ps1" "%~2"
+  if errorlevel 1 (
+    %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2" >nul 2>&1
+    exit /b 1
+  )
   %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev.ps1" "%~2"
-  exit /b %ERRORLEVEL%
+  if errorlevel 1 (
+    echo.
+    echo Rat Dev failed. Opening the local development folder for inspection...
+    %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2"
+    exit /b 1
+  )
+  exit /b 0
+)
+if /I "%~1"=="dev-open" (
+  if "%~2"=="" (
+    echo Usage: rat dev-open ^<slug^>
+    exit /b 2
+  )
+  %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2"
+  if errorlevel 1 exit /b 1
+  exit /b 0
 )
 %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat.ps1" %*
 exit /b %ERRORLEVEL%
