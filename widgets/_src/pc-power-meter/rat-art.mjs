@@ -27,7 +27,7 @@ export async function prepare(page, context) {
 
   await page.addInitScript(({ sensors, mode }) => {
     globalThis.uniqueId = 'rat-art-power';
-    globalThis.powerSensor = 'total';
+    globalThis.powerSensor = mode === 'empty' ? '' : 'total';
     globalThis.textColor = '#F4F6F8';
     globalThis.accentColor = '#2BE86A';
     globalThis.graphColor = '#2BE86A';
@@ -35,6 +35,9 @@ export async function prepare(page, context) {
     globalThis.tr = async value => value;
     globalThis.iCUE = { isPreview: false };
     globalThis.pluginLinkprovider_initialized = true;
+    globalThis.__fixtureErrors = [];
+    addEventListener('error', event => globalThis.__fixtureErrors.push(`error:${event.message || event.error || 'unknown'}`));
+    addEventListener('unhandledrejection', event => globalThis.__fixtureErrors.push(`rejection:${String(event.reason || 'unknown')}`));
 
     try {
       localStorage.clear();
@@ -113,16 +116,37 @@ export async function prepare(page, context) {
   }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
 }
 
+async function waitForPanel(page, expected) {
+  try {
+    await page.waitForFunction(
+      state => document.body.getAttribute('data-panel-state') === state,
+      expected,
+      { timeout: 10000 },
+    );
+  } catch (error) {
+    const report = await page.evaluate(() => ({
+      panel: document.body.getAttribute('data-panel-state'),
+      stateTitle: document.getElementById('stateTitle')?.textContent?.trim() || '',
+      stateBody: document.getElementById('stateBody')?.textContent?.trim() || '',
+      errors: globalThis.__fixtureErrors || [],
+      primary: globalThis.PackRatPowerMeterTest?.getPrimary?.() || null,
+      catalogue: globalThis.PackRatPowerMeterTest?.getCatalogue?.() || {},
+      powerSensor: typeof globalThis.powerSensor === 'string' ? globalThis.powerSensor : typeof globalThis.powerSensor,
+    }));
+    throw new Error(`power fixture failed waiting for ${expected}: ${JSON.stringify(report)} :: ${error.message}`);
+  }
+}
+
 export async function ready(page, context) {
   if (context.variant?.mode === 'empty') {
-    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'empty', { timeout: 10000 });
+    await waitForPanel(page, 'empty');
     return;
   }
-  await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'ready', { timeout: 10000 });
-  await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', { timeout: 5000 });
+  await waitForPanel(page, 'ready');
+  await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
   if (context.variant?.mode === 'info') {
     await page.locator('#infoButton').click();
-    await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden);
+    await page.waitForFunction(() => !document.getElementById('infoOverlay')?.hidden, null, { timeout: 3000 });
   }
   await page.waitForTimeout(120);
 }
@@ -156,14 +180,12 @@ export async function assert(page, context) {
   if (context.variant?.mode === 'info' && report.overlayHidden) throw new Error('info overlay did not open');
   if (!context.variant && !['Wh', 'kWh'].includes(report.energyUnit)) throw new Error(`energy unit failed: ${JSON.stringify(report)}`);
 
-  // One representative slot exercises disappearance and reconnect. The selected
-  // sensor must not silently become a different power sensor while it is gone.
   if (!context.variant && context.slot === 'M_H') {
     const before = await page.evaluate(() => globalThis.PackRatPowerMeterTest.getSession());
     await page.evaluate(() => globalThis.__powerFixture.remove('total'));
-    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'disconnected', { timeout: 3000 });
+    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'disconnected', null, { timeout: 3000 });
     await page.evaluate(() => globalThis.__powerFixture.add('total', globalThis.__powerFixture.totalSensor));
-    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'ready' && globalThis.PackRatPowerMeterTest.getPrimary()?.id === 'total', { timeout: 3000 });
+    await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'ready' && globalThis.PackRatPowerMeterTest.getPrimary()?.id === 'total', null, { timeout: 3000 });
     const after = await page.evaluate(() => globalThis.PackRatPowerMeterTest.getSession());
     if (after.sensorId !== 'total' || after.energyWh + 1e-9 < before.energyWh) throw new Error(`reconnect corrupted session: ${JSON.stringify({ before, after })}`);
   }
