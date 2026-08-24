@@ -18,13 +18,21 @@ Keep **CS2 Competitive Dashboard Lite** packaged and ready, but do not submit Li
 
 ### Short description
 
-Turn your Stream Deck into a live CS2 competitive dashboard with match telemetry, session performance, Premier and Competitive rank views, and FACEIT stats.
+Turn your Stream Deck into a live CS2 competitive dashboard with match telemetry, session performance, Premier and Competitive rank views, FACEIT stats, and ready-to-use profiles.
 
 ### Product description
 
 Keep the match information you actually care about on your Stream Deck while you play CS2.
 
-CS2 Competitive Dashboard Pro combines local Game State Integration with session tracking and optional competitive account data in one configurable plugin.
+CS2 Competitive Dashboard Pro combines local Game State Integration with session tracking and optional competitive account data in one configurable plugin. It also includes purpose-built Stream Deck layouts so users do not have to configure every metric key by hand.
+
+**Ready-to-use profiles**
+
+* Competitive profile for Premier, Competitive ranks, FACEIT, recent form, and session performance
+* Live Match profile for score, round state, K/D, health, money, weapon, ADR, HS%, bomb state, map, and connection status
+* layouts for Stream Deck, Stream Deck Mini, Stream Deck XL, Stream Deck +, and Stream Deck Neo
+* profiles install with the plugin and remain fully editable
+* profiles do not automatically hijack the user's active Stream Deck profile after installation
 
 **Live CS2**
 
@@ -66,8 +74,8 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 
 ### Setup copy
 
-1. Install the plugin.
-2. Add any CS2 Competitive Dashboard Pro action to your Stream Deck.
+1. Install the plugin and accept the included Stream Deck profiles for your device if prompted.
+2. Start with the included **Competitive** or **Live Match** profile, or add individual CS2 Competitive Dashboard Pro actions anywhere you want.
 3. Open the Property Inspector and select **Enable Live CS2 Tracking**.
 4. Launch or restart CS2.
 5. Add your Steam profile URL or SteamID once.
@@ -115,12 +123,13 @@ Provider setup requirements can change upstream. The Property Inspector links di
 
 ### Suggested keywords
 
-CS2, Counter-Strike 2, Counter Strike, FACEIT, Premier, rank, stats, competitive, GSI, Game State Integration, Steam, dashboard, tracker, gaming
+CS2, Counter-Strike 2, Counter Strike, FACEIT, Premier, rank, stats, competitive, GSI, Game State Integration, Steam, dashboard, tracker, gaming, Stream Deck profile
 
 ### Version 0.1.0.0 release notes
 
 Initial release of CS2 Competitive Dashboard Pro.
 
+* ready-to-use Competitive and Live Match profiles for supported Stream Deck models
 * live CS2 Game State Integration
 * automatic Steam/CS2 setup
 * session K/D, ADR, HS%, W/L and match tracking
@@ -141,7 +150,7 @@ Initial release of CS2 Competitive Dashboard Pro.
 
 ### Short description
 
-A simple live CS2 Stream Deck dashboard for Score, Health, Money, Map, and connection status.
+A simple live CS2 Stream Deck dashboard for Score, Health, Money, Map, and connection status, with a ready-to-use starter profile.
 
 ### Lite product description
 
@@ -155,8 +164,9 @@ Includes:
 * Current Map
 * CS2 / GSI Status
 * one-click live tracking setup
+* one basic ready-to-use starter profile for supported Stream Deck models
 
-For session performance, Premier and Competitive ranks, FACEIT stats, weapons/ammo, and the complete live metric set, use CS2 Competitive Dashboard Pro.
+For session performance, Premier and Competitive ranks, FACEIT stats, weapons/ammo, the complete live metric set, and separate **Competitive + Live Match profiles**, use CS2 Competitive Dashboard Pro.
 
 ## Listing truth gate
 
@@ -176,8 +186,9 @@ Recommended sequence:
 
 1. Hero: clean Stream Deck key grid showing the strongest live/session/competitive mix, with minimal copy.
 2. Feature breakdown: Live CS2 / Session / Competitive / FACEIT as the four value areas.
-3. Setup: Property Inspector showing one-click GSI setup, Steam profile, and the guided provider key cards.
-4. Live states: examples of Score, Health, Premier, FACEIT Elo, Session K/D.
-5. Lite vs Pro / ecosystem frame after Pro is published.
+3. Profiles: show the Competitive and Live Match layouts as an ease-of-setup and Pro-value feature.
+4. Setup: Property Inspector showing one-click GSI setup, Steam profile, and the guided provider key cards.
+5. Live states: examples of Score, Health, Premier, FACEIT Elo, Session K/D.
+6. Lite vs Pro / ecosystem frame after Pro is published.
 
 The gallery should use truthful captured or deterministic fixture states and the official unmodified Leetify attribution asset anywhere Leetify data is shown.
