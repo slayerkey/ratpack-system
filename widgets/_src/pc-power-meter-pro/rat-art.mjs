@@ -12,6 +12,7 @@ export const variants = [
   { name: 'high-power', slot: 'M_H', mode: 'high' },
   { name: 'preview', slot: 'M_H', mode: 'preview' },
   { name: 'empty', slot: 'M_H', mode: 'empty' },
+  { name: 'unavailable', slot: 'M_H', mode: 'unavailable' },
 ];
 
 export async function prepare(page, context) {
@@ -41,7 +42,7 @@ export async function prepare(page, context) {
 
     try {
       localStorage.clear();
-      if (mode !== 'preview' && mode !== 'empty') {
+      if (!['preview', 'empty', 'unavailable'].includes(mode)) {
         const now = Date.now();
         localStorage.setItem('rat-art-power-pro:pc-power-meter-pro:session', JSON.stringify({
           sensorId: 'total', startedAt: now - 2 * 3600000, lastSeenAt: now - 1000,
@@ -58,7 +59,7 @@ export async function prepare(page, context) {
       }
     } catch {}
 
-    if (mode === 'preview') {
+    if (mode === 'preview' || mode === 'unavailable') {
       globalThis.plugins = {};
       return;
     }
@@ -115,6 +116,7 @@ async function waitForPanel(page, expected) {
 
 export async function ready(page, context) {
   if (context.variant?.mode === 'empty') { await waitForPanel(page, 'empty'); return; }
+  if (context.variant?.mode === 'unavailable') { await waitForPanel(page, 'unavailable'); return; }
   await waitForPanel(page, 'ready');
   await page.waitForFunction(() => document.getElementById('nowValue')?.textContent?.trim() !== '—', null, { timeout: 5000 });
   if (context.variant?.mode === 'info') {
@@ -146,9 +148,13 @@ export async function assert(page, context) {
     if (report.panel !== 'empty') throw new Error(`empty Pro fixture failed: ${JSON.stringify(report)}`);
     return;
   }
+  if (context.variant?.mode === 'unavailable') {
+    if (report.panel !== 'unavailable') throw new Error(`unavailable Pro fixture failed: ${JSON.stringify(report)}`);
+    return;
+  }
   if (report.panel !== 'ready') throw new Error(`Pro fixture not ready: ${JSON.stringify(report)}`);
   if (context.variant?.mode === 'preview') {
-    if (report.primary?.id !== 'preview-power') throw new Error(`preview mode did not use safe demo telemetry: ${JSON.stringify(report)}`);
+    if (report.primary?.id !== 'preview-power' || report.now === '—') throw new Error(`preview mode did not use safe demo telemetry: ${JSON.stringify(report)}`);
     return;
   }
   if (report.primary?.id !== 'total') throw new Error(`wrong Pro primary sensor: ${JSON.stringify(report)}`);
