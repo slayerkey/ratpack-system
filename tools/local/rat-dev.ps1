@@ -34,6 +34,12 @@ function Test-GitRef {
     return $LASTEXITCODE -eq 0
 }
 
+function Test-GitObject {
+    param([string]$Object)
+    & git -C $RepoRoot cat-file -e $Object 2>$null
+    return $LASTEXITCODE -eq 0
+}
+
 function Ensure-StreamDeckCli {
     Require-Command "node" "Install Node.js 24 or newer."
     Require-Command "npm" "Install Node.js 24 or newer."
@@ -51,6 +57,12 @@ function Ensure-StreamDeckCli {
     }
 
     Require-Command "streamdeck" "Install with: npm install -g @elgato/cli@latest"
+}
+
+function Ensure-XeneonTools {
+    Require-Command "python" "Install Python 3.13 or newer."
+    Require-Command "node" "Install Node.js 24 or newer."
+    Require-Command "npm" "Install Node.js 24 or newer."
 }
 
 function Stop-ExistingLink {
@@ -82,12 +94,26 @@ function Resolve-Source {
 
     $productRef = "refs/remotes/origin/product/$Slug"
     if (Test-GitRef $productRef) {
-        return [PSCustomObject]@{
-            Kind = "ratpack"
-            Ref = "origin/product/$Slug"
-            Config = $null
-            SourceRoot = "plugins\$Slug"
-            Display = "origin/product/$Slug"
+        $productWidget = "origin/product/${Slug}:widgets/_src/${Slug}"
+        if (Test-GitObject $productWidget) {
+            return [PSCustomObject]@{
+                Kind = "xeneon"
+                Ref = "origin/product/$Slug"
+                Config = $null
+                SourceRoot = "widgets\_src\$Slug"
+                Display = "origin/product/$Slug"
+            }
+        }
+
+        $productPlugin = "origin/product/${Slug}:plugins/${Slug}"
+        if (Test-GitObject $productPlugin) {
+            return [PSCustomObject]@{
+                Kind = "ratpack"
+                Ref = "origin/product/$Slug"
+                Config = $null
+                SourceRoot = "plugins\$Slug"
+                Display = "origin/product/$Slug"
+            }
         }
     }
 
@@ -105,9 +131,19 @@ function Resolve-Source {
         }
     }
 
-    $mainObject = "origin/main:plugins/$Slug"
-    & git -C $RepoRoot cat-file -e $mainObject 2>$null
-    if ($LASTEXITCODE -eq 0) {
+    $mainWidget = "origin/main:widgets/_src/$Slug"
+    if (Test-GitObject $mainWidget) {
+        return [PSCustomObject]@{
+            Kind = "xeneon"
+            Ref = "origin/main"
+            Config = $null
+            SourceRoot = "widgets\_src\$Slug"
+            Display = "origin/main"
+        }
+    }
+
+    $mainPlugin = "origin/main:plugins/$Slug"
+    if (Test-GitObject $mainPlugin) {
         return [PSCustomObject]@{
             Kind = "ratpack"
             Ref = "origin/main"
@@ -117,15 +153,10 @@ function Resolve-Source {
         }
     }
 
-    throw "Could not find $Slug in RatPack or an external rat-dev registration on origin/main."
+    throw "Could not find $Slug as a RatPack Stream Deck plugin, XENEON widget, or external Rat Dev registration."
 }
 
 function Remove-ExistingCheckout {
-    # The dev slot can be either a real RatPack git worktree or a standalone clone
-    # for an externally registered product. Calling `git worktree remove` on the
-    # standalone clone aborts PowerShell under ErrorActionPreference=Stop, so clear
-    # the filesystem checkout first and let `worktree prune` discard any stale
-    # RatPack worktree metadata afterward.
     if (Test-Path $Worktree) {
         Write-Host "Clearing stale local development checkout..." -ForegroundColor DarkGray
         Remove-Item $Worktree -Recurse -Force
@@ -269,7 +300,7 @@ function Build-And-TestPlugin {
         }
     }
     if ($config -and $config.type -and [string]$config.type -ne "streamdeck-plugin") {
-        throw "rat dev currently supports streamdeck-plugin products. $Slug declares type '$($config.type)'."
+        throw "Rat Dev expected a streamdeck-plugin product. $Slug declares type '$($config.type)'."
     }
 
     $packagePath = Join-Path $PluginRoot "package.json"
@@ -359,10 +390,72 @@ function Install-DevPlugin {
     }
 }
 
+function Build-XeneonWidget {
+    Ensure-XeneonTools
+    $sourcePath = Join-Path $Worktree "widgets\_src\$Slug"
+    if (-not (Test-Path $sourcePath)) {
+        throw "XENEON widget source not found after sync: $sourcePath"
+    }
+
+    Push-Location $Worktree
+    try {
+        $verify = Join-Path $sourcePath "verify.mjs"
+        if (Test-Path $verify) {
+            Write-Host "Running $Slug widget regression suite..." -ForegroundColor Cyan
+            Invoke-Checked -Command "node" -Arguments @($verify, $Worktree) -Failure "XENEON widget regression suite failed"
+        }
+
+        Write-Host "Building canonical XENEON widget..." -ForegroundColor Cyan
+        Invoke-Checked -Command "python" -Arguments @("tools\xeneon\inline.py", $Slug) -Failure "XENEON inline build failed"
+
+        $shipping = Join-Path $Worktree "widgets\$Slug"
+        if (-not (Test-Path $shipping)) {
+            throw "XENEON shipping directory was not created: $shipping"
+        }
+
+        Write-Host "Validating with the official CORSAIR CLI..." -ForegroundColor Cyan
+        Invoke-Checked -Command "npx" -Arguments @("--yes", "icuewidget-cli@0.4.47", "validate", $shipping) -Failure "Official CORSAIR validation failed"
+
+        Get-ChildItem -Path (Join-Path $Worktree "widgets") -Filter "*.icuewidget" -File -ErrorAction SilentlyContinue | Remove-Item -Force
+        Write-Host "Packaging with the official CORSAIR CLI..." -ForegroundColor Cyan
+        Invoke-Checked -Command "npx" -Arguments @("--yes", "icuewidget-cli@0.4.47", "package", $shipping) -Failure "Official CORSAIR package failed"
+
+        $package = Get-ChildItem -Path (Join-Path $Worktree "widgets") -Filter "*.icuewidget" -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if (-not $package) {
+            throw "Official CORSAIR CLI completed without creating an .icuewidget package."
+        }
+
+        $destDir = Join-Path $DevRoot "packages\$Slug"
+        New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+        $dest = Join-Path $destDir "$Slug.icuewidget"
+        Copy-Item $package.FullName $dest -Force
+
+        Write-Host ""
+        Write-Host "Rat Dev built $Slug for XENEON Edge." -ForegroundColor Green
+        Write-Host "Source:  $sourcePath"
+        Write-Host "Package: $dest"
+        Write-Host "Opening the widget package for iCUE import..." -ForegroundColor DarkGray
+        Start-Process $dest
+        return $dest
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 Require-Command "git" "Install Git for Windows first."
-Ensure-StreamDeckCli
 $source = Resolve-Source
 Write-Host "Using $($source.Display)" -ForegroundColor DarkGray
+
+if ($source.Kind -eq "xeneon") {
+    Sync-RatPackWorktree ([string]$source.Ref)
+    Build-XeneonWidget | Out-Null
+    exit 0
+}
+
+Ensure-StreamDeckCli
 $oldUuid = Get-ExistingPluginUuid $source
 Stop-ExistingLink $oldUuid
 

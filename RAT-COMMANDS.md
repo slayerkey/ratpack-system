@@ -80,42 +80,60 @@ The first time the local Maker Console profile is used, Elgato may require you t
 
 ## `rat dev <slug>`
 
-This is the normal one command local development updater for Stream Deck plugins that need a real local host application to test.
+This is the normal one command local development updater for products that need a real Windows host application or XENEON Edge to test.
 
 Examples:
 
 ```text
 rat dev discord-bridge
+rat dev discord-panel
 rat dev valorant-tracker
 ```
 
-What it does:
-
-1. Fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout.
-2. Reads the product's registered Stream Deck plugin UUID before creating the development checkout.
-3. Stops and unlinks any previous development or manually installed copy, with retries while Windows releases plugin files.
-4. Prefers `origin/product/<slug>` for products developed inside RatPack. Products registered as external repositories automatically fetch their configured repository and development ref instead.
-5. Reuses a development checkout under:
+Rat Dev first fetches the latest canonical GitHub source without switching or dirtying the main RatPack checkout. It prefers `origin/product/<slug>` during active development and reuses an ignored development checkout under:
 
 ```text
 out\dev\worktrees\<slug>
 ```
 
-RatPack native products use detached worktrees. Registered external products use a reusable local clone in the same location.
+### Stream Deck plugins
 
-6. Installs plugin dependencies only when needed.
-7. Runs the plugin build and automated tests declared by the product.
-8. Runs the official Elgato Stream Deck CLI validator.
-9. Links the fresh plugin into Stream Deck developer mode and restarts it.
-10. Opens the product's local status page when `rat-dev.json` declares one.
+For a Stream Deck plugin Rat Dev:
+
+1. Reads the registered plugin UUID before creating the development checkout.
+2. Stops and unlinks any previous development or manually installed copy, with retries while Windows releases plugin files.
+3. Installs dependencies only when needed.
+4. Runs the product build and automated tests.
+5. Runs the official Elgato Stream Deck CLI validator.
+6. Links the fresh plugin into Stream Deck developer mode and restarts it.
+7. Opens the product's local status page when `rat-dev.json` declares one.
+
+A Stream Deck plugin opts in with `plugins/<slug>/rat-dev.json`. The registration should include `plugin_uuid` so Rat Dev can clean up an older installed copy before the first development worktree exists. The file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
+
+### XENEON Edge widgets
+
+For a XENEON widget Rat Dev automatically detects `widgets/_src/<slug>` and:
+
+1. Reuses the same ignored detached development worktree.
+2. Runs the widget's local `verify.mjs` regression suite when one is present.
+3. Regenerates the canonical flattened shipping widget with `tools/xeneon/inline.py`.
+4. Runs the official CORSAIR widget validator.
+5. Packages the widget with the official CORSAIR CLI.
+6. Copies the fresh package to:
+
+```text
+out\dev\packages\<slug>\<slug>.icuewidget
+```
+
+7. Opens the `.icuewidget` package so iCUE can import it for the physical XENEON Edge smoke test.
+
+The final iCUE import confirmation is intentionally left to the user because it is a host UI action. Everything before that is regenerated from canonical GitHub source by the command.
 
 If Rat Dev fails, it automatically opens the product's local development folder so logs or generated files are immediately available for inspection.
 
-Normal iteration should not use Downloads, hand copied ZIP folders, or manually installed development packages. Product specific local state stays inside the normal Stream Deck application or the ignored RatPack `out` directory.
+Normal iteration should not use Downloads, hand copied ZIP folders, or manually installed development source folders. Product specific local state stays inside the host application or the ignored RatPack `out` directory.
 
-`rat dev` currently targets Stream Deck plugins. A product opts in with `plugins/<slug>/rat-dev.json`. The registration should include `plugin_uuid` so Rat Dev can clean up an older installed copy before the first development worktree exists. The file can live with the product source inside RatPack, or act as a thin registration pointing Rat Dev at a separate canonical GitHub repository and ref.
-
-The first run may install the official `@elgato/cli` once. Current Stream Deck CLI development requires Node.js 24 or newer.
+The first Stream Deck run may install the official `@elgato/cli` once. Current Stream Deck development requires Node.js 24 or newer. XENEON development uses the pinned official `icuewidget-cli@0.4.47` through `npx`.
 
 ## `rat status`
 
@@ -198,6 +216,12 @@ Development worktrees and external development clones live under:
 
 ```text
 C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\worktrees
+```
+
+Development XENEON packages live under:
+
+```text
+C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub\out\dev\packages
 ```
 
 The shared local Rat Ship browser runtime lives in:
