@@ -8,21 +8,32 @@ The repository can live anywhere on Windows. The current preferred checkout is:
 
 After one time setup, the repository root is added to the user's PATH so `rat` can be called from any terminal.
 
+## Command freshness
+
+Normal build and development commands self refresh the RatPack command layer before they do product work. `rat dev`, `rat ship`, `rat submit`, `rat stage`, `rat kit`, `rat ship-cloud`, and `rat kit-cloud` fetch canonical GitHub `main`, fast forward the local command checkout, and then re enter the freshly updated `rat.cmd` in the same invocation.
+
+That means a committed update to Rat Dev or Rat Ship is picked up by the next command you run. You do not need to run `rat main` first. The bootstrap itself does not start GitHub Actions; it is only a Git fetch and fast forward of the canonical command repository.
+
+The canonical RatPack checkout must be clean before a self updating command runs. Product development state belongs under ignored `out/` worktrees or in the external product repositories, not as edits in the command checkout.
+
 ## Normal commands
 
-* `rat ship <slug> [slug...]` syncs canonical `main` once, then builds, validates, packages, captures, creates Rat Art, creates the ship kit, fills Maker Console, and submits locally on this PC. Existing dependencies are reused and missing runtime pieces are installed only when needed.
+* `rat dev <slug>` refreshes the RatPack command layer, fetches the newest canonical product source, builds and tests it locally, runs the official platform validator, and installs or opens the development build for host testing. Stream Deck products are linked and restarted in developer mode. External products such as Valorant Tracker are fetched from the repository and ref registered in `plugins/<slug>/rat-dev.json` on RatPack `main`.
+* `rat ship <slug> [slug...]` refreshes the RatPack command layer, then builds, validates, packages, captures, creates Rat Art, creates the ship kit, fills Maker Console, and submits locally on this PC. Existing dependencies are reused and missing runtime pieces are installed only when needed.
 * `rat status` shows the current checkout state.
 * `rat help` shows the command cheat sheet.
 
+Rat Dev itself does not use a hosted GitHub Actions runner. GitHub is used for source freshness, while the build, tests, official Stream Deck or CORSAIR validation, development linking, and host smoke workflow happen on the Windows PC.
+
 ## Optional commands
 
-* `rat ship-cloud <slug> [slug...]` preserves the old clean-runner path: explicitly run the full Rat Ship workflow on GitHub Actions, download the kit, then submit through the local Maker Console browser.
+* `rat ship-cloud <slug> [slug...]` explicitly uses the clean hosted Rat Ship workflow on GitHub Actions, downloads the kit, then submits through the local Maker Console browser. This is useful when you want an independent clean runner check rather than the normal local build.
 * `rat kit-cloud <slug> [slug...]` runs the clean GitHub Actions build and downloads the resulting kit without submitting.
 * `rat kit <slug> [slug...]` builds fresh ship kits locally and opens the output without submitting.
 * `rat stage <slug> [slug...]` builds locally and fills Maker Console without final submission.
 * `rat submit <slug> [slug...]` is an alias for the normal local `rat ship` path.
 * `rat update` fetches and fast forwards the current branch when the worktree is clean.
-* `rat main` switches to `main` and fast forwards it.
+* `rat main` switches to `main` and fast forwards it. This remains useful for explicit maintenance, but it is not required before normal `rat dev` or `rat ship` use.
 * `rat open` opens the repository folder.
 * `rat doctor` checks Git, Python, GitHub CLI, Node, repository state, and GitHub authentication.
 
@@ -46,4 +57,4 @@ If it is not cloned yet, run:
 $dest='C:\Users\Key\Videos\Claude Projects\Ratpack-GitHub'; if (!(Test-Path "$dest\.git")) { git clone https://github.com/slayerkey/ratpack-system.git "$dest" }; powershell -NoProfile -ExecutionPolicy Bypass -File "$dest\setup-windows.ps1"
 ```
 
-The setup script installs GitHub CLI with winget if needed and opens its browser login if required. Normal local Rat Ship does not need a GitHub Actions runner; Git is still used to sync the canonical repository before a shipping queue starts.
+The setup script installs GitHub CLI with winget if needed and opens its browser login if required. Normal local Rat Dev and Rat Ship do not need a GitHub Actions runner; Git is still used to refresh canonical source before work starts.
