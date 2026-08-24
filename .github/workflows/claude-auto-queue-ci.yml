@@ -1,0 +1,40 @@
+name: Claude Auto Queue Spike CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/claude-auto-queue/**'
+      - '.github/workflows/claude-auto-queue-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-streamdeck:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        working-directory: plugins/claude-auto-queue
+        run: npm install --no-fund --no-audit
+
+      - name: Build plugin
+        working-directory: plugins/claude-auto-queue
+        run: npm run build
+
+      - name: Run feasibility fixtures
+        working-directory: plugins/claude-auto-queue
+        run: npm test
+
+      - name: Validate with official Stream Deck CLI
+        working-directory: plugins/claude-auto-queue
+        run: npx streamdeck validate com.packrat.claude-auto-queue.sdPlugin

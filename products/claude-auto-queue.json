@@ -1,0 +1,21 @@
+{
+  "id": "claude-auto-queue",
+  "name": "Claude Auto Queue",
+  "type": "plugin",
+  "status": "researching",
+  "workflow_state": "TESTING",
+  "price_usd": null,
+  "version": "0.1.0.0",
+  "platform": "Elgato Stream Deck / Claude Code",
+  "source": "plugins/claude-auto-queue",
+  "plugin_uuid": "com.packrat.claude-auto-queue",
+  "release_gate": [
+    "supported Claude hook fixture suite",
+    "queue persistence and six-continuation safety tests",
+    "official Stream Deck CLI validation",
+    "authenticated Windows Claude Code same-session host spike",
+    "premium profile and deterministic key-art QA after technical GO"
+  ],
+  "final_boundary": "authenticated local Claude Code session plus physical Stream Deck host smoke test",
+  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI."
+}
