@@ -12,7 +12,8 @@
     "policy": "node scripts/release-policy.mjs",
     "check": "npm run typecheck && npm test && npm run build && npm run policy",
     "validate": "node scripts/validate.mjs",
-    "pack": "node scripts/pack.mjs"
+    "pack": "node scripts/pack.mjs",
+    "set-gateway": "node scripts/set-gateway.mjs"
   },
   "dependencies": {
     "@elgato/streamdeck": "^2.0.1"
