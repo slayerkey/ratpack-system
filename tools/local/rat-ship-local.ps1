@@ -11,6 +11,9 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $ToolsRoot = Join-Path $RepoRoot "tools"
 $ShipToolRoot = Join-Path $ToolsRoot "ship"
 $WorkRoot = Join-Path $RepoRoot "out\ship-local\$WidgetSlug"
+$PlaywrightModule = Join-Path $ToolsRoot "node_modules\playwright"
+$PlaywrightCmd = Join-Path $ToolsRoot "node_modules\.bin\playwright.cmd"
+$IcueWidgetCliCmd = Join-Path $ToolsRoot "node_modules\.bin\icuewidget-cli.cmd"
 
 function Require-LocalCommand {
     param([string]$Name, [string]$Hint)
@@ -32,36 +35,46 @@ function Invoke-LocalStep {
 }
 
 function Ensure-LocalDependencies {
+    if ($env:RATPACK_LOCAL_SHIP_DEPS_READY -eq "1") {
+        Write-Host "Local Rat Ship: dependency preflight already passed for this queue." -ForegroundColor DarkGray
+        return
+    }
+
     Require-LocalCommand "python" "Install Python 3.13 or a compatible Python 3 release."
     Require-LocalCommand "node" "Install Node.js."
     Require-LocalCommand "npm" "Install Node.js."
-    Require-LocalCommand "npx" "Install Node.js."
 
     & python -c "import PIL,sys; sys.exit(0 if PIL.__version__ == '12.3.0' else 1)" *> $null
     if ($LASTEXITCODE -ne 0) {
         Invoke-LocalStep "install Pillow 12.3.0" { & python -m pip install --disable-pip-version-check Pillow==12.3.0 }
     }
 
-    $playwrightModule = Join-Path $ToolsRoot "node_modules\playwright"
-    if (-not (Test-Path $playwrightModule)) {
-        Invoke-LocalStep "install Playwright 1.62.1" { & npm install --prefix $ToolsRoot --no-save --package-lock=false --no-fund --no-audit playwright@1.62.1 }
+    if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd) -or -not (Test-Path $IcueWidgetCliCmd)) {
+        Invoke-LocalStep "install shared Rat Ship Node tools" {
+            & npm install --prefix $ToolsRoot --no-save --package-lock=false --no-fund --no-audit playwright@1.62.1 icuewidget-cli@0.4.47
+        }
     }
 
-    $playwrightCmd = Join-Path $ToolsRoot "node_modules\.bin\playwright.cmd"
-    if (-not (Test-Path $playwrightCmd)) {
-        throw "Playwright installed without its command shim at $playwrightCmd"
+    if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd)) {
+        throw "Playwright installed without its expected module/command under $ToolsRoot"
+    }
+    if (-not (Test-Path $IcueWidgetCliCmd)) {
+        throw "CORSAIR iCUE widget CLI installed without its command shim at $IcueWidgetCliCmd"
     }
 
     Push-Location $ToolsRoot
     try {
         & node -e "import('playwright').then(({chromium})=>process.exit(require('fs').existsSync(chromium.executablePath())?0:2)).catch(()=>process.exit(3))" *> $null
         if ($LASTEXITCODE -ne 0) {
-            Invoke-LocalStep "install Chromium runtime" { & $playwrightCmd install chromium }
+            Invoke-LocalStep "install Chromium runtime" { & $PlaywrightCmd install chromium }
         }
     }
     finally {
         Pop-Location
     }
+
+    $env:RATPACK_LOCAL_SHIP_DEPS_READY = "1"
+    Write-Host "Local Rat Ship: shared Pillow, Playwright, Chromium, and CORSAIR CLI are ready for the rest of this queue." -ForegroundColor DarkGray
 }
 
 if ($WidgetSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
@@ -96,10 +109,10 @@ try {
         throw "Canonical local build changed tracked widgets/$WidgetSlug files. Commit the generated shipping output before Rat Ship so the local fallback cannot ship uncommitted drift."
     }
 
-    Invoke-LocalStep "official CORSAIR validation" { & npx --yes icuewidget-cli@0.4.47 validate "widgets/$WidgetSlug" }
+    Invoke-LocalStep "official CORSAIR validation" { & $IcueWidgetCliCmd validate "widgets/$WidgetSlug" }
 
     $packageStarted = Get-Date
-    Invoke-LocalStep "official CORSAIR package" { & npx --yes icuewidget-cli@0.4.47 package "widgets/$WidgetSlug" }
+    Invoke-LocalStep "official CORSAIR package" { & $IcueWidgetCliCmd package "widgets/$WidgetSlug" }
     $pkg = Get-ChildItem -Path (Join-Path $RepoRoot "widgets") -Filter *.icuewidget -File |
         Where-Object { $_.LastWriteTime -ge $packageStarted.AddSeconds(-2) } |
         Sort-Object LastWriteTime -Descending |
