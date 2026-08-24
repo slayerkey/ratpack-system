@@ -32,6 +32,11 @@ function Invoke-LocalStep {
 }
 
 function Ensure-LocalDependencies {
+    if ($env:RATPACK_LOCAL_SHIP_DEPS_READY -eq "1") {
+        Write-Host "Local Rat Ship: dependency preflight already passed for this queue." -ForegroundColor DarkGray
+        return
+    }
+
     Require-LocalCommand "python" "Install Python 3.13 or a compatible Python 3 release."
     Require-LocalCommand "node" "Install Node.js."
     Require-LocalCommand "npm" "Install Node.js."
@@ -62,6 +67,9 @@ function Ensure-LocalDependencies {
     finally {
         Pop-Location
     }
+
+    $env:RATPACK_LOCAL_SHIP_DEPS_READY = "1"
+    Write-Host "Local Rat Ship: dependency preflight cached for the rest of this queue." -ForegroundColor DarkGray
 }
 
 if ($WidgetSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
