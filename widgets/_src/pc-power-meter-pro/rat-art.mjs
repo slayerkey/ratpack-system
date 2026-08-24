@@ -18,9 +18,15 @@ export const variants = [
 
 export async function prepare(page, context) {
   const fixtureSensors = structuredClone(baseSensors);
-  if (context.variant?.mode === 'zero') fixtureSensors.total.value = '0';
-  if (context.variant?.mode === 'high') fixtureSensors.total.value = '12500';
-  if (context.variant?.mode === 'empty') {
+  const mode = context.variant?.mode || 'normal';
+  if (mode === 'normal') {
+    fixtureSensors.total.value = '330';
+    fixtureSensors.cpu.value = '80';
+    fixtureSensors.gpu.value = '170';
+  }
+  if (mode === 'zero') fixtureSensors.total.value = '0';
+  if (mode === 'high') fixtureSensors.total.value = '12500';
+  if (mode === 'empty') {
     for (const key of Object.keys(fixtureSensors)) if (fixtureSensors[key].type === 'power') delete fixtureSensors[key];
   }
 
@@ -41,6 +47,14 @@ export async function prepare(page, context) {
     globalThis.__fixtureErrors = [];
     addEventListener('error', event => globalThis.__fixtureErrors.push(`error:${event.message || event.error || 'unknown'}`));
     addEventListener('unhandledrejection', event => globalThis.__fixtureErrors.push(`rejection:${String(event.reason || 'unknown')}`));
+
+    const nativeNow = Date.now.bind(Date);
+    globalThis.__powerFixtureNativeNow = nativeNow;
+    if (mode === 'normal') {
+      const fixtureNow = nativeNow();
+      globalThis.__powerFixtureNow = fixtureNow;
+      Date.now = () => fixtureNow - 160000;
+    }
 
     try {
       localStorage.clear();
@@ -116,7 +130,7 @@ export async function prepare(page, context) {
       },
       totalSensor: structuredClone(store.total),
     };
-  }, { sensors: fixtureSensors, mode: context.variant?.mode || 'normal' });
+  }, { sensors: fixtureSensors, mode });
 }
 
 async function waitForPanel(page, expected) {
@@ -138,23 +152,23 @@ async function waitForPanel(page, expected) {
 
 async function seedBaseGraph(page) {
   const traces = {
-    total: [330, 360, 410, 385, 455, 517, 470, 430, 412],
-    cpu: [80, 95, 120, 105, 135, 160, 145, 132, 128],
-    gpu: [170, 190, 220, 205, 250, 285, 270, 255, 244],
+    total: [360, 410, 385, 455, 517, 470, 430, 412],
+    cpu: [95, 120, 105, 135, 160, 145, 132, 128],
+    gpu: [190, 220, 205, 250, 285, 270, 255, 244],
   };
   await page.evaluate(series => {
-    const originalNow = Date.now;
-    const base = originalNow();
+    const nativeNow = globalThis.__powerFixtureNativeNow || Date.now.bind(Date);
+    const base = globalThis.__powerFixtureNow || nativeNow();
     try {
       const count = series.total.length;
       for (let index = 0; index < count; index += 1) {
-        Date.now = () => base - (count - 1 - index) * 18000;
+        Date.now = () => base - (count - 1 - index) * 20000;
         globalThis.__powerProFixture.setValue('total', series.total[index]);
         globalThis.__powerProFixture.setValue('cpu', series.cpu[index]);
         globalThis.__powerProFixture.setValue('gpu', series.gpu[index]);
       }
     } finally {
-      Date.now = originalNow;
+      Date.now = nativeNow;
     }
   }, traces);
   await page.waitForTimeout(80);
