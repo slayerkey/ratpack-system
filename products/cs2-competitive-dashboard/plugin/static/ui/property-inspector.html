@@ -51,13 +51,62 @@
       <input id="steam-profile" type="text" spellcheck="false" placeholder="https://steamcommunity.com/id/..." />
       <div class="button-row">
         <button class="primary compact" id="save-steam">Save Steam Profile</button>
-        <button class="secondary compact" id="refresh-online">Refresh</button>
+        <button class="secondary compact" id="refresh-online">Refresh Stats</button>
       </div>
+      <p class="hint">Your Steam profile identifies which CS2 account to load from Leetify and FACEIT.</p>
+    </section>
+
+    <section class="panel" id="provider-setup-panel" hidden>
+      <div class="field-label">Provider API Setup</div>
+      <p class="hint setup-intro">Pro uses your own free provider keys. PackRat does not operate a shared FACEIT or Leetify key, so another user's usage cannot consume your allowance.</p>
+
+      <div class="provider-card">
+        <div class="provider-card-head">
+          <div>
+            <div class="provider-name">Leetify</div>
+            <div class="provider-state" id="leetify-key-state">API key required</div>
+          </div>
+          <button class="text-link" id="get-leetify-key">Get free key ↗</button>
+        </div>
+        <ol class="setup-steps">
+          <li>Sign in to Leetify.</li>
+          <li>Open the Developer API page.</li>
+          <li>Copy your API key and paste it below.</li>
+        </ol>
+        <div class="secret-row">
+          <input id="leetify-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Leetify API key" />
+          <button class="secondary compact remove-key" id="clear-leetify-key">Remove</button>
+        </div>
+      </div>
+
+      <div class="provider-card">
+        <div class="provider-card-head">
+          <div>
+            <div class="provider-name">FACEIT</div>
+            <div class="provider-state" id="faceit-key-state">API key required</div>
+          </div>
+          <button class="text-link" id="get-faceit-key">Open Developer Portal ↗</button>
+        </div>
+        <ol class="setup-steps">
+          <li>Sign in to the FACEIT Developer Portal.</li>
+          <li>Create an App in App Studio.</li>
+          <li>Open API Keys and create a Client Side key.</li>
+          <li>Copy the key and paste it below.</li>
+        </ol>
+        <button class="text-link docs-link" id="faceit-key-guide">Official FACEIT key guide ↗</button>
+        <div class="secret-row">
+          <input id="faceit-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste FACEIT API key" />
+          <button class="secondary compact remove-key" id="clear-faceit-key">Remove</button>
+        </div>
+      </div>
+
+      <button class="primary full-width" id="save-provider-keys">Save Keys and Test Connection</button>
+      <p class="privacy-note">Keys are stored in this plugin's local Stream Deck settings on this PC and sent only to the matching provider API. They are never sent to a PackRat server.</p>
+
       <div class="integration-grid">
-        <div><span>FACEIT</span><strong id="faceit-state">Add Steam profile</strong></div>
-        <div><span>Valve ranks</span><strong id="leetify-state">Add Steam profile</strong></div>
+        <div><span>FACEIT</span><strong id="faceit-state">Setup required</strong></div>
+        <div><span>Leetify / Valve ranks</span><strong id="leetify-state">Setup required</strong></div>
       </div>
-      <p class="hint">FACEIT is auto-detected from Steam. Premier and per-map Competitive ranks require a registered, visible Leetify profile.</p>
       <div class="provider-links">
         <button class="text-link" id="view-leetify" hidden>View on Leetify ↗</button>
         <button class="text-link" id="view-faceit" hidden>View on FACEIT ↗</button>
