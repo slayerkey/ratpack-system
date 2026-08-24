@@ -3,7 +3,10 @@ param(
     [string]$Action = "status",
 
     [Parameter(Position = 1)]
-    [string]$Slug = "now-playing"
+    [string]$Slug = "now-playing",
+
+    [Parameter(Position = 2, ValueFromRemainingArguments = $true)]
+    [string[]]$AdditionalSlugs = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -137,18 +140,22 @@ function Show-Help {
     Write-Host "RatPack cheat sheet" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "NORMAL" -ForegroundColor Green
-    Write-Host "  rat ship <slug>    Build, validate, package, create Rat Art, download the fresh kit, fill Maker Console, and submit."
-    Write-Host "  rat status         Show the local repo branch, commit, and whether local files changed."
-    Write-Host "  rat help           Show this cheat sheet."
+    Write-Host "  rat ship <slug> [slug...]    Build, validate, package, create Rat Art, fill Maker Console, and submit one or more products in sequence."
+    Write-Host "  rat status                   Show the local repo branch, commit, and whether local files changed."
+    Write-Host "  rat help                     Show this cheat sheet."
+    Write-Host ""
+    Write-Host "BATCH EXAMPLE" -ForegroundColor Green
+    Write-Host "  rat ship weather-timeline-pro weather-timeline snake desk-notes"
+    Write-Host "  Batch mode continues to later products if one product fails, then prints a failure summary."
     Write-Host ""
     Write-Host "OPTIONAL" -ForegroundColor DarkGray
-    Write-Host "  rat kit <slug>     Build and download the fresh ship kit without opening Maker Console."
-    Write-Host "  rat stage <slug>   Build and fill Maker Console, but stop before final Submit."
-    Write-Host "  rat submit <slug>  Alias for rat ship."
-    Write-Host "  rat update         Pull the latest changes for the current branch."
-    Write-Host "  rat main           Switch to main and pull the latest canonical RatPack."
-    Write-Host "  rat open           Open the RatPack repo in Explorer."
-    Write-Host "  rat doctor         Check Git, Node, npm, GitHub CLI, GitHub login, and repo state."
+    Write-Host "  rat kit <slug> [slug...]     Build and download fresh ship kits without opening Maker Console."
+    Write-Host "  rat stage <slug> [slug...]   Build and fill Maker Console, but stop before final Submit."
+    Write-Host "  rat submit <slug> [slug...]  Alias for rat ship."
+    Write-Host "  rat update                   Pull the latest changes for the current branch."
+    Write-Host "  rat main                     Switch to main and pull the latest canonical RatPack."
+    Write-Host "  rat open                     Open the RatPack repo in Explorer."
+    Write-Host "  rat doctor                   Check Git, Node, npm, GitHub CLI, GitHub login, and repo state."
     Write-Host ""
     Write-Host "Maker Console login persists at: $MakerProfile"
     Write-Host "Full reference: $RepoRoot\RAT-COMMANDS.md"
@@ -315,6 +322,21 @@ function Invoke-MakerConsoleBridge {
     }
 }
 
+function Open-RecoveryLog {
+    param([string]$Kit)
+    $logZip = Join-Path $Kit "log.zip"
+    $logDir = Join-Path $Kit "log"
+    if (Test-Path $logZip) {
+        Write-Host "Opening Rat Ship recovery ZIP for easy sharing:`n$logZip" -ForegroundColor Yellow
+        Start-Process explorer.exe -ArgumentList "/select,`"$logZip`""
+        return
+    }
+    if (Test-Path $logDir) {
+        Write-Host "Opening Rat Ship recovery log folder:`n$logDir" -ForegroundColor Yellow
+        Start-Process explorer.exe $logDir
+    }
+}
+
 function Run-MakerConsole {
     param(
         [string]$WidgetSlug,
@@ -322,6 +344,7 @@ function Run-MakerConsole {
         [switch]$Submit
     )
 
+    $noRetry = Join-Path $Kit "log\NO_RETRY.txt"
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         $resume = $attempt -gt 1
         if ($attempt -eq 1) {
@@ -343,10 +366,18 @@ function Run-MakerConsole {
             }
             return
         }
+
+        if (Test-Path $noRetry) {
+            $reason = (Get-Content $noRetry -Raw).Trim()
+            Write-Host "Rat Ship found a draft state that is unsafe to retry automatically." -ForegroundColor Red
+            if ($reason) { Write-Host $reason -ForegroundColor Yellow }
+            break
+        }
     }
 
+    Open-RecoveryLog -Kit $Kit
     $logDir = Join-Path $Kit "log"
-    throw "Maker Console failed after three attempts. The ship kit is still safe at $Kit. Recovery screenshots and state, when available, are in $logDir"
+    throw "Maker Console failed. The ship kit is still safe at $Kit. Recovery screenshots, error text, state, and log.zip are in $logDir"
 }
 
 function Run-Kit {
@@ -365,6 +396,56 @@ function Run-Stage {
     param([string]$WidgetSlug)
     $dest = Download-ShipKit $WidgetSlug
     Run-MakerConsole -WidgetSlug $WidgetSlug -Kit $dest
+}
+
+function Invoke-SlugBatch {
+    param(
+        [ValidateSet("ship","submit","stage","kit")]
+        [string]$Mode,
+        [string[]]$Slugs
+    )
+
+    $queue = @($Slugs | ForEach-Object { if ($_ -and $_.Trim()) { $_.Trim() } })
+    if (-not $queue.Count) {
+        throw "Rat $Mode needs at least one product slug."
+    }
+
+    Write-Host "Rat $Mode queue: $($queue -join ', ')" -ForegroundColor Cyan
+    $failures = @()
+    $completed = @()
+
+    for ($i = 0; $i -lt $queue.Count; $i++) {
+        $item = $queue[$i]
+        Write-Host ""
+        Write-Host "[$($i + 1)/$($queue.Count)] $Mode $item" -ForegroundColor Cyan
+        try {
+            switch ($Mode) {
+                "ship"   { Run-Ship $item }
+                "submit" { Run-Ship $item }
+                "stage"  { Run-Stage $item }
+                "kit"    { Run-Kit $item }
+            }
+            $completed += $item
+        }
+        catch {
+            $failures += [PSCustomObject]@{ Slug = $item; Message = $_.Exception.Message }
+            Write-Host "Rat $Mode failed for '$item'. Continuing the remaining queue." -ForegroundColor Red
+            Write-Host $_.Exception.Message -ForegroundColor Yellow
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Rat $Mode queue finished." -ForegroundColor Cyan
+    if ($completed.Count) {
+        Write-Host "Completed: $($completed -join ', ')" -ForegroundColor Green
+    }
+    if ($failures.Count) {
+        Write-Host "Failed:" -ForegroundColor Red
+        foreach ($failure in $failures) {
+            Write-Host "  $($failure.Slug): $($failure.Message)" -ForegroundColor Red
+        }
+        throw "Rat $Mode finished with $($failures.Count) failed product(s)."
+    }
 }
 
 function Run-Doctor {
@@ -397,16 +478,18 @@ function Run-Doctor {
     }
 }
 
+$RequestedSlugs = @($Slug) + @($AdditionalSlugs)
+
 switch ($Action.ToLowerInvariant()) {
     "status" { Show-Status }
     "help" { Show-Help }
     "commands" { Show-Help }
     "update" { Sync-CurrentBranch }
     "main" { Sync-Main }
-    "ship" { Run-Ship $Slug }
-    "submit" { Run-Ship $Slug }
-    "kit" { Run-Kit $Slug }
-    "stage" { Run-Stage $Slug }
+    "ship" { Invoke-SlugBatch -Mode "ship" -Slugs $RequestedSlugs }
+    "submit" { Invoke-SlugBatch -Mode "submit" -Slugs $RequestedSlugs }
+    "kit" { Invoke-SlugBatch -Mode "kit" -Slugs $RequestedSlugs }
+    "stage" { Invoke-SlugBatch -Mode "stage" -Slugs $RequestedSlugs }
     "open" { Start-Process explorer.exe $RepoRoot }
     "doctor" { Run-Doctor }
     default {
