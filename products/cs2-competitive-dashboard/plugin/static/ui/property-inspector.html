@@ -32,8 +32,10 @@
 
     <section class="panel" id="profiles-panel">
       <div class="field-label">Included Profiles</div>
-      <div class="profile-summary">Ready to use layouts are included for supported Stream Deck models.</div>
-      <p class="hint">Profiles install with the plugin and remain fully editable, so you can start with the PackRat layout and change any key later.</p>
+      <div class="profile-summary" id="profile-summary">Ready to use layouts are included for supported Stream Deck models.</div>
+      <p class="hint">Profiles remain fully editable. Start with the PackRat layout, then change any key you want.</p>
+      <button class="secondary full-width plugin-command" id="open-profiles">Open bundled profile files</button>
+      <p class="action-feedback" id="profile-feedback">If the profiles do not appear automatically, open this folder and double click the profile for your Stream Deck model.</p>
     </section>
 
     <section class="panel">
@@ -45,6 +47,17 @@
         <span class="pill" id="port-pill">LOCAL</span>
       </div>
 
+      <div class="setup-guide">
+        <div class="sub-label">How live tracking works</div>
+        <ol class="setup-steps">
+          <li>Click <strong>Enable Live CS2 Tracking</strong> once. The plugin finds Steam and CS2 and writes a local Valve GSI config.</li>
+          <li>If CS2 is already open, restart CS2 once so the game loads that config.</li>
+          <li>Enter Deathmatch, Premier, Competitive, or another game mode.</li>
+          <li>When CS2 sends its first game-state update, this status changes to <strong>Connected to CS2</strong> and your live/session keys begin updating.</li>
+        </ol>
+        <p class="privacy-note">Live tracking is local only. It does not need Steam, Leetify, or FACEIT API keys.</p>
+      </div>
+
       <label class="field-label small-gap" for="manual-path">CS2 path override <span class="optional">optional</span></label>
       <input id="manual-path" type="text" spellcheck="false" placeholder="Auto detect Steam and CS2" />
       <p class="hint">Leave blank unless automatic Steam library detection fails.</p>
@@ -53,7 +66,7 @@
         <button class="primary plugin-command" id="enable-gsi">Enable Live CS2 Tracking</button>
         <button class="secondary plugin-command" id="disable-gsi">Disable</button>
       </div>
-      <p class="action-feedback" id="gsi-feedback">Enable once, then CS2 sends live game state to the plugin locally.</p>
+      <p class="action-feedback" id="gsi-feedback">Tracking is currently off.</p>
       <div class="error-copy" id="setup-error" hidden></div>
     </section>
 
@@ -65,28 +78,29 @@
         <button class="primary compact plugin-command" id="save-steam">Save Steam Profile</button>
         <button class="secondary compact plugin-command" id="refresh-online">Refresh Stats</button>
       </div>
-      <p class="hint">Your Steam profile identifies which CS2 account to load from Leetify and FACEIT.</p>
+      <p class="hint">Your Steam profile identifies the CS2 account that Leetify and FACEIT should load.</p>
       <p class="action-feedback" id="steam-feedback">Not saved yet.</p>
     </section>
 
     <section class="panel" id="provider-setup-panel" hidden>
-      <div class="field-label">Provider API Setup</div>
-      <p class="hint setup-intro">Pro uses your own free provider keys. PackRat does not operate a shared FACEIT or Leetify key, so another user's usage cannot consume your allowance.</p>
+      <div class="field-label">Pro Provider API Setup</div>
+      <p class="hint setup-intro"><strong>Leetify powers Premier and Competitive stats.</strong> <strong>FACEIT powers FACEIT stats only.</strong> Each provider uses your own free key, so another user's usage cannot consume your allowance.</p>
 
       <div class="provider-card">
         <div class="provider-card-head">
           <div>
-            <div class="provider-name">Leetify</div>
+            <div class="provider-name">Leetify · Premier & Competitive</div>
             <div class="provider-state" id="leetify-key-state">API key required</div>
           </div>
           <button class="text-link" id="get-leetify-key">Get free key ↗</button>
         </div>
+        <p class="hint provider-note"><strong>Unlocks:</strong> Premier Rating, Competitive map ranks, recent Competitive result, win rate, and Leetify Rating.</p>
         <ol class="setup-steps">
           <li>Sign in to Leetify.</li>
           <li>Open the Developer API page.</li>
           <li>Copy your API key and paste it below.</li>
         </ol>
-        <p class="hint provider-note">Your Steam and CS2 data must already be connected in Leetify for Premier and Competitive map ranks to exist.</p>
+        <p class="hint provider-note">Your Steam and CS2 data must already be connected in Leetify for Valve rank data to exist.</p>
         <div class="secret-row">
           <input id="leetify-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Leetify API key" />
           <button class="secondary compact remove-key plugin-command" id="clear-leetify-key">Remove</button>
@@ -96,11 +110,12 @@
       <div class="provider-card">
         <div class="provider-card-head">
           <div>
-            <div class="provider-name">FACEIT</div>
+            <div class="provider-name">FACEIT · FACEIT Stats</div>
             <div class="provider-state" id="faceit-key-state">API key required</div>
           </div>
           <button class="text-link" id="get-faceit-key">Open Developer Portal ↗</button>
         </div>
+        <p class="hint provider-note"><strong>Unlocks:</strong> FACEIT Elo, Level, Region, K/D, HS%, win rate, recent record, and recent match.</p>
         <ol class="setup-steps">
           <li>Sign in to the FACEIT Developer Portal.</li>
           <li>Create an App in App Studio.</li>
@@ -116,12 +131,12 @@
       </div>
 
       <button class="primary full-width plugin-command" id="save-provider-keys">Save Keys and Test Connection</button>
-      <p class="action-feedback" id="provider-feedback">Add either key whenever you want to enable that provider's Pro stats.</p>
+      <p class="action-feedback" id="provider-feedback">Add the Leetify key for Competitive stats, the FACEIT key for FACEIT stats, or both.</p>
       <p class="privacy-note">Keys are stored in this plugin's local Stream Deck settings on this PC and sent only to the matching provider API. They are never sent to a PackRat server.</p>
 
       <div class="integration-grid">
+        <div><span>Leetify · Competitive</span><strong id="leetify-state">Setup required</strong></div>
         <div><span>FACEIT</span><strong id="faceit-state">Setup required</strong></div>
-        <div><span>Leetify / Valve ranks</span><strong id="leetify-state">Setup required</strong></div>
       </div>
       <div class="provider-links">
         <button class="text-link" id="view-leetify" hidden>View on Leetify ↗</button>
