@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS2 Competitive Dashboard</title>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="build-config.js"></script>
+  <script src="pi.js" defer></script>
+</head>
+<body>
+  <main class="pi-shell">
+    <header class="hero">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <div>
+        <div class="eyebrow">PACKRAT</div>
+        <h1 id="product-name">CS2 Competitive Dashboard</h1>
+        <div class="flavor" id="flavor-badge">PRO</div>
+      </div>
+    </header>
+
+    <section class="panel" id="metric-panel">
+      <label class="field-label" for="metric-select">Key Display</label>
+      <select id="metric-select"></select>
+      <p class="hint" id="metric-hint">Choose what this key displays.</p>
+    </section>
+
+    <section class="panel">
+      <div class="section-row">
+        <div>
+          <div class="field-label">Live CS2 Tracking</div>
+          <div class="status-line"><span class="status-dot" id="status-dot"></span><span id="status-text">Checking...</span></div>
+        </div>
+        <span class="pill" id="port-pill">LOCAL</span>
+      </div>
+
+      <label class="field-label small-gap" for="manual-path">CS2 path override <span class="optional">optional</span></label>
+      <input id="manual-path" type="text" spellcheck="false" placeholder="Auto detect Steam and CS2" />
+      <p class="hint">Leave blank unless automatic Steam library detection fails.</p>
+
+      <div class="button-row">
+        <button class="primary" id="enable-gsi">Enable Live CS2 Tracking</button>
+        <button class="secondary" id="disable-gsi">Disable</button>
+      </div>
+      <div class="error-copy" id="setup-error" hidden></div>
+    </section>
+
+    <section class="panel" id="pro-account-panel" hidden>
+      <div class="field-label">Competitive Account</div>
+      <label class="sub-label" for="steam-profile">Steam profile URL or SteamID</label>
+      <input id="steam-profile" type="text" spellcheck="false" placeholder="https://steamcommunity.com/id/..." />
+      <button class="primary compact" id="save-steam">Save Steam Profile</button>
+      <div class="integration-grid">
+        <div><span>FACEIT</span><strong id="faceit-state">Auto detect after setup</strong></div>
+        <div><span>Valve ranks</span><strong id="leetify-state">Leetify required</strong></div>
+      </div>
+      <p class="hint">FACEIT is optional. Premier and map Competitive ranks will use Leetify only after the production integration is commercially cleared.</p>
+    </section>
+
+    <section class="panel" id="session-panel" hidden>
+      <div class="section-row">
+        <div>
+          <div class="field-label">Current Session</div>
+          <div class="session-value" id="session-value">0W 0L</div>
+        </div>
+        <button class="secondary compact" id="reset-session">Reset</button>
+      </div>
+    </section>
+
+    <footer class="packrat-footer">
+      <button id="marketplace-link" class="footer-link"><span id="footer-label">Explore PackRat</span><span aria-hidden="true">↗</span></button>
+    </footer>
+  </main>
+</body>
+</html>
