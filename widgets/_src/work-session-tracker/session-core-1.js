@@ -12,7 +12,7 @@
   var PRO_UPGRADE_URL = 'https://marketplace.elgato.com/icue';
   var STORAGE_VERSION = 2;
   var RENDER_TIMER = null;
-  var lastActionAt = 0;
+  var lastActionAt = -Infinity;
   var lastWall = Date.now();
   var lastMono = typeof performance !== 'undefined' ? performance.now() : 0;
   var testNow = null;
