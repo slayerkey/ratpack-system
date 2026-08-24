@@ -31,8 +31,8 @@ function Remove-KnownGeneratedArtifacts {
             $index = Join-Path $_.FullName "index.html"
             if (Test-Path $index) {
                 $relative = "widgets/$($_.Name)/index.html"
-                & git -C $RepoRoot ls-files --error-unmatch -- $relative *> $null
-                if ($LASTEXITCODE -ne 0) {
+                $tracked = (& git -C $RepoRoot ls-files -- $relative 2>$null | Select-Object -First 1)
+                if (-not $tracked) {
                     Remove-Item $index -Force -ErrorAction SilentlyContinue
                 }
             }
