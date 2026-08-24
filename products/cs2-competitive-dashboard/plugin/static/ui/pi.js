@@ -3,6 +3,7 @@
   const FACEIT_DEVELOPER_PORTAL = "https://developers.faceit.com/";
   const FACEIT_KEY_GUIDE = "https://docs.faceit.com/getting-started/authentication/api-keys/";
   const LEETIFY_DEVELOPER_PAGE = "https://leetify.com/app/developer";
+  const COMMAND_WATCHDOG_MS = 12_000;
   const labels = {
     score: "Live Score",
     round: "Round / Phase",
@@ -47,6 +48,7 @@
   let registered = false;
   let domReady = false;
   let reconnectTimer;
+  let commandTimer;
   let pendingCommand = "";
   const queuedMessages = [];
 
@@ -77,12 +79,16 @@
     $("flavor-badge").textContent = build.flavor.toUpperCase();
     $("footer-label").textContent = build.footerLabel;
     $("marketplace-link").addEventListener("click", () => openUrl(build.footerUrl));
+    $("open-profiles").addEventListener("click", () => {
+      beginCommand("profile", "Opening the bundled profile files…");
+      sendToPlugin({ type: "open-profiles-folder" });
+    });
     $("enable-gsi").addEventListener("click", () => {
-      beginCommand("gsi", "Enabling live tracking…");
+      beginCommand("gsi", "Finding Steam and CS2, starting the local listener, and installing the GSI config…");
       sendToPlugin({ type: "enable-gsi", manualCs2Path: $("manual-path").value.trim() });
     });
     $("disable-gsi").addEventListener("click", () => {
-      beginCommand("gsi", "Disabling live tracking…");
+      beginCommand("gsi", "Stopping the local listener and removing the PackRat GSI config…");
       sendToPlugin({ type: "disable-gsi" });
     });
     $("reset-session").addEventListener("click", () => {
@@ -94,7 +100,7 @@
       sendToPlugin({ type: "set-steam-profile", steamProfile: $("steam-profile").value.trim() });
     });
     $("refresh-online").addEventListener("click", () => {
-      beginCommand("steam", "Refreshing provider stats…");
+      beginCommand("steam", "Refreshing Leetify and FACEIT stats…");
       sendToPlugin({ type: "refresh-online" });
     });
     $("save-provider-keys").addEventListener("click", saveProviderKeys);
@@ -166,12 +172,14 @@
 
     socket.onerror = () => {
       registered = false;
+      finishCommand();
       setInteractiveState(false);
       setTransport("bad", "Stream Deck connection error · retrying…");
     };
 
     socket.onclose = () => {
       registered = false;
+      finishCommand();
       setInteractiveState(false);
       setTransport("warn", "Stream Deck disconnected · retrying…");
       clearTimeout(reconnectTimer);
@@ -183,10 +191,10 @@
     const faceitApiKey = $("faceit-api-key").value.trim();
     const leetifyApiKey = $("leetify-api-key").value.trim();
     if (!faceitApiKey && !leetifyApiKey) {
-      $("provider-feedback").textContent = "Paste at least one provider key first.";
+      $("provider-feedback").textContent = "Paste at least one provider key first. Leetify unlocks Competitive stats; FACEIT unlocks FACEIT stats.";
       return;
     }
-    beginCommand("provider", "Saving keys and testing connection…");
+    beginCommand("provider", "Saving keys and testing configured providers…");
     sendToPlugin({ type: "set-provider-keys", faceitApiKey, leetifyApiKey });
     $("faceit-api-key").value = "";
     $("leetify-api-key").value = "";
@@ -211,6 +219,7 @@
   function sendToPlugin(payload) {
     if (!actionUuid || !actionContext) {
       setTransport("bad", "This action is missing its Stream Deck context");
+      finishCommand();
       return false;
     }
     return send({ event: "sendToPlugin", action: actionUuid, context: actionContext, payload });
@@ -228,9 +237,11 @@
     }
     if (message.event === "sendToPropertyInspector") {
       latestState = message.payload || {};
+      const commandResult = latestState.commandResult;
       finishCommand();
       renderState();
       renderMetric();
+      renderCommandResult(commandResult);
     }
   }
 
@@ -240,6 +251,9 @@
     $("pro-account-panel").hidden = !pro;
     $("provider-setup-panel").hidden = !pro;
     $("session-panel").hidden = !pro;
+    $("profile-summary").textContent = pro
+      ? "Pro includes separate Competitive and Live Match layouts for supported Stream Deck models."
+      : "Lite includes one simple Starter layout for supported Stream Deck models.";
     renderMetric();
     renderState();
   }
@@ -278,11 +292,11 @@
       return;
     }
     if (actionUuid.endsWith(".competitive")) {
-      $("metric-hint").textContent = `${selectedLabel} requires a saved Steam profile and Leetify API key.`;
+      $("metric-hint").textContent = `${selectedLabel} is a Leetify-backed Competitive stat. Save your Steam profile and Leetify API key below.`;
       return;
     }
     if (actionUuid.endsWith(".faceit")) {
-      $("metric-hint").textContent = `${selectedLabel} requires a saved Steam profile and FACEIT API key.`;
+      $("metric-hint").textContent = `${selectedLabel} comes from FACEIT. Save your Steam profile and FACEIT API key below.`;
       return;
     }
     $("metric-hint").textContent = "Choose what this key displays.";
@@ -302,26 +316,26 @@
     if (status.gsiConnected) {
       dot.classList.add("good");
       $("status-text").textContent = "Connected to CS2";
-      $("gsi-feedback").textContent = "Live game state is arriving from CS2.";
+      $("gsi-feedback").textContent = "Live game state is arriving from CS2. Live and session keys are updating automatically.";
     } else if (status.gsiRestartRequired) {
       dot.classList.add("warn");
       if (status.cs2Running) {
         $("status-text").textContent = "GSI installed · restart CS2 once";
-        $("gsi-feedback").textContent = "CS2 was already open when tracking was enabled. Close and reopen CS2 once so it loads the new GSI config.";
+        $("gsi-feedback").textContent = "Setup succeeded. CS2 was already open, so close and reopen CS2 once. Then enter any game mode and wait for Connected to CS2.";
       } else {
         $("status-text").textContent = "GSI installed · launch CS2";
-        $("gsi-feedback").textContent = "Setup is complete. Launch CS2 to begin live tracking.";
+        $("gsi-feedback").textContent = "Setup succeeded. Launch CS2, enter any game mode, and this will change to Connected to CS2 when the first game-state update arrives.";
       }
     } else if (status.gsiConfigured) {
       dot.classList.add(status.cs2Running ? "warn" : "good");
       $("status-text").textContent = status.cs2Running ? "Waiting for CS2 game state" : "Ready · launch CS2";
       $("gsi-feedback").textContent = status.cs2Running
-        ? "Tracking is enabled. Enter a match or game mode and the keys should update when CS2 sends GSI data."
-        : "Tracking is enabled. Launch CS2 when you are ready.";
+        ? "Tracking is enabled. Enter Deathmatch, Premier, Competitive, or another game mode. If this never changes to Connected, restart CS2 once."
+        : "Tracking is enabled. Launch CS2 and enter a game mode. No API key is required for live tracking.";
     } else {
       dot.classList.add("warn");
       $("status-text").textContent = "Live tracking not enabled";
-      $("gsi-feedback").textContent = "Click Enable Live CS2 Tracking once. The plugin will find CS2 and install its local GSI config automatically.";
+      $("gsi-feedback").textContent = "Tracking is off. Click Enable once. PackRat will find CS2 and install its local Valve GSI config automatically.";
     }
 
     $("enable-gsi").textContent = status.gsiConfigured ? "Reinstall Live Tracking" : "Enable Live CS2 Tracking";
@@ -334,12 +348,12 @@
     if (build.flavor === "pro") {
       if (document.activeElement !== $("steam-profile")) $("steam-profile").value = account.steamProfile || "";
       $("steam-feedback").textContent = account.steamConfigured
-        ? "Steam profile saved. Provider stats refresh in the background."
-        : "Not saved yet.";
+        ? "Steam profile saved. Leetify and FACEIT use this identity when their own API key is configured."
+        : "Save your Steam profile once before loading Leetify or FACEIT stats.";
       renderKeyState("faceit-key-state", account.faceitKeyConfigured, online.faceit);
       renderKeyState("leetify-key-state", account.leetifyKeyConfigured, online.leetify);
-      $("faceit-state").textContent = sourceText(online.faceit, account.faceitKeyConfigured ? "Waiting for Steam profile" : "API key required");
-      $("leetify-state").textContent = sourceText(online.leetify, account.leetifyKeyConfigured ? "Waiting for Steam profile" : "API key required");
+      $("faceit-state").textContent = sourceText(online.faceit, account.faceitKeyConfigured ? "Waiting for Steam profile" : "FACEIT key required");
+      $("leetify-state").textContent = sourceText(online.leetify, account.leetifyKeyConfigured ? "Waiting for Steam profile" : "Leetify key required");
       $("view-faceit").hidden = !online.faceit?.profileUrl;
       $("view-leetify").hidden = !online.leetify?.profileUrl;
       $("leetify-attribution").hidden = online.leetify?.status !== "ready";
@@ -347,7 +361,7 @@
       $("clear-leetify-key").hidden = !account.leetifyKeyConfigured;
       if (!pendingCommand || pendingCommand !== "provider") {
         if (account.faceitKeyConfigured || account.leetifyKeyConfigured) {
-          $("provider-feedback").textContent = "Saved provider keys stay local to this Stream Deck plugin and are not shown again after saving.";
+          $("provider-feedback").textContent = "Leetify powers Competitive stats. FACEIT powers FACEIT stats. Saved keys stay local and are not shown again after saving.";
         }
       }
     }
@@ -355,15 +369,54 @@
     renderMetricHint();
   }
 
+  function renderCommandResult(result) {
+    if (!result) return;
+    if (result.command === "open-profiles-folder") {
+      $("profile-feedback").textContent = result.ok
+        ? "Profile folder opened. Double click the Competitive, Live Match, or Starter file for your Stream Deck model, then click Install."
+        : result.message;
+      return;
+    }
+    if (result.command === "disable-gsi" && result.ok) {
+      $("gsi-feedback").textContent = "Live tracking disabled. PackRat stopped the local listener and removed its GSI config.";
+      return;
+    }
+    if ((result.command === "set-steam-profile" || result.command === "refresh-online") && result.message) {
+      $("steam-feedback").textContent = result.message;
+      return;
+    }
+    if ((result.command === "set-provider-keys" || result.command === "clear-provider-key") && result.message) {
+      $("provider-feedback").textContent = result.message;
+    }
+  }
+
   function beginCommand(kind, text) {
+    finishCommand();
     pendingCommand = kind;
-    if (kind === "gsi") $("gsi-feedback").textContent = text;
-    if (kind === "steam") $("steam-feedback").textContent = text;
-    if (kind === "provider") $("provider-feedback").textContent = text;
+    setInteractiveState(false);
+    setFeedback(kind, text);
+    commandTimer = window.setTimeout(() => {
+      if (!pendingCommand) return;
+      const stalled = pendingCommand;
+      pendingCommand = "";
+      setInteractiveState(registered);
+      setFeedback(stalled, "No response after 12 seconds. The command stopped waiting. Check the status above, then retry once. If it repeats, reinstall with Rat Dev and report the status message.");
+      sendToPlugin({ type: "get-status" });
+    }, COMMAND_WATCHDOG_MS);
   }
 
   function finishCommand() {
+    clearTimeout(commandTimer);
+    commandTimer = undefined;
     pendingCommand = "";
+    setInteractiveState(registered);
+  }
+
+  function setFeedback(kind, text) {
+    if (kind === "gsi") $("gsi-feedback").textContent = text;
+    if (kind === "steam") $("steam-feedback").textContent = text;
+    if (kind === "provider") $("provider-feedback").textContent = text;
+    if (kind === "profile") $("profile-feedback").textContent = text;
   }
 
   function setTransport(state, text) {
