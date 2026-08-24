@@ -13,7 +13,8 @@ $ShipToolRoot = Join-Path $ToolsRoot "ship"
 $WorkRoot = Join-Path $RepoRoot "out\ship-local\$WidgetSlug"
 $PlaywrightModule = Join-Path $ToolsRoot "node_modules\playwright"
 $PlaywrightCmd = Join-Path $ToolsRoot "node_modules\.bin\playwright.cmd"
-$IcueWidgetCliCmd = Join-Path $ToolsRoot "node_modules\.bin\icuewidget-cli.cmd"
+$LocalIcueWidgetCliCmd = Join-Path $ToolsRoot "node_modules\.bin\icuewidget.cmd"
+$IcueWidgetCliCmd = $null
 
 function Require-LocalCommand {
     param([string]$Name, [string]$Hint)
@@ -36,6 +37,16 @@ function Invoke-LocalStep {
 
 function Ensure-LocalDependencies {
     if ($env:RATPACK_LOCAL_SHIP_DEPS_READY -eq "1") {
+        $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
+        if ($systemIcue) {
+            $script:IcueWidgetCliCmd = $systemIcue.Source
+        }
+        elseif (Test-Path $LocalIcueWidgetCliCmd) {
+            $script:IcueWidgetCliCmd = $LocalIcueWidgetCliCmd
+        }
+        else {
+            throw "Rat Ship dependency cache said ready, but the CORSAIR iCUE widget CLI is no longer available."
+        }
         Write-Host "Local Rat Ship: dependency preflight already passed for this queue." -ForegroundColor DarkGray
         return
     }
@@ -49,17 +60,36 @@ function Ensure-LocalDependencies {
         Invoke-LocalStep "install Pillow 12.3.0" { & python -m pip install --disable-pip-version-check Pillow==12.3.0 }
     }
 
-    if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd) -or -not (Test-Path $IcueWidgetCliCmd)) {
-        Invoke-LocalStep "install shared Rat Ship Node tools" {
-            & npm install --prefix $ToolsRoot --no-save --package-lock=false --no-fund --no-audit playwright@1.62.1 icuewidget-cli@0.4.47
+    $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
+    $packages = @()
+    if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd)) {
+        $packages += "playwright@1.62.1"
+    }
+    if (-not $systemIcue -and -not (Test-Path $LocalIcueWidgetCliCmd)) {
+        $packages += "icuewidget-cli@0.4.47"
+    }
+
+    if ($packages.Count) {
+        Invoke-LocalStep "install missing shared Rat Ship Node tools" {
+            & npm install --prefix $ToolsRoot --no-save --package-lock=false --no-fund --no-audit @packages
         }
     }
 
     if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd)) {
         throw "Playwright installed without its expected module/command under $ToolsRoot"
     }
-    if (-not (Test-Path $IcueWidgetCliCmd)) {
-        throw "CORSAIR iCUE widget CLI installed without its command shim at $IcueWidgetCliCmd"
+
+    $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
+    if ($systemIcue) {
+        $script:IcueWidgetCliCmd = $systemIcue.Source
+        Write-Host "Local Rat Ship: using installed CORSAIR CLI at $($systemIcue.Source)" -ForegroundColor DarkGray
+    }
+    elseif (Test-Path $LocalIcueWidgetCliCmd) {
+        $script:IcueWidgetCliCmd = $LocalIcueWidgetCliCmd
+        Write-Host "Local Rat Ship: using cached CORSAIR CLI at $LocalIcueWidgetCliCmd" -ForegroundColor DarkGray
+    }
+    else {
+        throw "CORSAIR iCUE widget CLI is unavailable after dependency setup. Expected the 'icuewidget' command or $LocalIcueWidgetCliCmd"
     }
 
     Push-Location $ToolsRoot
