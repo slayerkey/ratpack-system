@@ -1,9 +1,10 @@
 import { deflateSync } from "node:zlib";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { builds } from "./builds.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
+const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
 
 for (const build of builds) {
   await mkdir(path.join(build.output, "bin"), { recursive: true });
@@ -13,6 +14,9 @@ for (const build of builds) {
   await copyFile("static/ui/property-inspector.html", path.join(build.output, "ui", "property-inspector.html"));
   await copyFile("static/ui/pi.js", path.join(build.output, "ui", "pi.js"));
   await copyFile("static/ui/theme.css", path.join(build.output, "ui", "theme.css"));
+  if (build.flavor === "pro" && await exists(LEETIFY_ATTRIBUTION)) {
+    await copyFile(LEETIFY_ATTRIBUTION, path.join(build.output, "ui", "leetify-provided-dark.svg"));
+  }
   await writeFile(
     path.join(build.output, "ui", "build-config.js"),
     `window.PACKRAT_BUILD = ${JSON.stringify({
@@ -70,6 +74,15 @@ function createManifest(build) {
     UUID: build.uuid,
     Version: "0.1.0.0"
   };
+}
+
+async function exists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function generateImages(build) {
