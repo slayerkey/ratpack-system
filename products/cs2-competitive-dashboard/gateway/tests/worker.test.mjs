@@ -4,8 +4,9 @@ import { handleRequest, resolveSteamIdentity } from "../src/worker.mjs";
 
 const STEAM = "76561198000000000";
 
-function response(body, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+function response(body, status = 200, contentType = "application/json") {
+  const payload = typeof body === "string" ? body : JSON.stringify(body);
+  return new Response(payload, { status, headers: { "content-type": contentType } });
 }
 
 function routeFetch(routes) {
@@ -14,22 +15,35 @@ function routeFetch(routes) {
     const route = routes.find((candidate) => url.includes(candidate.match));
     if (!route) throw new Error(`Unexpected fetch: ${url}`);
     if (route.assert) route.assert(url, init);
-    return response(route.body, route.status ?? 200);
+    return response(route.text ?? route.body, route.status ?? 200, route.contentType ?? (route.text ? "application/xml" : "application/json"));
   };
 }
 
 test("accepts a raw SteamID64 without an upstream lookup", async () => {
   let called = false;
-  const resolved = await resolveSteamIdentity(STEAM, {}, async () => { called = true; return response({}); });
+  const resolved = await resolveSteamIdentity(STEAM, async () => { called = true; return response({}); });
   assert.equal(resolved, STEAM);
   assert.equal(called, false);
 });
 
-test("resolves a Steam vanity URL only with server-side Steam credentials", async () => {
-  const fetchImpl = routeFetch([{ match: "ResolveVanityURL", body: { response: { success: 1, steamid: STEAM } } }]);
-  const resolved = await resolveSteamIdentity("https://steamcommunity.com/id/packrattest/", { STEAM_WEB_API_KEY: "secret" }, fetchImpl);
-  assert.equal(resolved, STEAM);
-  await assert.rejects(() => resolveSteamIdentity("packrattest", {}, fetchImpl), /STEAM_WEB_API_KEY/);
+test("resolves a Steam vanity URL through public Steam profile XML without an API key", async () => {
+  const fetchImpl = routeFetch([{
+    match: "steamcommunity.com/id/packrattest/?xml=1",
+    assert: (_url, init) => {
+      assert.equal(init.method, "GET");
+      assert.match(init.headers.accept, /application\/xml/);
+    },
+    text: `<profile><steamID64>${STEAM}</steamID64><steamID>PackRat</steamID></profile>`
+  }]);
+  const resolvedFromUrl = await resolveSteamIdentity("https://steamcommunity.com/id/packrattest/", fetchImpl);
+  assert.equal(resolvedFromUrl, STEAM);
+  const resolvedFromVanity = await resolveSteamIdentity("packrattest", fetchImpl);
+  assert.equal(resolvedFromVanity, STEAM);
+});
+
+test("rejects vanity profiles that do not expose a SteamID64", async () => {
+  const fetchImpl = routeFetch([{ match: "steamcommunity.com/id/missing/?xml=1", text: "<profile><steamID>Missing</steamID></profile>" }]);
+  await assert.rejects(() => resolveSteamIdentity("missing", fetchImpl), /valid SteamID64/);
 });
 
 test("normalizes Leetify and FACEIT without storing or proxying raw payloads", async () => {
@@ -77,6 +91,20 @@ test("normalizes Leetify and FACEIT without storing or proxying raw payloads", a
   assert.equal(body.faceit.recentMatches[0].score, "13-9");
   assert.equal("ranks" in body.leetify, false);
   assert.equal("lifetime" in body.faceit, false);
+});
+
+test("Leetify remains usable without a gateway API key", async () => {
+  const fetchImpl = routeFetch([
+    {
+      match: "api-public.cs-prod.leetify.com/v3/profile",
+      assert: (_url, init) => assert.equal(init.headers.Authorization, undefined),
+      body: { name: "Rat", ranks: { competitive: [] }, recent_matches: [] }
+    }
+  ]);
+  const result = await handleRequest(new Request(`https://gateway.example/v1/cs2/profile?steam=${STEAM}`), {}, fetchImpl);
+  const body = await result.json();
+  assert.equal(body.leetify.status, "ready");
+  assert.equal(body.faceit.status, "unavailable");
 });
 
 test("returns honest source-level not-found states instead of failing the whole profile", async () => {
