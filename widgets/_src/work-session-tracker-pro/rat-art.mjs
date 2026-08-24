@@ -11,7 +11,7 @@ const sessions = [
   focus('p3','Website Redesign',-3,570,190,'#2BE86A','web'), focus('p4','Writing',-4,590,95,'#62A8FF','writing'),
   focus('p5','Video Edit',-5,680,145,'#A879FF','video'), focus('p6','Writing',-6,620,110,'#62A8FF','writing')
 ];
-export const variants = [{ name:'week', slot:'L_H', mode:'week' }, { name:'projects', slot:'M_V', mode:'projects' }];
+export const variants = [{ name:'week', slot:'L_H', mode:'week' }, { name:'projects', slot:'L_V', mode:'projects' }];
 export async function prepare(page) {
   await page.addInitScript(({ now, fixture }) => {
     Date.now = () => now;
