@@ -53,24 +53,180 @@ function Ensure-StreamDeckCli {
     Require-Command "streamdeck" "Install with: npm install -g @elgato/cli@latest"
 }
 
-function Get-ExistingPluginUuid {
-    if (-not (Test-Path $Worktree)) { return $null }
-    $root = Join-Path $Worktree "plugins\$Slug"
-    if (-not (Test-Path $root)) { return $null }
-    $configPath = Join-Path $root "rat-dev.json"
-    $pluginDir = $null
-    if (Test-Path $configPath) {
-        try {
-            $config = Get-Content $configPath -Raw | ConvertFrom-Json
-            if ($config.plugin_dir) { $pluginDir = Join-Path $root ([string]$config.plugin_dir) }
+function Stop-ExistingLink {
+    param([string]$Uuid)
+    if (-not $Uuid) { return }
+    if (-not (Get-Command streamdeck -ErrorAction SilentlyContinue)) { return }
+    Write-Host "Stopping previous linked plugin $Uuid..." -ForegroundColor DarkGray
+    & streamdeck stop $Uuid *> $null
+    & streamdeck unlink -d $Uuid *> $null
+}
+
+function Read-OriginMainRegistration {
+    $configObject = "origin/main:plugins/$Slug/rat-dev.json"
+    $raw = & git -C $RepoRoot show $configObject 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $raw) {
+        return $null
+    }
+    try {
+        return (($raw -join "`n") | ConvertFrom-Json)
+    }
+    catch {
+        throw "Invalid rat-dev.json registration for $Slug on origin/main."
+    }
+}
+
+function Resolve-Source {
+    Write-Host "Fetching canonical RatPack source..." -ForegroundColor Cyan
+    Invoke-Checked -Command "git" -Arguments @("-C", $RepoRoot, "fetch", "--prune", "origin") -Failure "Git fetch failed"
+
+    $productRef = "refs/remotes/origin/product/$Slug"
+    if (Test-GitRef $productRef) {
+        return [PSCustomObject]@{
+            Kind = "ratpack"
+            Ref = "origin/product/$Slug"
+            Config = $null
+            SourceRoot = "plugins\$Slug"
+            Display = "origin/product/$Slug"
         }
-        catch { }
+    }
+
+    $registration = Read-OriginMainRegistration
+    if ($registration -and $registration.repository) {
+        $externalRef = if ($registration.ref) { [string]$registration.ref } else { "product/$Slug" }
+        $sourceRoot = if ($registration.source_root) { [string]$registration.source_root } else { "." }
+        return [PSCustomObject]@{
+            Kind = "external"
+            Repository = [string]$registration.repository
+            Ref = $externalRef
+            Config = $registration
+            SourceRoot = $sourceRoot
+            Display = "$($registration.repository) @ $externalRef"
+        }
+    }
+
+    $mainObject = "origin/main:plugins/$Slug"
+    & git -C $RepoRoot cat-file -e $mainObject 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        return [PSCustomObject]@{
+            Kind = "ratpack"
+            Ref = "origin/main"
+            Config = $null
+            SourceRoot = "plugins\$Slug"
+            Display = "origin/main"
+        }
+    }
+
+    throw "Could not find $Slug in RatPack or an external rat-dev registration on origin/main."
+}
+
+function Remove-ExistingCheckout {
+    & git -C $RepoRoot worktree remove --force $Worktree *> $null
+    if (Test-Path $Worktree) {
+        Remove-Item $Worktree -Recurse -Force
+    }
+    & git -C $RepoRoot worktree prune *> $null
+}
+
+function Sync-RatPackWorktree {
+    param([string]$Ref)
+
+    New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
+
+    $gitMarker = Join-Path $Worktree ".git"
+    if ((Test-Path $Worktree) -and (Test-Path $gitMarker -PathType Leaf)) {
+        Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "reset", "--hard", $Ref) -Failure "Could not update development worktree"
+        Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "clean", "-fd") -Failure "Could not clean development worktree"
+        return
+    }
+
+    if (Test-Path $Worktree) {
+        Remove-ExistingCheckout
+    }
+
+    Invoke-Checked -Command "git" -Arguments @("-C", $RepoRoot, "worktree", "add", "--force", "--detach", $Worktree, $Ref) -Failure "Could not create development worktree"
+}
+
+function Resolve-ExternalTarget {
+    param([string]$Ref)
+
+    $remoteTarget = "origin/$Ref"
+    & git -C $Worktree rev-parse --verify --quiet $remoteTarget *> $null
+    if ($LASTEXITCODE -eq 0) {
+        return $remoteTarget
+    }
+
+    & git -C $Worktree rev-parse --verify --quiet $Ref *> $null
+    if ($LASTEXITCODE -eq 0) {
+        return $Ref
+    }
+
+    throw "Could not resolve external development ref '$Ref' for $Slug."
+}
+
+function Sync-ExternalCheckout {
+    param($Source)
+
+    New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
+    $gitDir = Join-Path $Worktree ".git"
+    $canReuse = $false
+
+    if ((Test-Path $Worktree) -and (Test-Path $gitDir -PathType Container)) {
+        $remoteUrl = (& git -C $Worktree remote get-url origin 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -eq 0 -and [string]$remoteUrl -eq [string]$Source.Repository) {
+            $canReuse = $true
+        }
+    }
+
+    if (-not $canReuse) {
+        if (Test-Path $Worktree) {
+            Remove-ExistingCheckout
+        }
+        Write-Host "Cloning external product source..." -ForegroundColor Cyan
+        Invoke-Checked -Command "git" -Arguments @("clone", "--no-checkout", [string]$Source.Repository, $Worktree) -Failure "Could not clone external development repository"
+    }
+
+    Write-Host "Fetching external product updates..." -ForegroundColor Cyan
+    Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "fetch", "--prune", "origin") -Failure "External product fetch failed"
+    $target = Resolve-ExternalTarget ([string]$Source.Ref)
+    Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "reset", "--hard", $target) -Failure "Could not update external development checkout"
+    Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "clean", "-fd") -Failure "Could not clean external development checkout"
+}
+
+function Get-PluginRoot {
+    param($Source)
+    return (Join-Path $Worktree ([string]$Source.SourceRoot))
+}
+
+function Get-ExistingPluginUuid {
+    param($Source)
+
+    if ($Source.Config -and $Source.Config.plugin_uuid) {
+        return [string]$Source.Config.plugin_uuid
+    }
+    if (-not (Test-Path $Worktree)) { return $null }
+
+    $root = Get-PluginRoot $Source
+    if (-not (Test-Path $root)) { return $null }
+
+    $config = $Source.Config
+    if (-not $config) {
+        $configPath = Join-Path $root "rat-dev.json"
+        if (Test-Path $configPath) {
+            try { $config = Get-Content $configPath -Raw | ConvertFrom-Json } catch { }
+        }
+    }
+
+    $pluginDir = $null
+    if ($config -and $config.plugin_dir) {
+        $pluginDir = Join-Path $root ([string]$config.plugin_dir)
     }
     if (-not $pluginDir) {
         $candidate = Get-ChildItem $root -Directory -Filter "*.sdPlugin" -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($candidate) { $pluginDir = $candidate.FullName }
     }
     if (-not $pluginDir) { return $null }
+
     $manifestPath = Join-Path $pluginDir "manifest.json"
     if (-not (Test-Path $manifestPath)) { return $null }
     try {
@@ -82,74 +238,34 @@ function Get-ExistingPluginUuid {
     }
 }
 
-function Stop-ExistingLink {
-    param([string]$Uuid)
-    if (-not $Uuid) { return }
-    if (-not (Get-Command streamdeck -ErrorAction SilentlyContinue)) { return }
-    Write-Host "Stopping previous linked plugin $Uuid..." -ForegroundColor DarkGray
-    & streamdeck stop $Uuid *> $null
-    & streamdeck unlink -d $Uuid *> $null
-}
-
-function Resolve-SourceRef {
-    Write-Host "Fetching canonical RatPack source..." -ForegroundColor Cyan
-    Invoke-Checked -Command "git" -Arguments @("-C", $RepoRoot, "fetch", "--prune", "origin") -Failure "Git fetch failed"
-
-    $productRef = "refs/remotes/origin/product/$Slug"
-    if (Test-GitRef $productRef) {
-        return "origin/product/$Slug"
-    }
-
-    $mainObject = "origin/main:plugins/$Slug"
-    & git -C $RepoRoot cat-file -e $mainObject 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        return "origin/main"
-    }
-
-    throw "Could not find plugins/$Slug on origin/product/$Slug or origin/main. Push the product branch first."
-}
-
-function Sync-DevWorktree {
-    param([string]$Ref)
-
-    New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
-
-    if (Test-Path $Worktree) {
-        & git -C $Worktree rev-parse --is-inside-work-tree *> $null
-        if ($LASTEXITCODE -eq 0) {
-            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "reset", "--hard", $Ref) -Failure "Could not update development worktree"
-            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "clean", "-fd") -Failure "Could not clean development worktree"
-            return
-        }
-        Remove-Item $Worktree -Recurse -Force
-    }
-
-    & git -C $RepoRoot worktree prune *> $null
-    Invoke-Checked -Command "git" -Arguments @("-C", $RepoRoot, "worktree", "add", "--force", "--detach", $Worktree, $Ref) -Failure "Could not create development worktree"
-}
-
 function Build-And-TestPlugin {
-    $pluginRoot = Join-Path $Worktree "plugins\$Slug"
-    if (-not (Test-Path $pluginRoot)) {
-        throw "Plugin source not found after sync: $pluginRoot"
+    param(
+        [string]$PluginRoot,
+        $RegistrationConfig
+    )
+
+    if (-not (Test-Path $PluginRoot)) {
+        throw "Plugin source not found after sync: $PluginRoot"
     }
 
-    $configPath = Join-Path $pluginRoot "rat-dev.json"
-    $config = $null
-    if (Test-Path $configPath) {
-        $config = Get-Content $configPath -Raw | ConvertFrom-Json
-        if ($config.type -and [string]$config.type -ne "streamdeck-plugin") {
-            throw "rat dev currently supports streamdeck-plugin products. $Slug declares type '$($config.type)'."
+    $config = $RegistrationConfig
+    if (-not $config) {
+        $configPath = Join-Path $PluginRoot "rat-dev.json"
+        if (Test-Path $configPath) {
+            $config = Get-Content $configPath -Raw | ConvertFrom-Json
         }
     }
+    if ($config -and $config.type -and [string]$config.type -ne "streamdeck-plugin") {
+        throw "rat dev currently supports streamdeck-plugin products. $Slug declares type '$($config.type)'."
+    }
 
-    $packagePath = Join-Path $pluginRoot "package.json"
+    $packagePath = Join-Path $PluginRoot "package.json"
     if (Test-Path $packagePath) {
         $package = Get-Content $packagePath -Raw | ConvertFrom-Json
-        $nodeModules = Join-Path $pluginRoot "node_modules"
-        Push-Location $pluginRoot
+        $nodeModules = Join-Path $PluginRoot "node_modules"
+        Push-Location $PluginRoot
         try {
-            if (-not (Test-Path $nodeModules) -and (Test-Path (Join-Path $pluginRoot "package-lock.json"))) {
+            if (-not (Test-Path $nodeModules) -and (Test-Path (Join-Path $PluginRoot "package-lock.json"))) {
                 Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
                 Invoke-Checked -Command "npm" -Arguments @("ci", "--no-fund", "--no-audit") -Failure "npm ci failed"
             }
@@ -174,15 +290,15 @@ function Build-And-TestPlugin {
 
     $pluginDir = $null
     if ($config -and $config.plugin_dir) {
-        $pluginDir = Join-Path $pluginRoot ([string]$config.plugin_dir)
+        $pluginDir = Join-Path $PluginRoot ([string]$config.plugin_dir)
     }
     else {
-        $candidate = Get-ChildItem $pluginRoot -Directory -Filter "*.sdPlugin" | Select-Object -First 1
+        $candidate = Get-ChildItem $PluginRoot -Directory -Filter "*.sdPlugin" | Select-Object -First 1
         if ($candidate) { $pluginDir = $candidate.FullName }
     }
 
     if (-not $pluginDir -or -not (Test-Path $pluginDir)) {
-        throw "Could not locate the built .sdPlugin directory under $pluginRoot"
+        throw "Could not locate the built .sdPlugin directory under $PluginRoot"
     }
 
     $manifestPath = Join-Path $pluginDir "manifest.json"
@@ -198,7 +314,7 @@ function Build-And-TestPlugin {
     Invoke-Checked -Command "streamdeck" -Arguments @("validate", $pluginDir) -Failure "Stream Deck validation failed"
 
     return [PSCustomObject]@{
-        Root = $pluginRoot
+        Root = $PluginRoot
         PluginDir = $pluginDir
         Uuid = [string]$manifest.UUID
         Version = [string]$manifest.Version
@@ -232,10 +348,18 @@ function Install-DevPlugin {
 
 Require-Command "git" "Install Git for Windows first."
 Ensure-StreamDeckCli
-$oldUuid = Get-ExistingPluginUuid
+$source = Resolve-Source
+Write-Host "Using $($source.Display)" -ForegroundColor DarkGray
+$oldUuid = Get-ExistingPluginUuid $source
 Stop-ExistingLink $oldUuid
-$sourceRef = Resolve-SourceRef
-Write-Host "Using $sourceRef" -ForegroundColor DarkGray
-Sync-DevWorktree $sourceRef
-$plugin = Build-And-TestPlugin
+
+if ($source.Kind -eq "external") {
+    Sync-ExternalCheckout $source
+}
+else {
+    Sync-RatPackWorktree ([string]$source.Ref)
+}
+
+$pluginRoot = Get-PluginRoot $source
+$plugin = Build-And-TestPlugin -PluginRoot $pluginRoot -RegistrationConfig $source.Config
 Install-DevPlugin $plugin
