@@ -1,8 +1,22 @@
 # Discord Bridge QA
 
-Current build: `0.1.0.4`
+Current feasibility build: `0.2.0.0`
 
-## Automated checks
+## Proven before the StreamKit pivot
+
+PASS: Stream Deck plugin process runs on the user's Windows host.
+
+PASS: localhost PackRat bridge listens on `127.0.0.1:17483`.
+
+PASS: plugin connects to `\\?\\pipe\\discord-ipc-0`.
+
+PASS: Discord returns the native IPC `READY` handshake.
+
+PASS: direct XENEON browser to legacy Discord WebSocket RPC is not viable because Discord returns Invalid Origin.
+
+PASS: native RPC `AUTHORIZE` reaches Discord, which rejects `rpc.voice.read` and `rpc.voice.write` with `invalid_scope` before issuing a code for the current application.
+
+## Current automated checks
 
 PASS: Discord IPC framing is little endian and handles chunked frames.
 
@@ -14,58 +28,40 @@ PASS: XENEON-compatible local/file origins are accepted and normal remote web or
 
 PASS: local `Origin: null` bridge connection and command delivery.
 
-PASS: OAuth helper does not send a Discord Client Secret.
+PASS: official StreamKit voice URL generation uses `streamkit.discord.com/overlay/voice/<guild>/<channel>`.
 
-PASS: Public Client token-exchange request is covered by deterministic fixture tests.
+PASS: StreamKit DOM normalization preserves roster, order, speaking state, and self voice hints.
 
-PASS: all JavaScript source parses and the package build completes.
+PASS: StreamKit DOM probe uses broad class substring selectors instead of a single generated CSS hash.
 
-PASS: ten Node tests pass in the current ChatGPT execution environment.
+PASS: mute helper emits Discord's Ctrl Shift M shortcut.
 
-PASS: normal connection/auth states no longer call Stream Deck `showAlert`; state is communicated through the key title instead.
+PASS: deafen helper emits Discord's Ctrl Shift D shortcut.
 
-PASS: `UserTitleEnabled` is true so Stream Deck does not present the action as `Title disabled`.
+PASS: normal connection states do not invoke Stream Deck warning overlays.
 
-## Proven on the user's Windows host
+PASS: `UserTitleEnabled` remains true.
 
-PASS: Stream Deck plugin process runs.
+## Current physical feasibility gate
 
-PASS: localhost bridge listens on port 17483.
+Run:
 
-PASS: plugin connects to `\\?\\pipe\\discord-ipc-0`.
+```text
+rat dev discord-bridge
+rat dev discord-panel
+```
 
-PASS: Discord returns the native IPC `READY` handshake.
+Configure the Discord Server ID and Voice Channel ID in the XENEON widget settings.
 
-PASS: Rat Dev canonical updater builds, tests and validates build `0.1.0.4` from `origin/product/discord-bridge` without using Downloads.
+Then prove on the user's Windows host and physical XENEON Edge:
 
-PASS: official Stream Deck CLI validation succeeds locally.
+1. bridge state reports `buildVersion: 0.2.0.0`
+2. `streamkit.mode` is `official_overlay_edge`
+3. `streamkit.stage` reaches `ready`
+4. roster members appear on XENEON
+5. speaking state changes are visible on XENEON
+6. mute touch toggles Discord
+7. deafen touch toggles Discord
+8. the companion recovers after Stream Deck or Discord restarts
 
-Observed healthy pre-auth state:
-
-- `buildVersion: 0.1.0.4`
-- `discord.connected: true`
-- `discord.ready: true`
-- `discord.rpcVersion: 1`
-- `discord.handshake: ready`
-- `error: null`
-
-## Current Discord authorization result
-
-BLOCKED: native IPC `AUTHORIZE` with `rpc.voice.read` and `rpc.voice.write` returns:
-
-`OAuth2 Error: invalid_scope: The requested scope is invalid, unknown, or malformed. (5000)`
-
-The rejection happens before code exchange:
-
-- `oauth.stage: failed`
-- `oauth.codeReceived: false`
-- `oauth.tokenExchangeAttempted: false`
-- `oauth.tokenExchangeStatus: null`
-
-This means the local transport, Stream Deck companion and Discord IPC handshake are not the blocker. Discord is rejecting the requested restricted voice scopes at the authorization boundary.
-
-## Final development-only check before parking
-
-Discord documents App Testers as the access path for unapproved RPC applications during development. Add the developer account explicitly under App Testers, accept the tester invitation if required, and retry once.
-
-If an explicitly accepted App Tester still receives `invalid_scope`, stop local auth iteration. General public release requires Discord approval for `rpc.voice.read` and `rpc.voice.write` regardless.
+If `streamkit.stage` never reaches `ready`, inspect `/state` before changing architecture again. The next debugging target is current StreamKit DOM/runtime behavior in the hidden Edge page, not Discord restricted OAuth.
