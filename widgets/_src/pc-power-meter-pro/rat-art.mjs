@@ -14,6 +14,7 @@ export const variants = [
   { name: 'preview', slot: 'M_H', mode: 'preview' },
   { name: 'empty', slot: 'M_H', mode: 'empty' },
   { name: 'unavailable', slot: 'M_H', mode: 'unavailable' },
+  { name: 'reconnect', slot: 'M_H', mode: 'reconnect' },
 ];
 
 export async function prepare(page, context) {
@@ -234,7 +235,7 @@ export async function assert(page, context) {
   }
   if (context.variant?.mode === 'info' && report.overlayHidden) throw new Error('Pro info overlay did not open');
 
-  if (!context.variant && context.slot === 'M_H') {
+  if (context.variant?.mode === 'reconnect') {
     const before = await page.evaluate(() => globalThis.PackRatPowerMeterTest.getSession());
     await page.evaluate(() => globalThis.__powerProFixture.remove('total'));
     await page.waitForFunction(() => document.body.getAttribute('data-panel-state') === 'disconnected', null, { timeout: 3000 });
