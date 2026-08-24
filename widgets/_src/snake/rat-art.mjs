@@ -40,12 +40,14 @@ export async function assert(page, context) {
     const overlay = document.getElementById("overlay");
     const canvas = document.getElementById("gameCanvas").getBoundingClientRect();
     const zones = Array.from(document.querySelectorAll(".touch-zone")).map(el => el.getBoundingClientRect());
+    const overlayStyle = getComputedStyle(overlay);
+    const overlayBox = overlay.getBoundingClientRect();
     return {
       slot: s.slot,
       state: s.state,
       score: s.score,
       highScore: s.highScore,
-      overlayOpacity: Number(getComputedStyle(overlay).opacity),
+      overlayVisible: overlayStyle.display !== "none" && overlayStyle.visibility !== "hidden" && overlayBox.width > 0 && overlayBox.height > 0,
       canvas: { width: canvas.width, height: canvas.height },
       zoneCount: zones.filter(r => r.width > 0 && r.height > 0).length
     };
@@ -54,7 +56,7 @@ export async function assert(page, context) {
   if (result.slot !== expected) throw new Error(`Rat Art slot mismatch ${context.slot}: ${result.slot}`);
   if (result.state !== "playing") throw new Error(`Rat Art fixture must show active game: ${result.state}`);
   if (result.score !== 180 || result.highScore !== 430) throw new Error("Rat Art score fixture drifted");
-  if (result.overlayOpacity > .05) throw new Error("Rat Art active-game overlay should be hidden");
+  if (result.overlayVisible) throw new Error("Rat Art active-game overlay should be hidden");
   if (result.canvas.width < 100 || result.canvas.height < 100) throw new Error("Rat Art canvas is unexpectedly small");
   if (result.zoneCount !== 4) throw new Error("Rat Art touch zones missing");
 }
