@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import streamDeck from "@elgato/streamdeck";
 import type { LiveState, RuntimeStatus, SessionMetrics } from "./core/types.js";
@@ -12,6 +13,8 @@ import { emptyOnlineSnapshot, type OnlineProfileSnapshot } from "./providers/typ
 import { SessionTracker } from "./session/session-tracker.js";
 
 const execFileAsync = promisify(execFile);
+const PI_COMMAND_TIMEOUT_MS = 10_000;
+const PROFILES_DIR = fileURLToPath(new URL("../profiles/", import.meta.url));
 
 export interface DashboardSnapshot {
   live?: LiveState;
@@ -36,6 +39,7 @@ type PiCommand =
   | { type: "get-status" }
   | { type: "enable-gsi"; manualCs2Path?: string }
   | { type: "disable-gsi" }
+  | { type: "open-profiles-folder" }
   | { type: "reset-session" }
   | { type: "set-steam-profile"; steamProfile?: string }
   | { type: "set-provider-keys"; faceitApiKey?: string; leetifyApiKey?: string }
@@ -136,51 +140,69 @@ export class DashboardRuntime {
 
   async handlePiCommand(payload: unknown): Promise<Record<string, unknown>> {
     const command = this.parseCommand(payload);
-    if (!command) return { type: "error", message: "Unknown command" };
+    if (!command) return { ...this.publicState(), type: "error", message: "Unknown command" };
 
     try {
       switch (command.type) {
         case "get-status":
           return this.publicState();
         case "enable-gsi":
-          await this.enableGsi(command.manualCs2Path);
-          return this.publicState();
+          await this.withTimeout(
+            this.enableGsi(command.manualCs2Path),
+            PI_COMMAND_TIMEOUT_MS,
+            "Live tracking setup took too long. Check the CS2 path or try again."
+          );
+          return this.commandState("enable-gsi", "Live tracking is enabled.");
         case "disable-gsi":
-          await this.disableGsi();
-          return this.publicState();
+          await this.withTimeout(
+            this.disableGsi(),
+            PI_COMMAND_TIMEOUT_MS,
+            "Disabling live tracking took too long. Restart the plugin and try again."
+          );
+          return this.commandState("disable-gsi", "Live tracking is disabled.");
+        case "open-profiles-folder":
+          this.openProfilesFolder();
+          return this.commandState("open-profiles-folder", "Opened the bundled profile files.");
         case "reset-session":
           this.sessionTracker.reset();
           this.publish({ session: this.sessionTracker.snapshot() });
-          return this.publicState();
+          return this.commandState("reset-session", "Session stats reset.");
         case "set-steam-profile":
           this.globals.steamProfile = command.steamProfile?.trim() || undefined;
-          await this.saveGlobals();
+          await this.withTimeout(this.saveGlobals(), PI_COMMAND_TIMEOUT_MS, "Saving the Steam profile took too long.");
           this.publish({ online: emptyOnlineSnapshot(this.globals.steamProfile) });
           if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
-          return this.publicState();
+          return this.commandState("set-steam-profile", this.globals.steamProfile ? "Steam profile saved." : "Steam profile cleared.");
         case "set-provider-keys": {
           const faceit = command.faceitApiKey?.trim();
           const leetify = command.leetifyApiKey?.trim();
           if (faceit) this.globals.faceitApiKey = faceit;
           if (leetify) this.globals.leetifyApiKey = leetify;
-          await this.saveGlobals();
+          await this.withTimeout(this.saveGlobals(), PI_COMMAND_TIMEOUT_MS, "Saving provider keys took too long.");
           if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
-          return this.publicState();
+          return this.commandState("set-provider-keys", "Provider keys saved. Testing configured providers now.");
         }
         case "clear-provider-key":
           if (command.provider === "faceit") this.globals.faceitApiKey = undefined;
           else this.globals.leetifyApiKey = undefined;
-          await this.saveGlobals();
+          await this.withTimeout(this.saveGlobals(), PI_COMMAND_TIMEOUT_MS, "Removing the provider key took too long.");
           if (this.onlineEnabled && this.globals.steamProfile) void this.refreshOnline(true);
-          return this.publicState();
+          return this.commandState("clear-provider-key", `${command.provider === "faceit" ? "FACEIT" : "Leetify"} key removed.`);
         case "refresh-online":
-          if (this.onlineEnabled) await this.refreshOnline(true);
-          return this.publicState();
+          if (this.onlineEnabled) {
+            await this.withTimeout(this.refreshOnline(true), PI_COMMAND_TIMEOUT_MS, "Provider refresh took too long. Check your keys and internet connection.");
+          }
+          return this.commandState("refresh-online", "Provider refresh finished.");
       }
     } catch (error) {
       const message = this.errorMessage(error);
       this.updateStatus({ error: message });
-      return { type: "error", message, ...this.publicState() };
+      return {
+        ...this.publicState(),
+        type: "error",
+        message,
+        commandResult: { command: command.type, ok: false, message }
+      };
     }
   }
 
@@ -320,6 +342,31 @@ export class DashboardRuntime {
     }
   }
 
+  private openProfilesFolder(): void {
+    execFile("explorer.exe", [PROFILES_DIR], { windowsHide: true });
+  }
+
+  private commandState(command: string, message: string): Record<string, unknown> {
+    return {
+      ...this.publicState(),
+      commandResult: { command, ok: true, message }
+    };
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+        })
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private updateStatus(patch: Partial<RuntimeStatus>): void {
     const current = this.store.get();
     this.store.set({ ...current, status: { ...current.status, ...patch } });
@@ -357,6 +404,7 @@ export class DashboardRuntime {
     const candidate = payload as Record<string, unknown>;
     if (candidate.type === "get-status") return { type: "get-status" };
     if (candidate.type === "disable-gsi") return { type: "disable-gsi" };
+    if (candidate.type === "open-profiles-folder") return { type: "open-profiles-folder" };
     if (candidate.type === "reset-session") return { type: "reset-session" };
     if (candidate.type === "refresh-online") return { type: "refresh-online" };
     if (candidate.type === "enable-gsi") {
