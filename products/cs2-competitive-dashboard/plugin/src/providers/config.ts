@@ -1,11 +1,7 @@
-// Filled with the production RatPack gateway URL only after the provider gateway is deployed
-// and the FACEIT / Leetify commercial release gates are cleared.
-export const PRO_GATEWAY_BASE_URL = "";
-
-// Rank and profile data does not need live polling. Normal background refreshes are
-// intentionally conservative because FACEIT documents 429 responses but does not
-// publish a numeric Data API quota. Match completion and manual refresh still force
-// an immediate provider update.
+// Provider rank data is slow-moving. Each Pro install uses the customer's own
+// FACEIT and Leetify keys, so there is no shared PackRat provider quota. We still
+// keep background polling conservative and refresh immediately after matches or on
+// explicit user request.
 const ONLINE_PROFILE_REFRESH_BASE_MS = 60 * 60 * 1000;
 const ONLINE_PROFILE_REFRESH_JITTER_MS = 10 * 60 * 1000;
 
@@ -17,6 +13,4 @@ export function nextOnlineProfileRefreshDelay(random = Math.random): number {
   );
 }
 
-// Chosen once per plugin process so installs naturally spread their provider traffic
-// over a 50 to 70 minute window instead of forming a synchronized refresh spike.
 export const ONLINE_PROFILE_REFRESH_MS = nextOnlineProfileRefreshDelay();
