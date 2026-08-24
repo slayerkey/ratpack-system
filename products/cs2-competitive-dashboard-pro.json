@@ -1,0 +1,34 @@
+{
+  "id": "cs2-competitive-dashboard-pro",
+  "name": "CS2 Competitive Dashboard Pro",
+  "type": "plugin",
+  "status": "building",
+  "workflow_state": "BUILDING",
+  "price_usd": 9.99,
+  "version": "0.1.0.0",
+  "platform": "Elgato Stream Deck / Windows",
+  "source": "products/cs2-competitive-dashboard/plugin",
+  "plugin_uuid": "com.packrat.cs2-competitive-dashboard-pro",
+  "build_flavor": "pro",
+  "minimum_stream_deck": "6.9",
+  "node_runtime": "20",
+  "validation": "products/cs2-competitive-dashboard/VALIDATION.md",
+  "plan": "products/cs2-competitive-dashboard/PLAN.md",
+  "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
+  "commercial_gates": [
+    "Leetify paid-distribution, caching, attribution and quota clarification before Leetify-backed features are listed as production-ready",
+    "FACEIT production developer terms and gateway credentials confirmed before live provider calls ship"
+  ],
+  "release_gate": [
+    "shared source builds Pro and Lite deterministically",
+    "unit and fixture tests pass",
+    "manifest validation",
+    "official Elgato CLI validation",
+    "official .streamDeckPlugin packaging",
+    "property inspector setup/error-state QA",
+    "GSI installer custom-library fixtures",
+    "real normal-player CS2 GSI payload spike",
+    "external provider commercial gates cleared for listed Pro features",
+    "physical Stream Deck smoke test where required"
+  ]
+}
