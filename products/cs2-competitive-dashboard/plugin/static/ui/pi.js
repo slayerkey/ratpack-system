@@ -19,7 +19,18 @@
     map: "Current Map",
     team: "Team",
     record: "Session Record",
-    matches: "Session Matches"
+    matches: "Session Matches",
+    premier: "Premier Rating",
+    "current-map-rank": "Current Map Competitive Rank",
+    "best-map-rank": "Best Competitive Map Rank",
+    "recent-result": "Recent Competitive Result",
+    "win-rate": "Win Rate",
+    "leetify-rating": "Leetify Rating",
+    elo: "FACEIT Elo",
+    level: "FACEIT Level",
+    region: "FACEIT Region",
+    "recent-record": "FACEIT Recent Record",
+    "recent-match": "FACEIT Recent Match"
   };
 
   let socket;
@@ -54,11 +65,15 @@
     $("product-name").textContent = build.name;
     $("flavor-badge").textContent = build.flavor.toUpperCase();
     $("footer-label").textContent = build.footerLabel;
-    $("marketplace-link").addEventListener("click", () => send({ event: "openUrl", payload: { url: build.footerUrl } }));
+    $("marketplace-link").addEventListener("click", () => openUrl(build.footerUrl));
     $("enable-gsi").addEventListener("click", () => sendToPlugin({ type: "enable-gsi", manualCs2Path: $("manual-path").value.trim() }));
     $("disable-gsi").addEventListener("click", () => sendToPlugin({ type: "disable-gsi" }));
     $("reset-session").addEventListener("click", () => sendToPlugin({ type: "reset-session" }));
     $("save-steam").addEventListener("click", () => sendToPlugin({ type: "set-steam-profile", steamProfile: $("steam-profile").value.trim() }));
+    $("refresh-online").addEventListener("click", () => sendToPlugin({ type: "refresh-online" }));
+    $("view-leetify").addEventListener("click", () => openUrl(latestState.online?.leetify?.profileUrl));
+    $("view-faceit").addEventListener("click", () => openUrl(latestState.online?.faceit?.profileUrl));
+    $("leetify-attribution").addEventListener("click", () => openUrl("https://leetify.com/"));
     $("metric-select").addEventListener("change", () => {
       actionSettings = { ...actionSettings, metric: $("metric-select").value };
       send({ event: "setSettings", action: actionUuid, context: actionContext, payload: actionSettings });
@@ -73,6 +88,10 @@
   function sendToPlugin(payload) {
     if (!actionUuid || !actionContext) return;
     send({ event: "sendToPlugin", action: actionUuid, context: actionContext, payload });
+  }
+
+  function openUrl(url) {
+    if (url) send({ event: "openUrl", payload: { url } });
   }
 
   function handleMessage(message) {
@@ -106,6 +125,8 @@
     let options = [];
     if (actionUuid.endsWith(".live")) options = build.liveMetrics || [];
     else if (actionUuid.endsWith(".session")) options = build.sessionMetrics || [];
+    else if (actionUuid.endsWith(".competitive")) options = build.competitiveMetrics || [];
+    else if (actionUuid.endsWith(".faceit")) options = build.faceitMetrics || [];
 
     $("metric-panel").hidden = options.length === 0;
     $("metric-select").innerHTML = options.map((metric) => `<option value="${escapeHtml(metric)}">${escapeHtml(labels[metric] || metric)}</option>`).join("");
@@ -118,6 +139,7 @@
     const status = latestState.status || {};
     const account = latestState.account || {};
     const session = latestState.session || {};
+    const online = latestState.online || {};
     const error = latestState.message || status.error || "";
 
     const dot = $("status-dot");
@@ -140,9 +162,28 @@
 
     if (build.flavor === "pro") {
       if (document.activeElement !== $("steam-profile")) $("steam-profile").value = account.steamProfile || "";
-      $("faceit-state").textContent = account.steamConfigured ? "Ready for auto detect" : "Add Steam profile";
-      $("leetify-state").textContent = account.steamConfigured ? "Leetify required" : "Add Steam profile";
+      $("faceit-state").textContent = sourceText(online.faceit, account.steamConfigured ? "Waiting for provider" : "Add Steam profile");
+      $("leetify-state").textContent = sourceText(online.leetify, account.steamConfigured ? "Leetify required" : "Add Steam profile");
+      $("view-faceit").hidden = !online.faceit?.profileUrl;
+      $("view-leetify").hidden = !online.leetify?.profileUrl;
+      $("leetify-attribution").hidden = online.leetify?.status !== "ready";
     }
+  }
+
+  function sourceText(source, fallback) {
+    if (!source) return fallback;
+    const states = {
+      ready: "Connected",
+      loading: "Loading…",
+      not_found: "Not found",
+      private: "Profile private",
+      rate_limited: "Rate limited",
+      commercial_gate: "Provider unavailable",
+      offline: "API offline",
+      unavailable: source.message || "Unavailable",
+      not_configured: fallback
+    };
+    return states[source.status] || fallback;
   }
 
   function escapeHtml(value) {

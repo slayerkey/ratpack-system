@@ -49,12 +49,20 @@
       <div class="field-label">Competitive Account</div>
       <label class="sub-label" for="steam-profile">Steam profile URL or SteamID</label>
       <input id="steam-profile" type="text" spellcheck="false" placeholder="https://steamcommunity.com/id/..." />
-      <button class="primary compact" id="save-steam">Save Steam Profile</button>
-      <div class="integration-grid">
-        <div><span>FACEIT</span><strong id="faceit-state">Auto detect after setup</strong></div>
-        <div><span>Valve ranks</span><strong id="leetify-state">Leetify required</strong></div>
+      <div class="button-row">
+        <button class="primary compact" id="save-steam">Save Steam Profile</button>
+        <button class="secondary compact" id="refresh-online">Refresh</button>
       </div>
-      <p class="hint">FACEIT is optional. Premier and map Competitive ranks will use Leetify only after the production integration is commercially cleared.</p>
+      <div class="integration-grid">
+        <div><span>FACEIT</span><strong id="faceit-state">Add Steam profile</strong></div>
+        <div><span>Valve ranks</span><strong id="leetify-state">Add Steam profile</strong></div>
+      </div>
+      <p class="hint">FACEIT is auto-detected from Steam. Premier and per-map Competitive ranks require a registered, visible Leetify profile.</p>
+      <div class="provider-links">
+        <button class="text-link" id="view-leetify" hidden>View on Leetify ↗</button>
+        <button class="text-link" id="view-faceit" hidden>View on FACEIT ↗</button>
+      </div>
+      <div class="attribution" id="leetify-attribution">Data Provided by Leetify</div>
     </section>
 
     <section class="panel" id="session-panel" hidden>

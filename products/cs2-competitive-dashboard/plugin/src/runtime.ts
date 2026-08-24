@@ -4,12 +4,16 @@ import { StateStore } from "./core/store.js";
 import { createGsiToken, installGsiConfig, removeGsiConfig } from "./gsi/installer.js";
 import { normalizeGsiPayload } from "./gsi/normalize.js";
 import { GsiServer } from "./gsi/server.js";
+import { ONLINE_PROFILE_REFRESH_MS, PRO_GATEWAY_BASE_URL } from "./providers/config.js";
+import { GatewayClient, GatewayError } from "./providers/gateway-client.js";
+import { emptyOnlineSnapshot, type OnlineProfileSnapshot, type OnlineSourceStatus } from "./providers/types.js";
 import { SessionTracker } from "./session/session-tracker.js";
 
 export interface DashboardSnapshot {
   live?: LiveState;
   session: SessionMetrics;
   status: RuntimeStatus;
+  online: OnlineProfileSnapshot;
 }
 
 type GlobalSettings = {
@@ -27,21 +31,38 @@ type PiCommand =
   | { type: "enable-gsi"; manualCs2Path?: string }
   | { type: "disable-gsi" }
   | { type: "reset-session" }
-  | { type: "set-steam-profile"; steamProfile?: string };
+  | { type: "set-steam-profile"; steamProfile?: string }
+  | { type: "refresh-online" };
+
+export interface DashboardRuntimeOptions {
+  onlineEnabled?: boolean;
+  gatewayBaseUrl?: string;
+}
 
 export class DashboardRuntime {
   private readonly server = new GsiServer();
   private readonly sessionTracker = new SessionTracker();
+  private readonly onlineEnabled: boolean;
+  private readonly gateway: GatewayClient;
   private readonly store = new StateStore<DashboardSnapshot>({
     session: this.sessionTracker.snapshot(),
     status: {
       cs2Running: false,
       gsiConfigured: false,
       gsiConnected: false
-    }
+    },
+    online: emptyOnlineSnapshot()
   });
   private globals: GlobalSettings = {};
   private disconnectTimer?: NodeJS.Timeout;
+  private onlineTimer?: NodeJS.Timeout;
+  private onlineAbort?: AbortController;
+  private onlineRefresh?: Promise<void>;
+
+  constructor(options: DashboardRuntimeOptions = {}) {
+    this.onlineEnabled = options.onlineEnabled ?? false;
+    this.gateway = new GatewayClient(options.gatewayBaseUrl ?? PRO_GATEWAY_BASE_URL);
+  }
 
   subscribe(listener: (snapshot: DashboardSnapshot) => void): () => void {
     return this.store.subscribe(listener);
@@ -85,10 +106,16 @@ export class DashboardRuntime {
     }
 
     this.disconnectTimer = setInterval(() => this.checkConnectionFreshness(), 2_000);
+    if (this.onlineEnabled) {
+      if (this.globals.steamProfile) void this.refreshOnline(true);
+      this.onlineTimer = setInterval(() => void this.refreshOnline(false), ONLINE_PROFILE_REFRESH_MS);
+    }
   }
 
   async shutdown(): Promise<void> {
     if (this.disconnectTimer) clearInterval(this.disconnectTimer);
+    if (this.onlineTimer) clearInterval(this.onlineTimer);
+    this.onlineAbort?.abort();
     await this.server.stop();
   }
 
@@ -120,6 +147,11 @@ export class DashboardRuntime {
         case "set-steam-profile":
           this.globals.steamProfile = command.steamProfile?.trim() || undefined;
           await this.saveGlobals();
+          this.publish({ online: emptyOnlineSnapshot(this.globals.steamProfile) });
+          if (this.onlineEnabled && this.globals.steamProfile) await this.refreshOnline(true);
+          return this.publicState();
+        case "refresh-online":
+          if (this.onlineEnabled) await this.refreshOnline(true);
           return this.publicState();
       }
     } catch (error) {
@@ -178,13 +210,14 @@ export class DashboardRuntime {
   }
 
   private ingest(payload: Parameters<typeof normalizeGsiPayload>[0]): void {
+    const before = this.store.get();
     const live = normalizeGsiPayload(payload);
     const session = this.sessionTracker.ingest(live);
     this.publish({
       live,
       session,
       status: {
-        ...this.store.get().status,
+        ...before.status,
         cs2Running: true,
         gsiConnected: true,
         gsiConfigured: true,
@@ -192,6 +225,59 @@ export class DashboardRuntime {
         error: undefined
       }
     });
+
+    if (this.onlineEnabled && session.matches > before.session.matches) {
+      setTimeout(() => void this.refreshOnline(true), 30_000);
+    }
+  }
+
+  private async refreshOnline(force: boolean): Promise<void> {
+    const identity = this.globals.steamProfile?.trim();
+    if (!identity) {
+      this.publish({ online: emptyOnlineSnapshot() });
+      return;
+    }
+
+    const current = this.store.get().online;
+    if (!force && current.updatedAt && Date.now() - current.updatedAt < ONLINE_PROFILE_REFRESH_MS) return;
+    if (this.onlineRefresh) return this.onlineRefresh;
+
+    this.onlineAbort?.abort();
+    const controller = new AbortController();
+    this.onlineAbort = controller;
+    this.publish({ online: { ...current, requestedIdentity: identity, refreshing: true, error: undefined } });
+
+    this.onlineRefresh = (async () => {
+      try {
+        const result = await this.gateway.getProfile(identity, controller.signal);
+        if (!controller.signal.aborted) this.publish({ online: result });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const status = this.onlineErrorStatus(error);
+        const message = this.errorMessage(error);
+        const failed = emptyOnlineSnapshot(identity);
+        failed.updatedAt = Date.now();
+        failed.error = message;
+        failed.leetify.status = status;
+        failed.leetify.message = message;
+        failed.faceit.status = status;
+        failed.faceit.message = message;
+        this.publish({ online: failed });
+      } finally {
+        this.onlineRefresh = undefined;
+      }
+    })();
+
+    return this.onlineRefresh;
+  }
+
+  private onlineErrorStatus(error: unknown): OnlineSourceStatus {
+    if (error instanceof GatewayError) {
+      if (error.status === 429) return "rate_limited";
+      if (error.status === 404) return "not_found";
+      if (error.status === 401 || error.status === 403) return "unavailable";
+    }
+    return "offline";
   }
 
   private checkConnectionFreshness(): void {
@@ -221,6 +307,7 @@ export class DashboardRuntime {
       type: "status",
       status: snapshot.status,
       session: snapshot.session,
+      online: snapshot.online,
       account: {
         steamProfile: this.globals.steamProfile ?? "",
         steamConfigured: Boolean(this.globals.steamProfile)
@@ -237,6 +324,7 @@ export class DashboardRuntime {
     if (candidate.type === "get-status") return { type: "get-status" };
     if (candidate.type === "disable-gsi") return { type: "disable-gsi" };
     if (candidate.type === "reset-session") return { type: "reset-session" };
+    if (candidate.type === "refresh-online") return { type: "refresh-online" };
     if (candidate.type === "enable-gsi") {
       return { type: "enable-gsi", manualCs2Path: typeof candidate.manualCs2Path === "string" ? candidate.manualCs2Path : undefined };
     }

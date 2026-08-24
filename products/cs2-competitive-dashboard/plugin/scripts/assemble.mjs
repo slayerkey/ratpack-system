@@ -20,8 +20,10 @@ for (const build of builds) {
       name: build.name,
       footerLabel: build.footerLabel,
       footerUrl: build.footerUrl,
-      liveMetrics: build.liveMetrics,
-      sessionMetrics: build.flavor === "pro" ? ["record", "matches", "kd", "adr", "hs"] : []
+      liveMetrics: build.liveMetrics ?? [],
+      sessionMetrics: build.sessionMetrics ?? [],
+      competitiveMetrics: build.competitiveMetrics ?? [],
+      faceitMetrics: build.faceitMetrics ?? []
     })};\n`,
     "utf8"
   );
@@ -54,7 +56,7 @@ function createManifest(build) {
     CategoryIcon: "imgs/category",
     CodePath: "bin/plugin.js",
     Description: build.flavor === "pro"
-      ? "A live CS2 competitive dashboard for Stream Deck with match telemetry, session performance, and expandable competitive integrations."
+      ? "A live CS2 competitive dashboard for Stream Deck with match telemetry, session performance, Premier and Competitive rank views, and FACEIT stats."
       : "A lightweight live CS2 dashboard for Stream Deck with Score, Health, Money, Map, and connection status.",
     Icon: "imgs/plugin",
     Name: build.name,
@@ -90,7 +92,14 @@ function actionIconSvg() {
 }
 
 function defaultKeySvg(label) {
-  const short = label === "Live Metric" ? "LIVE" : label === "Session Metric" ? "SESSION" : "STATUS";
+  const names = {
+    "Live Metric": "LIVE",
+    "Session Metric": "SESSION",
+    "Competitive Metric": "RANK",
+    "FACEIT Metric": "FACEIT",
+    "CS2 Status": "STATUS"
+  };
+  const short = names[label] ?? "CS2";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144"><rect width="144" height="144" rx="18" fill="#0B0F0D"/><rect x="10" y="10" width="124" height="124" rx="14" fill="#101713" stroke="#1D2A23" stroke-width="2"/><circle cx="72" cy="57" r="18" fill="none" stroke="#2BE86A" stroke-width="4"/><path d="M72 29v12M72 73v12M44 57h12M88 57h12" stroke="#2BE86A" stroke-width="4" stroke-linecap="round"/><text x="72" y="112" text-anchor="middle" fill="#F4F8F6" font-family="Arial,sans-serif" font-size="13" font-weight="700">${short}</text></svg>`;
 }
 
