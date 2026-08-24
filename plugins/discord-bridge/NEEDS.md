@@ -6,42 +6,38 @@
 - The local PackRat bridge listens on `127.0.0.1:17483`.
 - The companion connects to Discord through `\\?\\pipe\\discord-ipc-0`.
 - Discord accepts the native IPC handshake and returns RPC v1 `READY`.
-- The old browser/WebSocket `Origin` problem is therefore bypassed by the companion architecture.
+- The old browser/WebSocket `Origin` problem is bypassed by the companion architecture.
+- Discord rejects this application's `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing an authorization code.
 
-## Current external gate
+## Current feasibility path
 
-Discord RPC `AUTHORIZE` with `rpc.voice.read` and `rpc.voice.write` is rejected before any OAuth code is issued:
+The active spike no longer depends on those restricted voice scopes.
 
-`OAuth2 Error: invalid_scope: The requested scope is invalid, unknown, or malformed. (5000)`
+The companion launches Discord's official StreamKit voice overlay as a top-level page in a hidden Microsoft Edge process, reads the rendered roster and speaking state locally through Edge DevTools, and forwards normalized display state over the existing loopback bridge.
 
-Observed state in build `0.1.0.4`:
+Mute and deafen use Discord's documented global Windows shortcuts instead of `rpc.voice.write`.
 
-- `discord.ready: true`
-- `oauth.codeReceived: false`
-- `oauth.tokenExchangeAttempted: false`
-- `oauth.lastError: invalid_scope ... (5000)`
+## What still needs physical proof
 
-Discord's current OAuth2 documentation marks both `rpc.voice.read` and `rpc.voice.write` as only available to approved partners. Its RPC documentation also states that unapproved applications are restricted to the application's tester list during development.
+1. Run build `0.2.0.0` through `rat dev discord-bridge`.
+2. Build/import the XENEON widget through `rat dev discord-panel`.
+3. Configure the Discord Server ID and Voice Channel ID in iCUE.
+4. Confirm the hidden official StreamKit page reaches `streamkit.stage: ready`.
+5. Confirm the real roster appears on XENEON Edge.
+6. Confirm speaking highlights update quickly enough for the panel experience.
+7. Confirm mute and deafen touch controls reach Discord while Discord is in the background.
+8. Confirm the helper survives Discord, Stream Deck, and iCUE restarts.
 
-### One remaining development-only check
+## If the StreamKit spike works
 
-Before treating partner approval as the absolute development blocker, add the developer account explicitly under Discord Developer Portal -> App Testers, accept the tester invitation if Discord sends one, then retry RPC `AUTHORIZE` once.
+- replace PoC/raw Stream Deck host plumbing with current `@elgato/streamdeck` v2+ and SDKVersion 3 before Marketplace release
+- harden StreamKit DOM change detection and add safe diagnostics for selector drift
+- decide how many saved Discord channels the final companion should support
+- decide whether channel label should be manual or discovered from the overlay
+- package and validate the companion with the official Elgato CLI on a clean runner
+- run the complete XENEON eight-size gate, official CORSAIR package, StreamSpell, Rat Art, and Rat Ship flow
+- review current Marketplace/Maker terms for the local Edge helper before public submission
 
-This is worth testing because Discord explicitly documents App Testers as the development access path for unapproved RPC applications. It does not remove the production requirement: general public release still requires Discord approval for the restricted voice scopes.
+## Optional future enhancement
 
-If an explicitly accepted App Tester still receives `invalid_scope`, stop auth experiments. The product is blocked pending Discord approval for `rpc.voice.read` and `rpc.voice.write`.
-
-## After Discord grants development access
-
-1. Prove RPC `AUTHORIZE` returns a one-time code.
-2. Prove whether that code can be exchanged using a safe public-client path without a Client Secret.
-3. If Discord requires confidential exchange, design the smallest PackRat server-side token exchange. Never embed the Discord Client Secret in Stream Deck or XENEON code.
-4. Authenticate RPC and prove `GET_SELECTED_VOICE_CHANNEL`, `GET_VOICE_SETTINGS`, `SET_VOICE_SETTINGS`, voice-state events and speaking events.
-5. Connect the proven local bridge protocol to the production `discord-panel` XENEON widget.
-
-## Production hardening after feasibility
-
-- obtain Discord approval for the restricted RPC voice scopes before general public release
-- migrate the host layer to current `@elgato/streamdeck` v2+ and current SDK requirements before Marketplace release
-- run official Stream Deck CLI validate and pack on a clean runner
-- review the current private Maker Agreement in Maker Console before submission
+Discord partner approval for `rpc.voice.read` and `rpc.voice.write` would still be valuable because it could enable automatic current-channel following and richer state. It is no longer required for this alternate feasibility test.
