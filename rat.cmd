@@ -35,9 +35,9 @@ if /I "%~1"=="dev" (
   %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev.ps1" "%~2"
   if errorlevel 1 (
     echo.
-    echo Rat Dev failed.
+    echo Rat Dev failed. No new development build was installed.
     if exist "%~dp0tools\local\rat-dev-open.ps1" (
-      echo Opening the local development folder for inspection...
+      echo Opening the local development folder for inspection only...
       %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2"
     )
     exit /b 1
