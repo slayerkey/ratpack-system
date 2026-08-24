@@ -9,8 +9,7 @@
     "checkJs": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "experimentalDecorators": true
+    "noEmit": true
   },
   "include": ["src/**/*"]
 }
