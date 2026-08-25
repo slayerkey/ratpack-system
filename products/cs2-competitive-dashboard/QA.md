@@ -2,33 +2,124 @@
 
 Date: 2026-08-24
 
-## Automated release evidence
+## Current release state
 
-The shared Pro/Lite source is current with RatPack `main` and the customer-owned provider-key architecture has now passed a clean GitHub Actions release gate after the repository became public. The latest successful run includes TypeScript, provider fixtures, dependency audit, Pro/Lite builds, official Elgato validation, packaging, and the Rat Dev registration path.
+The product remains **TESTING** until the real Windows host shows an actual CS2 GSI packet arriving and a physical Stream Deck key changing.
+
+A green CI run is necessary but is not treated as proof that Valve loaded the cfg on the user's machine.
+
+The detailed root cause investigation and host evidence map live in:
+
+`products/cs2-competitive-dashboard/HOST_DEBUG_GSI_2026-08-24.md`
+
+## GSI root cause regression
+
+The previous dashboard architecture made local GSI setup depend on a later Stream Deck global settings write. The old sequence could:
+
+1. find CS2
+2. start the listener
+3. write the GSI cfg
+4. stall or fail on `streamDeck.settings.setGlobalSettings()`
+5. stop the working listener
+6. delete the cfg it had just written
+
+The first automatic setup rewrite still called that same old setup routine and therefore inherited the same rollback behavior.
+
+The critical local GSI path is now separate from Stream Deck global settings.
+
+Expected startup:
+
+```text
+Stream Deck connect
+→ local GSI host service
+→ resolve CS2
+→ prove cfg is writable
+→ bind localhost listener
+→ write cfg
+→ persist local GSI convenience state as best effort
+→ remain listening
+```
+
+Provider/global settings are handled afterward in Pro. A provider/settings problem cannot tear down an already working CS2 listener/config.
+
+## Persistent host diagnostics
+
+Every Pro/Lite process now writes a persistent log independent of Property Inspector RPC:
+
+```text
+%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+```
+
+The normal build prints this path, so `rat dev cs2-competitive-dashboard` surfaces it during development.
+
+The log must record enough evidence to locate a failure without guessing, including:
+
+* process start, PID, version and plugin directory
+* Stream Deck connection start/success/failure
+* settings channel state without secrets
+* Steam candidates and selected CS2/cfg paths
+* cfg existence and writeability probe
+* listener bind attempts, final port and URL
+* cfg write path/result
+* CS2 process state
+* first GSI HTTP request, method/path/body size
+* JSON parse, auth and App ID state
+* first GSI packet and periodic heartbeat
+* normalization success/failure
+* runtime connected state
+* throttled key refresh start/finish/failure
+* startup exceptions and stack traces
+
+Do not log FACEIT keys, Leetify keys, authorization headers, full GSI tokens, or other secrets.
+
+The Property Inspector's visible Advanced Diagnostics section reads the redacted localhost diagnostic endpoint directly. It must not depend on the long running `sendToPlugin` command path that previously timed out.
+
+Expected diagnostic endpoint:
+
+```text
+GET http://127.0.0.1:<selected-port>/packrat/diagnostics
+```
+
+Expected controls:
+
+* Open Log Folder
+* Copy Diagnostic Summary
+
+If the listener never starts, the AppData log is still the primary evidence.
+
+## Automated release evidence
 
 Automated checks cover:
 
 * TypeScript typecheck
-* CS2 normal-player GSI normalization fixtures
-* App ID 730 rejection for non-CS2 payloads
-* localhost-only authenticated GSI listener behavior
-* Steam library and custom-library discovery fixtures
-* atomic GSI configuration generation
-* session K/D, derived ADR, HS%, match finalization, and W/L fixtures
-* keyless Steam vanity/profile resolution through Steam Community XML
+* exact production GSI server to DashboardRuntime integration test
+* root GSI POST → connected runtime → changed live key display
+* root URI config generation matching the known working host pattern
+* legacy `/gsi` acceptance during migration
+* wrong method rejection
+* wrong route rejection
+* malformed JSON rejection
+* wrong GSI token rejection
+* App ID 730 rejection for non CS2 payloads
+* localhost only authenticated GSI listener behavior
+* normal player GSI normalization fixtures
+* Steam library and custom library discovery fixtures
+* manual install root and exact `game\csgo\cfg` normalization
+* cfg generation and atomic write behavior
+* local GSI startup has no Stream Deck settings dependency
+* persistent diagnostics do not depend on Property Inspector RPC
+* session K/D, derived ADR, HS%, match finalization and W/L fixtures
 * direct Leetify provider normalization using a customer key fixture
 * direct FACEIT provider normalization using a customer key fixture
-* missing provider-key states
-* rejected provider-key states
-* provider rate-limit states
+* missing/rejected/rate limited provider states
 * production dependency audit at high severity
-* exact Pro action-surface policy
+* exact Pro action surface policy
 * exact Lite action/metric ceiling policy
 * no bundled PackRat provider credentials
 * direct official provider setup links in the Property Inspector
 * masked provider key inputs
 * conservative provider refresh jitter tests
-* both Pro and Lite builds
+* Pro and Lite builds
 * official Elgato CLI validation
 * official `.streamDeckPlugin` packaging
 * Rat Dev Pro build registration
@@ -52,9 +143,9 @@ Lite Live Metric is restricted to Score, Health, Money, and Map.
 
 ## Provider architecture QA
 
-There is no shared PackRat FACEIT or Leetify provider gateway in the final architecture.
+There is no shared PackRat FACEIT or Leetify provider gateway.
 
-Pro uses customer-owned provider keys:
+Pro uses customer owned provider keys:
 
 * Leetify API key from `https://leetify.com/app/developer`
 * FACEIT API key created through `https://developers.faceit.com/`
@@ -62,7 +153,9 @@ Pro uses customer-owned provider keys:
 
 Expected provider path:
 
-Stream Deck plugin backend -> official provider HTTPS API
+```text
+Stream Deck plugin backend → official provider HTTPS API
+```
 
 Requirements:
 
@@ -72,103 +165,89 @@ Requirements:
 * no customer provider key is sent to a PackRat service
 * no PackRat provider secret is bundled in Pro or Lite
 * Steam identity resolution does not require a Steam Web API key
-* Leetify `not configured`, rejected-key, not-found, private, rate-limit, unavailable, and offline states remain explicit
-* FACEIT `not configured`, rejected-key, not-found, private, rate-limit, unavailable, and offline states remain explicit
-* one customer's provider rate limit cannot consume another customer's API allowance through a shared PackRat key
+* Leetify and FACEIT setup/rejected/not-found/private/rate-limit/offline states remain explicit
+* one customer's provider quota cannot consume another customer's allowance through a shared PackRat key
 
 ### Provider refresh strategy
 
-Online rank/profile data is slow-changing data, not live telemetry.
+Online profile data is slow changing data, not live telemetry.
 
-* normal background refresh is selected once per process inside a 50 to 70 minute jitter window
+* normal background refresh uses the conservative jitter window
 * manual refresh remains immediate
-* completing a local CS2 match schedules one provider refresh after 30 seconds
-* each full configured refresh currently uses one Leetify profile request and up to three FACEIT Data API requests
-* provider 429 responses render an explicit `rate_limited` state rather than tight retrying
-
-Since each install uses its own provider keys, this cadence is per-customer rather than an aggregate PackRat quota.
-
-## Provider setup UX QA
-
-The Pro Property Inspector must make provider setup understandable without outside documentation searches.
-
-### Leetify
-
-1. Show a direct **Get free key** action.
-2. Open `https://leetify.com/app/developer`.
-3. Explain: sign in, open Developer API page, copy key, paste key.
-4. Save without echoing the stored key back into the input.
-5. Show `Key saved`, `Connected`, `Key rejected`, or provider error state.
-6. Provide a Remove action.
-
-### FACEIT
-
-1. Show a direct **Open Developer Portal** action.
-2. Open `https://developers.faceit.com/`.
-3. Explain: sign in, create an App in App Studio, open API Keys, create the appropriate client/distributed-app key, copy it, paste it.
-4. Link the official FACEIT API key guide directly.
-5. Save without echoing the stored key back into the input.
-6. Show `Key saved`, `Connected`, `Key rejected`, or provider error state.
-7. Provide a Remove action.
-
-### Disclosure
-
-The PI must state that keys are stored in the plugin's local Stream Deck settings and are sent only to the matching provider API, not to a PackRat server. Do not claim encrypted-at-rest storage unless that is independently implemented and verified.
+* completing a local CS2 match schedules a delayed provider refresh
+* provider 429 responses render an explicit `rate_limited` state instead of tight retrying
 
 ## Rat Dev local install
 
 Development testing should not use ZIP downloads.
-
-With current RatPack `main`, the intended local workflow is:
 
 ```text
 rat main
 rat dev cs2-competitive-dashboard
 ```
 
-Rat Dev fetches `origin/product/cs2-competitive-dashboard`, builds and tests the Pro flavor, runs the official Stream Deck CLI validator, links the generated Pro `.sdPlugin` into Stream Deck developer mode, and restarts it. Development output stays under `out\dev`.
+Rat Dev fetches the product branch, builds/tests Pro, runs the official Stream Deck validator, links the generated Pro `.sdPlugin` into developer mode and restarts it.
 
-## Release blockers that require external state
+The build also prints:
 
-These are not ordinary implementation tasks and cannot be truthfully simulated in CI.
+```text
+Host diagnostics after install: %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+```
 
-1. **Leetify commercial / attribution clearance**
-   * Confirm the final paid Marketplace use remains consistent with Leetify's current developer rules.
-   * Obtain Leetify's official unmodified dark-background `Data Provided by Leetify` asset from the asset folder linked by Leetify's developer guidelines.
-   * Commit/package the official asset rather than redrawing or tracing it.
-   * Preserve `View on Leetify` linkback.
+Bundled profiles remain a separate development install behavior. Manual `.streamDeckProfile` installation already worked. Do not let profile auto installation distract from the GSI host gate.
 
-2. **Real customer-key provider smoke test**
-   * Use a real Leetify developer key created from the user-facing developer page.
-   * Use a real FACEIT App/API key created through the user-facing Developer Portal.
-   * Save both through the Property Inspector.
-   * Confirm neither raw key is redisplayed after save.
-   * Confirm Leetify Premier/map data and FACEIT Elo/level data load for the configured Steam account.
-   * Confirm invalid-key and Remove flows.
+## Required Windows GSI host gate
 
-3. **Real normal-player CS2 smoke test**
-   * Install/update Pro through `rat dev cs2-competitive-dashboard` on Windows.
-   * Open its Property Inspector and press `Enable Live CS2 Tracking`.
-   * Confirm automatic Steam/App 730 discovery or use the path override only if needed.
-   * Launch/restart CS2 as a normal player, not GOTV/observer.
-   * Verify live Score, Health, Money, Map, weapon/ammo, and player stat updates.
-   * Verify no exact timer is claimed from observer-only data.
-   * Complete a match and verify W/L increments once and session metrics remain coherent.
+1. Run `rat main`.
+2. Run `rat dev cs2-competitive-dashboard`.
+3. Do **not** click an Enable button. Local GSI starts automatically.
+4. Open any dashboard Property Inspector.
+5. Advanced Diagnostics should find the local diagnostic service within a few seconds.
+6. Before CS2 starts, verify:
+   * plugin process = running
+   * Stream Deck = connected
+   * CS2 install = detected
+   * cfg folder = found/writable
+   * GSI config = installed
+   * listener = running on `127.0.0.1`
+   * last GSI packet = none
+7. If CS2 was open during first install, close it fully and relaunch once.
+8. Enter Deathmatch or another normal game mode.
+9. Verify:
+   * CS2 process = running
+   * last GSI packet gets a current timestamp
+   * GSI connected = YES / LIVE
+   * live physical keys change to real values
+10. Verify the persistent log reaches:
+   * incoming HTTP request
+   * JSON parse success
+   * auth accepted
+   * App ID 730 accepted
+   * normalization success
+   * runtime marked connected
+   * key refresh finished
 
-4. **Physical Stream Deck smoke test**
-   * Add all five Pro action families to keys.
-   * Confirm readable rendering, prompt key refresh, Property Inspector settings persistence, Stream Deck restart persistence, and clean error states with CS2 closed/provider unavailable.
+Do not mark this gate passed until the real host reaches step 9.
 
-## Smallest final manual test
+## What to collect if the host still fails
 
-1. run `rat main`
-2. run `rat dev cs2-competitive-dashboard`
-3. enable GSI
-4. save a Steam profile, Leetify key, and FACEIT key
-5. confirm one Competitive and one FACEIT key load real data
-6. launch CS2 and enter a normal match
-7. confirm Live and Session keys update
-8. close/reopen Stream Deck and CS2
-9. confirm settings and data recovery
+First use **Copy Diagnostic Summary** and paste the full result.
 
-Everything before that boundary should remain automated.
+Also send the full contents of:
+
+```text
+%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+```
+
+If Advanced Diagnostics cannot find the local service at all, the persistent AppData log is the primary artifact because it is created at process startup before listener/config setup.
+
+The manifest also enables Node debugging, so Stream Deck managed plugin logs can be inspected if the persistent log indicates a crash at SDK connection.
+
+## Remaining release blockers
+
+1. **Real Windows GSI smoke test** described above.
+2. **Real customer provider key smoke test** for Leetify and FACEIT.
+3. **Leetify paid/commercial attribution clearance** and official unmodified attribution asset.
+4. **Physical Stream Deck smoke test** across live/session/provider rendering and restart recovery.
+
+Everything before those external boundaries should remain automated.
