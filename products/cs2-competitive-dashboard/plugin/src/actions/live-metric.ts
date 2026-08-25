@@ -1,5 +1,6 @@
 import { SingletonAction } from "@elgato/streamdeck";
 import type { LiveMetric } from "../core/types.js";
+import { beginKeyRefresh, failKeyRefresh, finishKeyRefresh } from "../diagnostics/render-trace.js";
 import { renderKeySvg } from "../render/key-svg.js";
 import type { DashboardRuntime } from "../runtime.js";
 import { liveDisplay } from "./format.js";
@@ -48,10 +49,17 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
   }
 
   private async refreshAll(): Promise<void> {
-    await Promise.all([...this.visible].map(async (action) => {
-      const settings = await action.getSettings() as MetricSettings;
-      await this.render(action, this.metricFrom(settings));
-    }));
+    const traced = beginKeyRefresh("live", this.visible.size);
+    try {
+      await Promise.all([...this.visible].map(async (action) => {
+        const settings = await action.getSettings() as MetricSettings;
+        await this.render(action, this.metricFrom(settings));
+      }));
+      finishKeyRefresh("live", this.visible.size, traced);
+    } catch (error) {
+      failKeyRefresh("live", error, traced);
+      throw error;
+    }
   }
 
   private async render(action: any, metric: LiveMetric): Promise<void> {
