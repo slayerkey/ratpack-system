@@ -5,11 +5,12 @@ import typescript from "@rollup/plugin-typescript";
 
 const isWatching = Boolean(process.env.ROLLUP_WATCH);
 const sdPlugin = "com.packrat.claude-auto-queue.sdPlugin";
+const outputDir = `${sdPlugin}/bin`;
 
 export default {
   input: "src/plugin.ts",
   output: {
-    dir: `${sdPlugin}/bin`,
+    dir: outputDir,
     entryFileNames: "plugin.js",
     format: "es",
     sourcemap: isWatching
@@ -17,7 +18,14 @@ export default {
   plugins: [
     typescript({
       tsconfig: "./tsconfig.json",
-      include: ["src/**/*.ts", "src/**/*.js"]
+      include: ["src/**/*.ts", "src/**/*.js"],
+      // @rollup/plugin-typescript 12.3 creates an automatic allowJs outDir in the OS temp
+      // directory when none is supplied. Its own Rollup path validation rejects that temp
+      // directory because it sits outside output.dir, which breaks Rat Dev on Windows.
+      // Keep TypeScript's intermediate emit namespace inside Rollup's output tree instead.
+      compilerOptions: {
+        outDir: `${outputDir}/.typescript`
+      }
     }),
     nodeResolve({
       browser: false,
