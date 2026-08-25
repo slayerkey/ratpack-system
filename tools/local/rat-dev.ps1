@@ -8,6 +8,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $DevRoot = Join-Path $RepoRoot "out\dev"
 $WorktreeRoot = Join-Path $DevRoot "worktrees"
 $Worktree = Join-Path $WorktreeRoot $Slug
+. (Join-Path $PSScriptRoot "rat-dev-dependencies.ps1")
 
 function Require-Command {
     param([string]$Name, [string]$Hint)
@@ -74,15 +75,6 @@ function Ensure-XeneonTools {
     Require-Command "python" "Install Python 3.13 or newer."
     Require-Command "node" "Install Node.js 24 or newer."
     Require-Command "npm" "Install Node.js 24 or newer."
-}
-
-function Stop-ExistingLink {
-    param([string]$Uuid)
-    if (-not $Uuid) { return }
-    if (-not (Get-Command streamdeck -ErrorAction SilentlyContinue)) { return }
-    Write-Host "Stopping previous linked plugin $Uuid..." -ForegroundColor DarkGray
-    & streamdeck stop $Uuid *> $null
-    & streamdeck unlink -d $Uuid *> $null
 }
 
 function Read-OriginMainRegistration {
@@ -219,21 +211,44 @@ function Resolve-ExternalTarget {
     throw "Could not resolve external development ref '$Ref' for $Slug."
 }
 
+function Test-ExternalCheckout {
+    if (-not (Test-Path $Worktree -PathType Container)) { return $false }
+    $gitDir = Join-Path $Worktree ".git"
+    if (-not (Test-Path $gitDir -PathType Container)) { return $false }
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $Worktree rev-parse --is-inside-work-tree *> $null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Sync-ExternalCheckout {
     param($Source)
 
     New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
-    $gitDir = Join-Path $Worktree ".git"
-    $canReuse = $false
+    $canReuse = Test-ExternalCheckout
 
-    if ((Test-Path $Worktree) -and (Test-Path $gitDir -PathType Container)) {
+    if ($canReuse) {
+        # The slug owns this checkout path. Reuse a healthy Git checkout in place even when
+        # Windows/Stream Deck currently has the .sdPlugin directory open. Deleting the checkout
+        # while the linked plugin is running causes the exact access-denied failure Rat Dev is
+        # designed to avoid. Reconcile origin to the canonical registration instead.
         $remoteUrl = (& git -C $Worktree remote get-url origin 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -eq 0 -and [string]$remoteUrl -eq [string]$Source.Repository) {
-            $canReuse = $true
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$remoteUrl)) {
+            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "remote", "add", "origin", [string]$Source.Repository) -Failure "Could not configure external product origin"
         }
+        elseif ([string]$remoteUrl -ne [string]$Source.Repository) {
+            Write-Host "Reconciling external product origin..." -ForegroundColor DarkGray
+            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "remote", "set-url", "origin", [string]$Source.Repository) -Failure "Could not update external product origin"
+        }
+        Write-Host "Reusing external product checkout in place..." -ForegroundColor DarkGray
     }
-
-    if (-not $canReuse) {
+    else {
         if (Test-Path $Worktree) {
             Remove-ExistingCheckout
         }
@@ -318,11 +333,21 @@ function Build-And-TestPlugin {
     if (Test-Path $packagePath) {
         $package = Get-Content $packagePath -Raw | ConvertFrom-Json
         $nodeModules = Join-Path $PluginRoot "node_modules"
+        $lockPath = Join-Path $PluginRoot "package-lock.json"
         Push-Location $PluginRoot
         try {
-            if (-not (Test-Path $nodeModules) -and (Test-Path (Join-Path $PluginRoot "package-lock.json"))) {
-                Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
-                Invoke-Checked -Command "npm" -Arguments @("ci", "--no-fund", "--no-audit") -Failure "npm ci failed"
+            if (Test-Path $lockPath -PathType Leaf) {
+                $dependencyState = Get-RatDevDependencyState -PluginRoot $PluginRoot
+                if (-not $dependencyState.Current) {
+                    if (Test-Path $nodeModules -PathType Container) {
+                        Write-Host "Plugin dependencies changed. Refreshing locked install..." -ForegroundColor Cyan
+                    }
+                    else {
+                        Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
+                    }
+                    Invoke-Checked -Command "npm" -Arguments @("ci", "--no-fund", "--no-audit") -Failure "npm ci failed"
+                    Set-RatDevDependencyState -PluginRoot $PluginRoot
+                }
             }
             elseif (-not (Test-Path $nodeModules) -and $package.dependencies) {
                 Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
@@ -378,12 +403,23 @@ function Build-And-TestPlugin {
 }
 
 function Install-DevPlugin {
-    param($Plugin)
+    param(
+        $Plugin,
+        [string]$PreviousUuid
+    )
 
     Write-Host "Enabling Stream Deck developer mode..." -ForegroundColor DarkGray
     & streamdeck dev *> $null
 
-    Write-Host "Linking $($Plugin.Uuid) into Stream Deck..." -ForegroundColor Cyan
+    # Keep the currently linked plugin alive while source sync, build, tests, and validation run.
+    # Only switch the link after the replacement has passed every local gate. This prevents a
+    # failed Rat Dev update from turning an existing profile into unresolved question-mark keys.
+    Write-Host "Switching $($Plugin.Uuid) to the validated development build..." -ForegroundColor Cyan
+    if ($PreviousUuid -and $PreviousUuid -ne $Plugin.Uuid) {
+        & streamdeck stop $PreviousUuid *> $null
+        & streamdeck unlink -d $PreviousUuid *> $null
+    }
+    & streamdeck stop $Plugin.Uuid *> $null
     & streamdeck unlink -d $Plugin.Uuid *> $null
     Invoke-Checked -Command "streamdeck" -Arguments @("link", $Plugin.PluginDir) -Failure "Stream Deck link failed"
     Invoke-Checked -Command "streamdeck" -Arguments @("restart", $Plugin.Uuid) -Failure "Stream Deck restart failed"
@@ -468,7 +504,6 @@ if ($source.Kind -eq "xeneon") {
 
 Ensure-StreamDeckCli
 $oldUuid = Get-ExistingPluginUuid $source
-Stop-ExistingLink $oldUuid
 
 if ($source.Kind -eq "external") {
     Sync-ExternalCheckout $source
@@ -479,4 +514,4 @@ else {
 
 $pluginRoot = Get-PluginRoot $source
 $plugin = Build-And-TestPlugin -PluginRoot $pluginRoot -RegistrationConfig $source.Config
-Install-DevPlugin $plugin
+Install-DevPlugin -Plugin $plugin -PreviousUuid $oldUuid

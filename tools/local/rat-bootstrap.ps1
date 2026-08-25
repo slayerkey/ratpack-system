@@ -18,9 +18,34 @@ function Get-GitText {
     return (($output -join "`n").Trim())
 }
 
+function Remove-KnownGeneratedArtifacts {
+    $widgetsRoot = Join-Path $RepoRoot "widgets"
+    if (-not (Test-Path $widgetsRoot)) { return }
+
+    Get-ChildItem -Path $widgetsRoot -Filter *.icuewidget -File -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    Get-ChildItem -Path $widgetsRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne "_src" -and $_.Name -notlike "_*" } |
+        ForEach-Object {
+            $index = Join-Path $_.FullName "index.html"
+            if (Test-Path $index) {
+                $relative = "widgets/$($_.Name)/index.html"
+                $tracked = (& git -C $RepoRoot ls-files -- $relative 2>$null | Select-Object -First 1)
+                if (-not $tracked) {
+                    Remove-Item $index -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+}
+
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required for RatPack commands."
 }
+
+# Local XENEON build/package outputs are disposable and must never block a
+# self-updating Rat command. Only known generated paths are cleaned here.
+Remove-KnownGeneratedArtifacts
 
 $dirty = Get-GitText -Arguments @("status", "--porcelain")
 if ($dirty) {

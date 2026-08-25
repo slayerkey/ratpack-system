@@ -9,10 +9,78 @@ export async function prepare(page, context) {
   await page.addInitScript(({ mode }) => {
     globalThis.uniqueId = 'rat-art-desk-notes-pro';
     const boards = [
-      ['## Content','# Creator','! [ ] Finish thumbnail','[ ] Upload video','Respond to email','','## Remember','Call dentist','Buy SSD'],
-      ['## Launch','! [ ] Ship widget','[ ] Test layouts','[ ] Submit assets','','## Later','Write changelog'],
-      ['[ ] Grocery run','Book appointment','Text Alex'],
-      ['# Release','[ ] Final QA','[ ] Rat Art','[ ] Ship kit']
+      [
+        '## Content',
+        '# Creator',
+        '! [ ] Finish thumbnail',
+        '[ ] Upload final video',
+        '[ ] Schedule publish',
+        'Respond to sponsor email',
+        'Review title options',
+        'Cut Shorts hook',
+        'Write description',
+        'Check chapters',
+        'Export captions',
+        'Update pinned comment',
+        '## Remember',
+        'Call dentist',
+        'Buy SSD',
+        'Back up project'
+      ],
+      [
+        '## Launch',
+        '! [ ] Ship XENEON widgets',
+        '[ ] Test all 8 layouts',
+        '[ ] Verify marketplace copy',
+        '[ ] Review Pro screenshots',
+        '[ ] Submit assets',
+        'Check analytics',
+        'Reply to support',
+        '## Next',
+        'Write changelog',
+        'Plan release post',
+        'Update docs',
+        'Review roadmap',
+        'Sort feedback',
+        'Archive finished tasks',
+        'Prep tomorrow'
+      ],
+      [
+        '## Personal',
+        '! [ ] Grocery run',
+        '[ ] Book appointment',
+        '[ ] Text Alex',
+        'Order coffee beans',
+        'Return package',
+        'Pick up prescription',
+        'Clean desk',
+        'Charge headphones',
+        'Water plants',
+        'Plan weekend',
+        'Check calendar',
+        'Renew membership',
+        'Wash car',
+        'Call family',
+        'Read 30 minutes'
+      ],
+      [
+        '# Release',
+        '! [ ] Final QA',
+        '[ ] Rat Art',
+        '[ ] Ship kit',
+        '[ ] Marketplace upload',
+        'Verify pricing',
+        'Check feature copy',
+        'Review gallery order',
+        'Confirm auto publish',
+        'Test clean install',
+        'Capture final screenshots',
+        'Write release notes',
+        'Update product index',
+        'Archive test assets',
+        'Post launch note',
+        'Track first feedback'
+      ]
     ];
     if (mode === 'max') boards[0] = Array.from({length:16}, (_, i) => (i === 0 ? '! ' : '') + '[ ] Task ' + (i + 1));
     const titles = ['TODAY','WORK','PERSONAL','CURRENT PROJECT'];

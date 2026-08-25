@@ -24,6 +24,12 @@ artifacts/
 out/
 *.log
 
+# Generated XENEON widget outputs
+# tools/xeneon/inline.py writes the flattened shipping entry point here.
+# The official CORSAIR packager writes transient packages into widgets/.
+widgets/*/index.html
+widgets/*.icuewidget
+
 # OS and editor files
 .DS_Store
 Thumbs.db
