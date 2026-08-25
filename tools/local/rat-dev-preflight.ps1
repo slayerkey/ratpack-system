@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$Worktree = Join-Path $RepoRoot "out\dev\worktrees\$Slug"
 
 function Get-StreamDeckCli {
     $cmd = Get-Command "streamdeck.cmd" -ErrorAction SilentlyContinue
@@ -77,69 +78,159 @@ function Get-Registration {
     return (Read-JsonFromGitObject $mainObject)
 }
 
-function Test-PluginInstalled {
+function Test-ReusableCheckout {
+    param($Config)
+
+    if (-not (Test-Path $Worktree -PathType Container)) { return $false }
+
+    if ($Config -and $Config.plugin_dir) {
+        $manifestPath = Join-Path (Join-Path $Worktree ([string]$Config.plugin_dir)) "manifest.json"
+        if (-not (Test-Path $manifestPath -PathType Leaf)) { return $false }
+    }
+
+    $gitMarker = Join-Path $Worktree ".git"
+    if ($Config -and $Config.repository) {
+        if (-not (Test-Path $gitMarker -PathType Container)) { return $false }
+
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $remote = (& git -C $Worktree remote get-url origin 2>$null | Select-Object -First 1)
+            $remoteCode = $LASTEXITCODE
+            & git -C $Worktree rev-parse --is-inside-work-tree *> $null
+            $worktreeCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previous
+        }
+
+        return ($remoteCode -eq 0 -and $worktreeCode -eq 0 -and [string]$remote -eq [string]$Config.repository)
+    }
+
+    if (-not (Test-Path $gitMarker -PathType Leaf)) { return $false }
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $Worktree rev-parse --is-inside-work-tree *> $null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+function Remove-StaleCheckout {
     param(
         [string]$Cli,
         [string]$Uuid
     )
 
-    $listed = Invoke-StreamDeckCli -Cli $Cli -Arguments @("list", "--all")
-    if ($listed.Code -ne 0) {
-        return $null
+    if (-not (Test-Path $Worktree)) { return }
+
+    Write-Host "Rat Dev found a stale local checkout. Releasing it before rebuilding..." -ForegroundColor Yellow
+
+    if ($Cli -and $Uuid) {
+        [void](Invoke-StreamDeckCli -Cli $Cli -Arguments @("stop", $Uuid))
+        [void](Invoke-StreamDeckCli -Cli $Cli -Arguments @("unlink", "-d", $Uuid))
     }
 
-    $text = ($listed.Output -join "`n")
-    return $text.IndexOf($Uuid, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 8; $attempt++) {
+        Start-Sleep -Milliseconds (500 + (250 * $attempt))
+        try {
+            Remove-Item $Worktree -Recurse -Force -ErrorAction Stop
+            $lastError = $null
+            break
+        }
+        catch {
+            $lastError = $_
+            if ($attempt -lt 8) {
+                Write-Host "Windows is still releasing the old development folder. Retrying..." -ForegroundColor DarkGray
+                if ($Cli -and $Uuid) {
+                    [void](Invoke-StreamDeckCli -Cli $cli -Arguments @("stop", $Uuid))
+                    [void](Invoke-StreamDeckCli -Cli $cli -Arguments @("unlink", "-d", $Uuid))
+                }
+            }
+        }
+    }
+
+    if ($lastError -and (Test-Path $Worktree)) {
+        $deck = Get-Process -Name "StreamDeck" -ErrorAction SilentlyContinue | Select-Object -First 1
+        $deckPath = $null
+        if ($deck) {
+            try { $deckPath = $deck.Path } catch { $deckPath = $null }
+            Write-Host "The stale plugin is still locked. Restarting the Stream Deck app once to release it..." -ForegroundColor Yellow
+            try {
+                Stop-Process -Id $deck.Id -Force -ErrorAction Stop
+                Start-Sleep -Seconds 2
+                Remove-Item $Worktree -Recurse -Force -ErrorAction Stop
+                $lastError = $null
+            }
+            catch {
+                $lastError = $_
+            }
+            finally {
+                if ($deckPath -and (Test-Path $deckPath)) {
+                    Start-Process $deckPath
+                    Start-Sleep -Seconds 2
+                }
+            }
+        }
+    }
+
+    if ($lastError -and (Test-Path $Worktree)) {
+        throw "Could not release the stale Rat Dev folder for '$Slug'. Close Stream Deck and any Explorer window opened inside '$Worktree', then retry: rat dev $Slug"
+    }
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $RepoRoot worktree prune *> $null
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+
+    Write-Host "Stale Rat Dev checkout cleared." -ForegroundColor DarkGray
 }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required for rat dev."
 }
 
-# Refresh refs so a first-ever Rat Dev run can know the plugin UUID before
-# the detached development worktree has been created.
-& git -C $RepoRoot fetch --prune origin *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "Could not fetch canonical RatPack refs before Rat Dev cleanup."
+# Refresh refs so a first ever Rat Dev run can resolve external registrations
+# and product metadata before the local development checkout exists. Git writes
+# normal fetch progress to stderr, so capture only the actual process exit code
+# while ErrorActionPreference is relaxed.
+$previous = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    & git -C $RepoRoot fetch --prune origin 1>$null 2>$null
+    $fetchCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previous
+}
+if ($fetchCode -ne 0) {
+    throw "Could not fetch canonical RatPack refs before Rat Dev preflight."
 }
 
 $config = Get-Registration
-if (-not $config -or -not $config.plugin_uuid) {
-    Write-Host "Rat Dev preflight: no plugin_uuid registration for '$Slug'; continuing without pre-cleanup." -ForegroundColor DarkGray
+
+if (-not (Test-Path $Worktree)) {
+    Write-Host "Preparing Stream Deck development copy..." -ForegroundColor DarkGray
     exit 0
 }
 
-$uuid = [string]$config.plugin_uuid
+# A healthy checkout may currently be the directory Stream Deck is running from.
+# Do not stop or unlink it before the replacement has built and validated. rat-dev.ps1
+# will switch the link only at the end of a successful update.
+if (Test-ReusableCheckout -Config $config) {
+    Write-Host "Existing Rat Dev checkout is reusable. Keeping the current plugin live during the update." -ForegroundColor DarkGray
+    exit 0
+}
+
+$uuid = if ($config -and $config.plugin_uuid) { [string]$config.plugin_uuid } else { $null }
 $cli = Get-StreamDeckCli
-if (-not $cli) {
-    # rat-dev.ps1 will install the official CLI when needed.
-    Write-Host "Rat Dev preflight: Stream Deck CLI is not installed yet; cleanup will happen after CLI setup." -ForegroundColor DarkGray
-    exit 0
-}
-
-Write-Host "Preparing existing Stream Deck development copy..." -ForegroundColor DarkGray
-
-for ($attempt = 1; $attempt -le 3; $attempt++) {
-    $stop = Invoke-StreamDeckCli -Cli $cli -Arguments @("stop", $uuid)
-    Start-Sleep -Milliseconds 450
-
-    $unlink = Invoke-StreamDeckCli -Cli $cli -Arguments @("unlink", "-d", $uuid)
-    Start-Sleep -Milliseconds (500 + (250 * $attempt))
-
-    $installed = Test-PluginInstalled -Cli $cli -Uuid $uuid
-    if ($installed -eq $false -or $installed -eq $null) {
-        Write-Host "Previous Stream Deck copy is clear." -ForegroundColor DarkGray
-        exit 0
-    }
-
-    if ($attempt -lt 3) {
-        Write-Host "Windows is still releasing the old plugin. Retrying cleanup..." -ForegroundColor Yellow
-    }
-    else {
-        Write-Host "Stream Deck still reports $uuid as installed after cleanup attempts." -ForegroundColor Yellow
-        if ($unlink.Output.Count -gt 0) {
-            Write-Host ($unlink.Output -join "`n") -ForegroundColor DarkGray
-        }
-        throw "Could not remove the previous Stream Deck development copy. Close any open plugin files and retry rat dev $Slug."
-    }
-}
+Remove-StaleCheckout -Cli $cli -Uuid $uuid

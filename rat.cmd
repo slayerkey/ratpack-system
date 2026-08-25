@@ -35,9 +35,9 @@ if /I "%~1"=="dev" (
   %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev.ps1" "%~2"
   if errorlevel 1 (
     echo.
-    echo Rat Dev failed.
+    echo Rat Dev failed. No new development build was installed.
     if exist "%~dp0tools\local\rat-dev-open.ps1" (
-      echo Opening the local development folder for inspection...
+      echo Opening the local development folder for inspection only...
       %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2"
     )
     exit /b 1
@@ -57,4 +57,21 @@ if /I "%~1"=="dev-open" (
   if errorlevel 1 exit /b 1
   exit /b 0
 )
+
+for %%A in (ship submit stage kit) do (
+  if /I "%~1"=="%%A" (
+    if "%~2"=="" (
+      echo Usage: rat %%A ^<slug^> [slug...]
+      exit /b 2
+    )
+    if not exist "%~dp0tools\local\rat-marketplace.ps1" (
+      echo Rat Marketplace router is not installed. Run: rat main
+      exit /b 1
+    )
+    %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-marketplace.ps1" %*
+    if errorlevel 1 exit /b 1
+    exit /b 0
+  )
+)
+
 %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat.ps1" %* & if errorlevel 1 (exit /b 1) else (exit /b 0)

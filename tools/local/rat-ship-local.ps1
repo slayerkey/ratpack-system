@@ -35,16 +35,56 @@ function Invoke-LocalStep {
     }
 }
 
+function Resolve-IcueWidgetCli {
+    if (Test-Path $LocalIcueWidgetCliCmd) {
+        $script:IcueWidgetCliCmd = $LocalIcueWidgetCliCmd
+        return
+    }
+
+    $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
+    if ($systemIcue) {
+        $script:IcueWidgetCliCmd = $systemIcue.Source
+        return
+    }
+
+    $script:IcueWidgetCliCmd = $null
+}
+
+function Invoke-IcueWidgetCliUtf8 {
+    param([string[]]$Arguments)
+
+    $oldConsoleEncoding = [Console]::OutputEncoding
+    $oldCodePage = $null
+    $exitCode = 0
+    try {
+        if ($env:OS -eq "Windows_NT") {
+            $codePageText = (& chcp.com 2>$null | Out-String)
+            if ($codePageText -match '(\d+)\s*$') {
+                $oldCodePage = [int]$Matches[1]
+            }
+            & chcp.com 65001 *> $null
+        }
+
+        [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        & $IcueWidgetCliCmd @Arguments
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        [Console]::OutputEncoding = $oldConsoleEncoding
+        if ($oldCodePage) {
+            & chcp.com $oldCodePage *> $null
+        }
+    }
+
+    if ($exitCode -ne 0) {
+        throw "CORSAIR iCUE widget CLI failed with exit code $exitCode."
+    }
+}
+
 function Ensure-LocalDependencies {
     if ($env:RATPACK_LOCAL_SHIP_DEPS_READY -eq "1") {
-        $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
-        if ($systemIcue) {
-            $script:IcueWidgetCliCmd = $systemIcue.Source
-        }
-        elseif (Test-Path $LocalIcueWidgetCliCmd) {
-            $script:IcueWidgetCliCmd = $LocalIcueWidgetCliCmd
-        }
-        else {
+        Resolve-IcueWidgetCli
+        if (-not $IcueWidgetCliCmd) {
             throw "Rat Ship dependency cache said ready, but the CORSAIR iCUE widget CLI is no longer available."
         }
         Write-Host "Local Rat Ship: dependency preflight already passed for this queue." -ForegroundColor DarkGray
@@ -60,12 +100,14 @@ function Ensure-LocalDependencies {
         Invoke-LocalStep "install Pillow 12.3.0" { & python -m pip install --disable-pip-version-check Pillow==12.3.0 }
     }
 
-    $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
     $packages = @()
     if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd)) {
         $packages += "playwright@1.62.1"
     }
-    if (-not $systemIcue -and -not (Test-Path $LocalIcueWidgetCliCmd)) {
+
+    # Prefer the canonical cached 0.4.47 CLI even when an older system CLI exists.
+    # This keeps local Rat Ship aligned with the version used by canonical shipping.
+    if (-not (Test-Path $LocalIcueWidgetCliCmd)) {
         $packages += "icuewidget-cli@0.4.47"
     }
 
@@ -79,17 +121,16 @@ function Ensure-LocalDependencies {
         throw "Playwright installed without its expected module/command under $ToolsRoot"
     }
 
-    $systemIcue = Get-Command icuewidget -ErrorAction SilentlyContinue
-    if ($systemIcue) {
-        $script:IcueWidgetCliCmd = $systemIcue.Source
-        Write-Host "Local Rat Ship: using installed CORSAIR CLI at $($systemIcue.Source)" -ForegroundColor DarkGray
+    Resolve-IcueWidgetCli
+    if (-not $IcueWidgetCliCmd) {
+        throw "CORSAIR iCUE widget CLI is unavailable after dependency setup. Expected $LocalIcueWidgetCliCmd or an installed 'icuewidget' command."
     }
-    elseif (Test-Path $LocalIcueWidgetCliCmd) {
-        $script:IcueWidgetCliCmd = $LocalIcueWidgetCliCmd
-        Write-Host "Local Rat Ship: using cached CORSAIR CLI at $LocalIcueWidgetCliCmd" -ForegroundColor DarkGray
+
+    if ($IcueWidgetCliCmd -eq $LocalIcueWidgetCliCmd) {
+        Write-Host "Local Rat Ship: using cached CORSAIR CLI 0.4.47 at $LocalIcueWidgetCliCmd" -ForegroundColor DarkGray
     }
     else {
-        throw "CORSAIR iCUE widget CLI is unavailable after dependency setup. Expected the 'icuewidget' command or $LocalIcueWidgetCliCmd"
+        Write-Host "Local Rat Ship: using installed CORSAIR CLI at $IcueWidgetCliCmd" -ForegroundColor DarkGray
     }
 
     Push-Location $ToolsRoot
@@ -112,8 +153,8 @@ function Remove-GeneratedWidgetOutputs {
     $generatedIndex = Join-Path $shippingDir "index.html"
     if (Test-Path $generatedIndex) {
         $relativeIndex = "widgets/$WidgetSlug/index.html"
-        & git -C $RepoRoot ls-files --error-unmatch -- $relativeIndex *> $null
-        if ($LASTEXITCODE -ne 0) {
+        $trackedIndex = (& git -C $RepoRoot ls-files -- $relativeIndex 2>$null | Select-Object -First 1)
+        if (-not $trackedIndex) {
             Remove-Item $generatedIndex -Force -ErrorAction SilentlyContinue
         }
     }
@@ -176,15 +217,15 @@ try {
     try {
         Invoke-LocalStep "build canonical shipping widget" { & python tools/xeneon/inline.py $WidgetSlug }
 
-        & git diff --quiet -- "widgets/$WidgetSlug"
-        if ($LASTEXITCODE -ne 0) {
+        $trackedDrift = (& git -C $RepoRoot diff --name-only -- "widgets/$WidgetSlug" 2>$null)
+        if ($trackedDrift) {
             throw "Canonical local build changed tracked widgets/$WidgetSlug files. Commit the generated shipping output before Rat Ship so the local fallback cannot ship uncommitted drift."
         }
 
-        Invoke-LocalStep "official CORSAIR validation" { & $IcueWidgetCliCmd validate "widgets/$WidgetSlug" }
+        Invoke-LocalStep "official CORSAIR validation" { Invoke-IcueWidgetCliUtf8 @("validate", "widgets/$WidgetSlug") }
 
         $packageStarted = Get-Date
-        Invoke-LocalStep "official CORSAIR package" { & $IcueWidgetCliCmd package "widgets/$WidgetSlug" }
+        Invoke-LocalStep "official CORSAIR package" { Invoke-IcueWidgetCliUtf8 @("package", "widgets/$WidgetSlug") }
         $pkg = Get-ChildItem -Path (Join-Path $RepoRoot "widgets") -Filter *.icuewidget -File |
             Where-Object { $_.LastWriteTime -ge $packageStarted.AddSeconds(-2) } |
             Sort-Object LastWriteTime -Descending |
