@@ -11,15 +11,16 @@
   "plugin_uuid": "com.packrat.claude-auto-queue",
   "minimum_claude_code_version": "2.1.163",
   "automated_feasibility": "PASS",
-  "automated_tests": 21,
+  "automated_tests": 23,
   "release_gate": [
-    "21-test supported Claude hook, security, command discovery, session targeting, context-envelope and persistence suite: PASS",
+    "23-test supported Claude hook, security, command discovery, VS Code bundled CLI discovery, session targeting, context-envelope and persistence suite: PASS",
     "locked npm ci dependency install on Windows: PASS",
+    "Windows Rat Dev build from a path containing spaces: PASS",
     "official Stream Deck CLI validation: PASS",
     "RatPack context CI: PASS",
     "authenticated Windows Claude Code same-session host spike: REQUIRED",
     "premium profile and deterministic key-art QA after technical GO: DEFERRED"
   ],
   "final_boundary": "authenticated local Claude Code session plus physical Stream Deck host smoke test",
-  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling below Claude's additionalContext spill threshold, a committed npm lockfile, and direct discovery of common Windows Claude Code install locations."
+  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling below Claude's additionalContext spill threshold, a committed npm lockfile, and direct discovery of native Windows Claude Code plus the CLI bundled with the official VS Code extension and common VS Code forks."
 }
