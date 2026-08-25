@@ -3,16 +3,40 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 function Invoke-Git {
     param([string[]]$Arguments)
-    & git -C $RepoRoot @Arguments | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "git $($Arguments -join ' ') failed with exit code $LASTEXITCODE"
+
+    # Windows PowerShell can surface normal native stderr such as Git fetch progress
+    # as NativeCommandError while ErrorActionPreference=Stop. Capture the process
+    # output with native errors temporarily non-terminating, then trust the exit code.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $RepoRoot @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+
+    if ($output) { $output | ForEach-Object { Write-Host ([string]$_) } }
+    if ($code -ne 0) {
+        throw "git $($Arguments -join ' ') failed with exit code $code"
     }
 }
 
 function Get-GitText {
     param([string[]]$Arguments)
-    $output = & git -C $RepoRoot @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $RepoRoot @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+
+    if ($code -ne 0) {
         throw "git $($Arguments -join ' ') failed: $($output -join ' ')"
     }
     return (($output -join "`n").Trim())
