@@ -3,7 +3,9 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { locateCs2Install, type Cs2Install } from "./steam-locator.js";
 
-export const GSI_FILENAME = "gamestate_integration_packrat_cs2.cfg";
+// Keep this distinct from the older PackRat CS2 Live Stats plugin so both products
+// can be installed at the same time without overwriting each other's Valve GSI config.
+export const GSI_FILENAME = "gamestate_integration_packrat_cs2_dashboard.cfg";
 
 export interface GsiInstallResult {
   cs2: Cs2Install;
