@@ -7,6 +7,10 @@ import { sessionDisplay } from "../src/actions/format.js";
 const html = readFileSync("static/ui/property-inspector.html", "utf8");
 const pi = readFileSync("static/ui/pi.js", "utf8");
 const runtime = readFileSync("src/runtime.ts", "utf8");
+const liveAction = readFileSync("src/actions/live-metric.ts", "utf8");
+const sessionAction = readFileSync("src/actions/session-metric.ts", "utf8");
+const onlineAction = readFileSync("src/actions/online-metric.ts", "utf8");
+const statusAction = readFileSync("src/actions/status.ts", "utf8");
 
 const emptySession = {
   matches: 0,
@@ -74,6 +78,7 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
       getElementById: () => null,
       querySelectorAll: () => []
     },
+    navigator: {},
     WebSocket: FakeWebSocket,
     clearTimeout: () => undefined,
     console
@@ -113,15 +118,20 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
   });
 });
 
-test("Property Inspector never silently accepts disconnected or stalled plugin commands", () => {
+test("Property Inspector reports command progress instead of silently stalling", () => {
   assert.match(html, /id="transport-text"/);
   assert.match(pi, /setInteractiveState\(false\)/);
   assert.match(pi, /Stream Deck disconnected · retrying/);
   assert.match(pi, /Waiting for Stream Deck connection/);
-  assert.match(pi, /COMMAND_WATCHDOG_MS\s*=\s*12_000/);
-  assert.match(pi, /No response after 12 seconds/);
-  assert.match(runtime, /PI_COMMAND_TIMEOUT_MS\s*=\s*10_000/);
-  assert.match(runtime, /commandResult/);
+  assert.match(pi, /COMMAND_WATCHDOG_MS\s*=\s*15_000/);
+  assert.match(pi, /No progress for 15 seconds/);
+  assert.match(pi, /command-progress/);
+  assert.match(runtime, /emitProgress/);
+  assert.match(runtime, /Plugin received/);
+  for (const actionFile of [liveAction, sessionAction, onlineAction, statusAction]) {
+    assert.match(actionFile, /handlePiCommand\(ev\.payload, \(progress\)/);
+    assert.match(actionFile, /setTimeout\(\(\) => void this\.refreshAll\(\), 0\)/);
+  }
 });
 
 test("Property Inspector explains the complete live tracking path", () => {
@@ -131,6 +141,25 @@ test("Property Inspector explains the complete live tracking path", () => {
   assert.match(html, /Connected to CS2/);
   assert.match(html, /does not need Steam, Leetify, or FACEIT API keys/);
   assert.match(pi, /GSI installed · restart CS2 once/);
+});
+
+test("manual CS2 override clearly accepts the install root or cfg directory", () => {
+  assert.match(html, /CS2 path override/);
+  assert.match(html, /game\\csgo\\cfg/);
+  assert.match(html, /Both are accepted/);
+});
+
+test("Advanced Diagnostics are exposed and redact secrets by design", () => {
+  assert.match(html, /Advanced Diagnostics/);
+  assert.match(html, /id="run-diagnostics"/);
+  assert.match(html, /id="diagnostic-output"/);
+  assert.match(html, /id="copy-diagnostics"/);
+  assert.match(pi, /run-diagnostics/);
+  assert.match(pi, /copyDiagnostics/);
+  assert.match(runtime, /runDiagnostics/);
+  assert.match(runtime, /Secrets are intentionally omitted/);
+  assert.match(runtime, /CS2 cfg write\/delete probe/);
+  assert.match(runtime, /localhost listener bind/);
 });
 
 test("Property Inspector makes provider ownership explicit", () => {
