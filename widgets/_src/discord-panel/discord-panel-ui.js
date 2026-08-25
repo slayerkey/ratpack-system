@@ -1,18 +1,8 @@
-/* Discord Voice Panel for XENEON Edge.
- *
- * Live transport uses Discord's deprecated local WebSocket RPC on ports 6463 to 6472.
- * The product requests only rpc.voice.read and rpc.voice.write.
- * A Discord client secret must never be embedded in this widget.
+/* Discord Voice Panel UI and state layer for XENEON Edge.
+ * Live Discord transport is owned by discord-panel-rpc.js and talks only to
+ * the local PackRat Discord Bridge on ws://127.0.0.1:17483.
  */
 
-var DISCORD_CLIENT_ID = "1540927508302536724";
-var DISCORD_SCOPES = ["rpc.voice.read", "rpc.voice.write"];
-var DISCORD_REDIRECT_URI = "http://127.0.0.1";
-var DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
-var DISCORD_PORT_FIRST = 6463;
-var DISCORD_PORT_LAST = 6472;
-var REQUEST_TIMEOUT_MS = 5000;
-var RECONNECT_MS = 5000;
 var SPEAKER_HOLD_MS = 900;
 
 var SLOT_SPECS = [
@@ -27,10 +17,7 @@ var SLOT_SPECS = [
 ];
 
 var rpcSocket = null;
-var rpcPending = {};
-var rpcNonce = 0;
 var reconnectTimer = null;
-var currentChannelSubscriptions = null;
 var liveStarted = false;
 var fixtureMode = false;
 var copy = {};
@@ -42,8 +29,7 @@ var model = {
   members: [],
   voice: { mute: false, deaf: false },
   activity: [],
-  detailUserId: null,
-  authorizationCodeReceived: false
+  detailUserId: null
 };
 
 function getIcueProperty(name, fallback) {
@@ -91,18 +77,9 @@ async function loadTranslations() {
     "VOICE CHANNEL",
     "Connecting to Discord",
     "The panel will update automatically.",
-    "Discord setup required",
-    "Add the PackRat Discord application Client ID before release.",
-    "Discord desktop not connected",
-    "Start Discord desktop and the panel will reconnect.",
     "Discord authorization required",
-    "Authorize voice read and voice write to continue.",
     "Connect Discord",
-    "Authorization approved",
-    "Secure token exchange is still required before release.",
     "Not in a voice channel",
-    "Join a voice channel in Discord",
-    "Panel updates automatically when you join.",
     "member",
     "members",
     "Mute",
@@ -128,10 +105,6 @@ async function loadTranslations() {
     "Disconnected",
     "Connected",
     "Authorization failed",
-    "Try connecting again.",
-    "Discord token exchange blocked",
-    "Public Client PKCE could not complete from this widget.",
-    "Retry",
     "Voice",
     "Show Recent Activity",
     "Recent speaking activity stays in memory only for this widget session.",
@@ -379,12 +352,11 @@ function renderControls() {
 }
 
 function stateCopy() {
-  if (model.state === "setup") return [copy["Discord setup required"] || "Discord setup required", copy["Add the PackRat Discord application Client ID before release."] || "Add the PackRat Discord application Client ID before release.", true];
-  if (model.state === "disconnected") return [copy["Discord desktop not connected"] || "Discord desktop not connected", copy["Start Discord desktop and the panel will reconnect."] || "Start Discord desktop and the panel will reconnect.", false];
-  if (model.state === "authorization") return [copy["Discord authorization required"] || "Discord authorization required", copy["Authorize voice read and voice write to continue."] || "Authorize voice read and voice write to continue.", true];
-  if (model.state === "auth-failed") return [copy["Authorization failed"] || "Authorization failed", copy["Try connecting again."] || "Try connecting again.", true];
-  if (model.state === "exchange-required") return [copy["Discord token exchange blocked"] || "Discord token exchange blocked", copy["Public Client PKCE could not complete from this widget."] || "Public Client PKCE could not complete from this widget.", true];
-  return [copy["Not in a voice channel"] || "Not in a voice channel", copy["Join a voice channel in Discord"] || "Join a voice channel in Discord", false];
+  if (model.state === "setup") return ["Starting Discord Panel", "The PackRat Discord Bridge will connect automatically.", true];
+  if (model.state === "disconnected") return ["PackRat Discord Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
+  if (model.state === "authorization") return [copy["Discord authorization required"] || "Discord authorization required", "Tap Connect Discord once, then approve the Discord prompt.", true];
+  if (model.state === "auth-failed") return [copy["Authorization failed"] || "Authorization failed", "Tap Connect Discord to retry. The bridge status page has the exact error.", true];
+  return [copy["Not in a voice channel"] || "Not in a voice channel", "Join any Discord voice channel and the panel will follow automatically.", false];
 }
 
 function renderHeader() {
@@ -416,7 +388,7 @@ function renderEmpty() {
   document.getElementById("emptyHint").textContent = text[1];
   var button = document.getElementById("authorizeButton");
   button.style.display = text[2] ? "inline-grid" : "none";
-  button.textContent = model.state === "exchange-required" ? (copy["Retry"] || "Retry") : (copy["Connect Discord"] || "Connect Discord");
+  button.textContent = copy["Connect Discord"] || "Connect Discord";
 }
 
 function render() {
