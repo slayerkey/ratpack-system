@@ -7,6 +7,10 @@ import { sessionDisplay } from "../src/actions/format.js";
 const html = readFileSync("static/ui/property-inspector.html", "utf8");
 const pi = readFileSync("static/ui/pi.js", "utf8");
 const runtime = readFileSync("src/runtime.ts", "utf8");
+const installer = readFileSync("src/gsi/installer.ts", "utf8");
+const autoSetup = readFileSync("src/gsi/auto-setup.ts", "utf8");
+const pluginPro = readFileSync("src/plugin-pro.ts", "utf8");
+const pluginLite = readFileSync("src/plugin-lite.ts", "utf8");
 const liveAction = readFileSync("src/actions/live-metric.ts", "utf8");
 const sessionAction = readFileSync("src/actions/session-metric.ts", "utf8");
 const onlineAction = readFileSync("src/actions/online-metric.ts", "utf8");
@@ -118,6 +122,21 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
   });
 });
 
+test("live tracking is automatic and does not depend on a Property Inspector button", () => {
+  assert.match(html, /Automatic setup/);
+  assert.match(html, /automatically finds Steam and CS2/);
+  assert.match(html, /There is no Enable button/);
+  assert.match(pluginPro, /ensureAutomaticGsi\(runtime\)/);
+  assert.match(pluginLite, /ensureAutomaticGsi\(runtime\)/);
+  assert.match(autoSetup, /primary CS2 locator failed; retrying with proven Steam locator/);
+  assert.match(autoSetup, /Counter-Strike Global Offensive/);
+});
+
+test("dashboard GSI config cannot overwrite the older CS2 Live Stats config", () => {
+  assert.match(installer, /gamestate_integration_packrat_cs2_dashboard\.cfg/);
+  assert.doesNotMatch(installer, /GSI_FILENAME = "gamestate_integration_packrat_cs2\.cfg"/);
+});
+
 test("Property Inspector reports command progress instead of silently stalling", () => {
   assert.match(html, /id="transport-text"/);
   assert.match(pi, /setInteractiveState\(false\)/);
@@ -134,32 +153,26 @@ test("Property Inspector reports command progress instead of silently stalling",
   }
 });
 
-test("Property Inspector explains the complete live tracking path", () => {
-  assert.match(html, /How live tracking works/);
-  assert.match(html, /writes a local Valve GSI config/);
-  assert.match(html, /If CS2 is already open, restart CS2 once/);
+test("Property Inspector explains the complete automatic live tracking path", () => {
+  assert.match(html, /Automatic setup/);
+  assert.match(html, /installs its Valve GSI config/);
+  assert.match(html, /first install while CS2 is already open, restart CS2 once/);
   assert.match(html, /Connected to CS2/);
-  assert.match(html, /does not need Steam, Leetify, or FACEIT API keys/);
-  assert.match(pi, /GSI installed · restart CS2 once/);
+  assert.match(html, /no API key required for live tracking/);
 });
 
-test("manual CS2 override clearly accepts the install root or cfg directory", () => {
+test("manual CS2 override remains accepted internally for support fallback", () => {
   assert.match(html, /CS2 path override/);
   assert.match(html, /game\\csgo\\cfg/);
   assert.match(html, /Both are accepted/);
 });
 
-test("Advanced Diagnostics are exposed and redact secrets by design", () => {
-  assert.match(html, /Advanced Diagnostics/);
+test("Advanced Diagnostics remain available internally but are no longer required for normal setup", () => {
+  assert.match(html, /id="diagnostics-panel" hidden/);
   assert.match(html, /id="run-diagnostics"/);
-  assert.match(html, /id="diagnostic-output"/);
-  assert.match(html, /id="copy-diagnostics"/);
   assert.match(pi, /run-diagnostics/);
-  assert.match(pi, /copyDiagnostics/);
   assert.match(runtime, /runDiagnostics/);
   assert.match(runtime, /Secrets are intentionally omitted/);
-  assert.match(runtime, /CS2 cfg write\/delete probe/);
-  assert.match(runtime, /localhost listener bind/);
 });
 
 test("Property Inspector makes provider ownership explicit", () => {
