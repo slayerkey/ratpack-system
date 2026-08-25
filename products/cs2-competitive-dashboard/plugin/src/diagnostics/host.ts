@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -194,7 +194,7 @@ export class HostDiagnostics {
     try {
       if (!existsSync(this.logPath) || statSync(this.logPath).size < MAX_LOG_BYTES) return;
       const previous = `${this.logPath}.1`;
-      try { writeFileSync(previous, "", "utf8"); } catch { }
+      rmSync(previous, { force: true });
       renameSync(this.logPath, previous);
     } catch {
       // Best effort only.
