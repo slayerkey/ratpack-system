@@ -153,6 +153,12 @@ try {
 
     if (slot.id === "m-h") {
       await page.evaluate(() => {
+        globalThis.__PACKRAT_DISCORD_TEST__.speaking("1002", false);
+        globalThis.__PACKRAT_DISCORD_TEST__.speaking("1006", false);
+        render();
+      });
+      await page.waitForTimeout(980);
+      await page.evaluate(() => {
         globalThis.__PACKRAT_DISCORD_TEST__.speaking("1012", true);
         render();
       });
