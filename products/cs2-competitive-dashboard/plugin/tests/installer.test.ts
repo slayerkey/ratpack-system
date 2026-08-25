@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { generateGsiConfig } from "../src/gsi/installer.js";
-import { parseInstallDir, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
+import { parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
 
 test("GSI config binds to localhost and requests only approved normal-player components", () => {
   const config = generateGsiConfig(32123, "secret-token");
@@ -18,4 +18,12 @@ test("parses custom Steam library paths and CS2 install folder", () => {
   const vdf = `"libraryfolders"\n{\n  "1"\n  {\n    "path" "D:\\\\SteamLibrary"\n  }\n  "2"\n  {\n    "path" "E:\\\\Games\\\\Steam"\n  }\n}`;
   assert.deepEqual(parseSteamLibraryPaths(vdf), ["D:\\SteamLibrary", "E:\\Games\\Steam"]);
   assert.equal(parseInstallDir(`"AppState" { "appid" "730" "installdir" "Counter-Strike Global Offensive" }`), "Counter-Strike Global Offensive");
+});
+
+test("marks the Steam library that explicitly owns app 730", () => {
+  const vdf = `"libraryfolders"\n{\n  "0"\n  {\n    "path" "C:\\\\Program Files (x86)\\\\Steam"\n    "apps"\n    {\n      "570" "1"\n    }\n  }\n  "1"\n  {\n    "path" "D:\\\\SteamLibrary"\n    "apps"\n    {\n      "730" "1"\n      "252490" "1"\n    }\n  }\n}`;
+  assert.deepEqual(parseSteamLibraries(vdf), [
+    { path: "C:\\Program Files (x86)\\Steam", hasCs2: false },
+    { path: "D:\\SteamLibrary", hasCs2: true }
+  ]);
 });
