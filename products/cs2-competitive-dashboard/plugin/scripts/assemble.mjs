@@ -6,6 +6,7 @@ import { generateBundledProfiles } from "./profiles.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
 const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
+const HOST_LOG = "%APPDATA%\\PackRat\\CS2CompetitiveDashboard\\logs\\cs2-competitive-dashboard.log";
 
 for (const build of builds) {
   await mkdir(path.join(build.output, "bin"), { recursive: true });
@@ -14,6 +15,7 @@ for (const build of builds) {
 
   await copyFile("static/ui/property-inspector.html", path.join(build.output, "ui", "property-inspector.html"));
   await copyFile("static/ui/pi.js", path.join(build.output, "ui", "pi.js"));
+  await copyFile("static/ui/diagnostics.js", path.join(build.output, "ui", "diagnostics.js"));
   await copyFile("static/ui/theme.css", path.join(build.output, "ui", "theme.css"));
   if (build.flavor === "pro" && await exists(LEETIFY_ATTRIBUTION)) {
     await copyFile(LEETIFY_ATTRIBUTION, path.join(build.output, "ui", "leetify-provided-dark.svg"));
@@ -38,6 +40,8 @@ for (const build of builds) {
   await writeFile(path.join(build.output, ".sdignore"), "logs/\n*.map\n", "utf8");
   await generateImages(build);
 }
+
+console.log(`Host diagnostics after install: ${HOST_LOG}`);
 
 function createManifest(build, profiles) {
   return {
@@ -66,7 +70,7 @@ function createManifest(build, profiles) {
       : "A lightweight live CS2 dashboard for Stream Deck with Score, Health, Money, Map, connection status, and a ready-to-use starter profile.",
     Icon: "imgs/plugin",
     Name: build.name,
-    Nodejs: { Version: "20" },
+    Nodejs: { Version: "20", Debug: "enabled" },
     OS: [{ Platform: "windows", MinimumVersion: "10" }],
     Profiles: profiles,
     PropertyInspectorPath: "ui/property-inspector.html",
