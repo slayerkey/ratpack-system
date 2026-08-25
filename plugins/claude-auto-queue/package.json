@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build:profiles": "node scripts/build-profiles.mjs",
-    "build": "npm run build:profiles && rollup -c",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && npm run build:profiles && rollup -c",
     "test": "node --test tests/*.test.js",
     "watch": "npm run build:profiles && rollup -c -w --watch.onEnd=\"streamdeck restart com.packrat.claude-auto-queue\""
   },
