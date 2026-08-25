@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import path from "node:path";
 import { generateGsiConfig } from "../src/gsi/installer.js";
-import { parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
+import { normalizeManualCs2Path, parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
 
 test("GSI config binds to localhost and requests only approved normal-player components", () => {
   const config = generateGsiConfig(32123, "secret-token");
@@ -26,4 +27,16 @@ test("marks the Steam library that explicitly owns app 730", () => {
     { path: "C:\\Program Files (x86)\\Steam", hasCs2: false },
     { path: "D:\\SteamLibrary", hasCs2: true }
   ]);
+});
+
+test("manual override accepts both the CS2 install root and game csgo cfg folder", () => {
+  const install = path.resolve("C:\\SteamLibrary\\steamapps\\common\\Counter-Strike Global Offensive");
+  const fromRoot = normalizeManualCs2Path(install);
+  assert.equal(fromRoot.installDir, install);
+  assert.equal(fromRoot.cfgDir, path.join(install, "game", "csgo", "cfg"));
+
+  const cfg = path.join(install, "game", "csgo", "cfg");
+  const fromCfg = normalizeManualCs2Path(cfg);
+  assert.equal(fromCfg.installDir, install);
+  assert.equal(fromCfg.cfgDir, cfg);
 });
