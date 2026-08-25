@@ -27,6 +27,14 @@ jobs:
         working-directory: plugins/claude-auto-queue
         run: npm install --no-fund --no-audit
 
+      - name: Emit generated package lock
+        working-directory: plugins/claude-auto-queue
+        shell: pwsh
+        run: |
+          Write-Host "PACKRAT_LOCKFILE_BEGIN"
+          [Convert]::ToBase64String([IO.File]::ReadAllBytes("package-lock.json")) | Write-Host
+          Write-Host "PACKRAT_LOCKFILE_END"
+
       - name: Build plugin
         working-directory: plugins/claude-auto-queue
         run: npm run build
