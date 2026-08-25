@@ -200,9 +200,19 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 
 # Refresh refs so a first ever Rat Dev run can resolve external registrations
-# and product metadata before the local development checkout exists.
-& git -C $RepoRoot fetch --prune origin *> $null
-if ($LASTEXITCODE -ne 0) {
+# and product metadata before the local development checkout exists. Git writes
+# normal fetch progress to stderr, so capture only the actual process exit code
+# while ErrorActionPreference is relaxed.
+$previous = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    & git -C $RepoRoot fetch --prune origin 1>$null 2>$null
+    $fetchCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previous
+}
+if ($fetchCode -ne 0) {
     throw "Could not fetch canonical RatPack refs before Rat Dev preflight."
 }
 
