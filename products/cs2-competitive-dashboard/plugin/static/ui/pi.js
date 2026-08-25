@@ -3,7 +3,7 @@
   const FACEIT_DEVELOPER_PORTAL = "https://developers.faceit.com/";
   const FACEIT_KEY_GUIDE = "https://docs.faceit.com/getting-started/authentication/api-keys/";
   const LEETIFY_DEVELOPER_PAGE = "https://leetify.com/app/developer";
-  const COMMAND_WATCHDOG_MS = 12_000;
+  const COMMAND_WATCHDOG_MS = 15_000;
   const labels = {
     score: "Live Score",
     round: "Round / Phase",
@@ -50,6 +50,7 @@
   let reconnectTimer;
   let commandTimer;
   let pendingCommand = "";
+  let lastProgress = "";
   const queuedMessages = [];
 
   const $ = (id) => document.getElementById(id);
@@ -84,13 +85,18 @@
       sendToPlugin({ type: "open-profiles-folder" });
     });
     $("enable-gsi").addEventListener("click", () => {
-      beginCommand("gsi", "Finding Steam and CS2, starting the local listener, and installing the GSI config…");
+      beginCommand("gsi", "Sending live tracking setup to the plugin…");
       sendToPlugin({ type: "enable-gsi", manualCs2Path: $("manual-path").value.trim() });
     });
     $("disable-gsi").addEventListener("click", () => {
-      beginCommand("gsi", "Stopping the local listener and removing the PackRat GSI config…");
+      beginCommand("gsi", "Sending disable request to the plugin…");
       sendToPlugin({ type: "disable-gsi" });
     });
+    $("run-diagnostics").addEventListener("click", () => {
+      beginCommand("diagnostic", "Sending diagnostic request to the plugin…");
+      sendToPlugin({ type: "run-diagnostics", manualCs2Path: $("manual-path").value.trim() });
+    });
+    $("copy-diagnostics").addEventListener("click", copyDiagnostics);
     $("reset-session").addEventListener("click", () => {
       beginCommand("session", "Resetting session…");
       sendToPlugin({ type: "reset-session" });
@@ -235,14 +241,24 @@
       renderMetric();
       return;
     }
-    if (message.event === "sendToPropertyInspector") {
-      latestState = message.payload || {};
-      const commandResult = latestState.commandResult;
-      finishCommand();
+    if (message.event !== "sendToPropertyInspector") return;
+
+    latestState = message.payload || {};
+    if (latestState.type === "command-progress") {
+      const progress = latestState.commandProgress || {};
+      lastProgress = progress.stage ? `${progress.stage}: ${progress.message || "working"}` : (progress.message || "working");
       renderState();
       renderMetric();
-      renderCommandResult(commandResult);
+      renderCommandProgress(progress);
+      armCommandWatchdog();
+      return;
     }
+
+    const commandResult = latestState.commandResult;
+    finishCommand();
+    renderState();
+    renderMetric();
+    renderCommandResult(commandResult);
   }
 
   function render() {
@@ -316,26 +332,30 @@
     if (status.gsiConnected) {
       dot.classList.add("good");
       $("status-text").textContent = "Connected to CS2";
-      $("gsi-feedback").textContent = "Live game state is arriving from CS2. Live and session keys are updating automatically.";
+      if (!pendingCommand || pendingCommand !== "gsi") $("gsi-feedback").textContent = "Live game state is arriving from CS2. Live and session keys are updating automatically.";
     } else if (status.gsiRestartRequired) {
       dot.classList.add("warn");
       if (status.cs2Running) {
         $("status-text").textContent = "GSI installed · restart CS2 once";
-        $("gsi-feedback").textContent = "Setup succeeded. CS2 was already open, so close and reopen CS2 once. Then enter any game mode and wait for Connected to CS2.";
+        if (!pendingCommand || pendingCommand !== "gsi") $("gsi-feedback").textContent = "Setup succeeded. CS2 was already open, so close and reopen CS2 once. Then enter any game mode and wait for Connected to CS2.";
       } else {
         $("status-text").textContent = "GSI installed · launch CS2";
-        $("gsi-feedback").textContent = "Setup succeeded. Launch CS2, enter any game mode, and this will change to Connected to CS2 when the first game-state update arrives.";
+        if (!pendingCommand || pendingCommand !== "gsi") $("gsi-feedback").textContent = "Setup succeeded. Launch CS2, enter any game mode, and this will change to Connected to CS2 when the first game-state update arrives.";
       }
     } else if (status.gsiConfigured) {
       dot.classList.add(status.cs2Running ? "warn" : "good");
       $("status-text").textContent = status.cs2Running ? "Waiting for CS2 game state" : "Ready · launch CS2";
-      $("gsi-feedback").textContent = status.cs2Running
-        ? "Tracking is enabled. Enter Deathmatch, Premier, Competitive, or another game mode. If this never changes to Connected, restart CS2 once."
-        : "Tracking is enabled. Launch CS2 and enter a game mode. No API key is required for live tracking.";
+      if (!pendingCommand || pendingCommand !== "gsi") {
+        $("gsi-feedback").textContent = status.cs2Running
+          ? "Tracking is enabled. Enter Deathmatch, Premier, Competitive, or another game mode. If this never changes to Connected, restart CS2 once."
+          : "Tracking is enabled. Launch CS2 and enter a game mode. No API key is required for live tracking.";
+      }
     } else {
       dot.classList.add("warn");
-      $("status-text").textContent = "Live tracking not enabled";
-      $("gsi-feedback").textContent = "Tracking is off. Click Enable once. PackRat will find CS2 and install its local Valve GSI config automatically.";
+      $("status-text").textContent = status.setupStage && status.setupStage !== "idle"
+        ? `Setup stage: ${status.setupStage}`
+        : "Live tracking not enabled";
+      if (!pendingCommand || pendingCommand !== "gsi") $("gsi-feedback").textContent = "Tracking is off. Click Enable once. PackRat will find CS2 and install its local Valve GSI config automatically.";
     }
 
     $("enable-gsi").textContent = status.gsiConfigured ? "Reinstall Live Tracking" : "Enable Live CS2 Tracking";
@@ -343,7 +363,17 @@
     $("setup-error").hidden = !error;
     $("setup-error").textContent = error;
     $("session-value").textContent = `${session.wins || 0}W ${session.losses || 0}L`;
-    if (document.activeElement !== $("manual-path")) $("manual-path").value = setup.manualCs2Path || "";
+    if (document.activeElement !== $("manual-path") && pendingCommand !== "gsi" && pendingCommand !== "diagnostic") {
+      $("manual-path").value = setup.manualCs2Path || "";
+    }
+
+    const diagnosticReport = latestState.diagnostics?.report || "";
+    if (diagnosticReport) {
+      $("diagnostic-output").hidden = false;
+      $("diagnostic-output").value = diagnosticReport;
+      $("copy-diagnostics").hidden = false;
+      if (pendingCommand !== "diagnostic") $("diagnostic-feedback").textContent = "Diagnostic report ready. Copy it and paste it into support/chat.";
+    }
 
     if (build.flavor === "pro") {
       if (document.activeElement !== $("steam-profile")) $("steam-profile").value = account.steamProfile || "";
@@ -369,6 +399,17 @@
     renderMetricHint();
   }
 
+  function renderCommandProgress(progress) {
+    if (!progress) return;
+    const message = progress.message || "Working…";
+    if (progress.command === "enable-gsi" || progress.command === "disable-gsi") {
+      $("gsi-feedback").textContent = message;
+    }
+    if (progress.command === "run-diagnostics") {
+      $("diagnostic-feedback").textContent = message;
+    }
+  }
+
   function renderCommandResult(result) {
     if (!result) return;
     if (result.command === "open-profiles-folder") {
@@ -377,8 +418,16 @@
         : result.message;
       return;
     }
+    if (result.command === "enable-gsi" && result.message) {
+      $("gsi-feedback").textContent = result.message;
+      return;
+    }
     if (result.command === "disable-gsi" && result.ok) {
       $("gsi-feedback").textContent = "Live tracking disabled. PackRat stopped the local listener and removed its GSI config.";
+      return;
+    }
+    if (result.command === "run-diagnostics") {
+      $("diagnostic-feedback").textContent = result.message || "Diagnostics finished.";
       return;
     }
     if ((result.command === "set-steam-profile" || result.command === "refresh-online") && result.message) {
@@ -393,14 +442,22 @@
   function beginCommand(kind, text) {
     finishCommand();
     pendingCommand = kind;
+    lastProgress = "request sent";
     setInteractiveState(false);
     setFeedback(kind, text);
+    armCommandWatchdog();
+  }
+
+  function armCommandWatchdog() {
+    clearTimeout(commandTimer);
+    if (!pendingCommand) return;
     commandTimer = window.setTimeout(() => {
       if (!pendingCommand) return;
       const stalled = pendingCommand;
+      const progress = lastProgress;
       pendingCommand = "";
       setInteractiveState(registered);
-      setFeedback(stalled, "No response after 12 seconds. The command stopped waiting. Check the status above, then retry once. If it repeats, reinstall with Rat Dev and report the status message.");
+      setFeedback(stalled, `No progress for 15 seconds. Last plugin progress: ${progress}. Run Advanced Diagnostics and copy the report.`);
       sendToPlugin({ type: "get-status" });
     }, COMMAND_WATCHDOG_MS);
   }
@@ -409,6 +466,7 @@
     clearTimeout(commandTimer);
     commandTimer = undefined;
     pendingCommand = "";
+    lastProgress = "";
     setInteractiveState(registered);
   }
 
@@ -417,6 +475,26 @@
     if (kind === "steam") $("steam-feedback").textContent = text;
     if (kind === "provider") $("provider-feedback").textContent = text;
     if (kind === "profile") $("profile-feedback").textContent = text;
+    if (kind === "diagnostic") $("diagnostic-feedback").textContent = text;
+  }
+
+  async function copyDiagnostics() {
+    const report = $("diagnostic-output").value || "";
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report);
+      $("diagnostic-feedback").textContent = "Diagnostic report copied. Paste it into support/chat.";
+    } catch {
+      $("diagnostic-output").hidden = false;
+      $("diagnostic-output").focus();
+      $("diagnostic-output").select();
+      try {
+        document.execCommand("copy");
+        $("diagnostic-feedback").textContent = "Diagnostic report copied. Paste it into support/chat.";
+      } catch {
+        $("diagnostic-feedback").textContent = "Could not copy automatically. The full report is selected above; press Ctrl+C.";
+      }
+    }
   }
 
   function setTransport(state, text) {
