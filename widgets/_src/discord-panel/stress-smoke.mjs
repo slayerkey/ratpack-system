@@ -63,7 +63,7 @@ const fixture = {
     type: 2,
     voice_states: members,
   },
-  speaking: ["900002", "900019", "900050"],
+  speaking: ["900002", "900019", "900049"],
   activity: Array.from({ length: 8 }, (_, index) => ({ userId: String(900001 + index), name: `Recent ${index + 1}`, at: Date.now() - index * 500 })),
 };
 
