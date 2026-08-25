@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
+    "build:profiles": "node scripts/build-profiles.mjs",
+    "build": "npm run build:profiles && rollup -c",
     "test": "node --test tests/*.test.js",
-    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.packrat.claude-auto-queue\""
+    "watch": "npm run build:profiles && rollup -c -w --watch.onEnd=\"streamdeck restart com.packrat.claude-auto-queue\""
   },
   "dependencies": {
     "@elgato/streamdeck": "^2.1.0"
