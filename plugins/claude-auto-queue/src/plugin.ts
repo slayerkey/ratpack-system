@@ -22,7 +22,10 @@ function propertyInspectorSessions() {
     activeSessionId: snapshot.activeSessionId,
     sessions: snapshot.sessions.map((session) => ({
       id: session.id,
-      label: runtime.service.getProjectLabel(session),
+      label: session.humanLabel,
+      projectLabel: session.projectLabel,
+      shortId: session.shortId,
+      lastUserPromptPreview: session.lastUserPromptPreview,
       cwd: session.cwd,
       state: session.state,
       waitingFor: session.waitingFor,
