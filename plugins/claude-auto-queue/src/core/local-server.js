@@ -119,8 +119,9 @@ async function refresh(){
     const vh=document.getElementById('versionHelp');vh.textContent=ready?'Compatible with Auto Queue Stop continuation.':(data.claude.error||('Claude Code '+data.claude.minimumVersion+' or newer is required.'));
     document.getElementById('connect').disabled=!ready;
     const i=document.getElementById('integration');
-    const integrationText=data.integration.needsReconnect?'Reconnect to upgrade hook auth':(data.integration.connected?'Hooks connected':'Hooks not connected');
-    i.className='pill '+(data.integration.connected&&!data.integration.needsReconnect?'good':'warn');i.innerHTML=statePill(integrationText);
+    const hookLive=Boolean(data.lastHookAt);
+    const integrationText=data.integration.needsReconnect?'Reconnect to upgrade hook auth':(data.integration.connected?(hookLive?'Claude hooks live':'Hooks configured · waiting for Claude'):'Hooks not configured');
+    i.className='pill '+(data.integration.connected&&!data.integration.needsReconnect&&hookLive?'good':'warn');i.innerHTML=statePill(integrationText);
     const sessions=data.queue.sessions||[];refreshSessionSelect(sessions,data.queue.activeSessionId||null);
     document.getElementById('sessions').innerHTML=sessions.length?sessions.map(s=>'<div class="session"><div class="title">'+esc(s.name||s.cwd||s.id)+'</div><div class="state">'+esc(s.state)+(s.waitingFor?' · '+esc(s.waitingFor):'')+'</div><div class="muted">Queue: '+s.queue.length+' · Chain: '+s.continuationCount+'/6</div>'+(s.queue[0]?'<div class="muted">Next: '+esc(s.queue[0].prompt)+'</div>':'')+'</div>').join(''):'No Claude sessions detected yet.';
     document.getElementById('raw').textContent=JSON.stringify(data,null,2);
