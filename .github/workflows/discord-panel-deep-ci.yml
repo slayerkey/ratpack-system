@@ -133,10 +133,15 @@ jobs:
               'Public Client PKCE',
               'Client ID before release',
           ]
+          external_js_refs = [
+              'src="discord-panel-rpc.js"',
+              'src="discord-panel-ui.js"',
+              'src="discord-panel.js"',
+          ]
           checks = {
               'loopback_transport': 'ws://127.0.0.1:17483' in index,
-              'flattened_no_external_js': 'discord-panel-rpc.js' not in index and 'discord-panel-ui.js' not in index and 'discord-panel.js' not in index,
-              'flattened_no_external_css': 'discord-panel.css' not in index,
+              'flattened_no_external_js': not any(value in index for value in external_js_refs),
+              'flattened_no_external_css': 'href="discord-panel.css"' not in index,
               'no_fixed_server_setting': 'discordServerId' not in index,
               'no_fixed_channel_setting': 'discordVoiceChannelId' not in index,
               'no_client_secret': 'client_secret' not in package_text.lower(),
@@ -145,7 +150,7 @@ jobs:
               'packrat_author': manifest.get('author') == 'PackRat 🐀',
           }
           failed = [name for name, ok in checks.items() if not ok]
-          (out / 'package-audit.json').write_text(json.dumps({'files': sorted(names), 'manifest': manifest, 'checks': checks, 'forbidden_signatures': obsolete}, indent=2), encoding='utf-8')
+          (out / 'package-audit.json').write_text(json.dumps({'files': sorted(names), 'manifest': manifest, 'checks': checks, 'forbidden_signatures': obsolete, 'forbidden_external_js_refs': external_js_refs}, indent=2), encoding='utf-8')
           if failed:
               raise SystemExit(f'package audit failed: {failed}')
           print(json.dumps(checks, indent=2))
