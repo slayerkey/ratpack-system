@@ -12,18 +12,9 @@
       "VOICE CHANNEL": "VOICE CHANNEL",
       "Connecting to Discord": "Connecting to Discord",
       "The panel will update automatically.": "The panel will update automatically.",
-      "Discord setup required": "Discord setup required",
-      "Add the PackRat Discord application Client ID before release.": "Add the PackRat Discord application Client ID before release.",
-      "Discord desktop not connected": "Discord desktop not connected",
-      "Start Discord desktop and the panel will reconnect.": "Start Discord desktop and the panel will reconnect.",
       "Discord authorization required": "Discord authorization required",
-      "Authorize voice read and voice write to continue.": "Authorize voice read and voice write to continue.",
       "Connect Discord": "Connect Discord",
-      "Authorization approved": "Authorization approved",
-      "Secure token exchange is still required before release.": "Secure token exchange is still required before release.",
       "Not in a voice channel": "Not in a voice channel",
-      "Join a voice channel in Discord": "Join a voice channel in Discord",
-      "Panel updates automatically when you join.": "Panel updates automatically when you join.",
       "member": "member",
       "members": "members",
       "Mute": "Mute",
@@ -54,11 +45,7 @@
       "No username available": "No username available",
       "Disconnected": "Disconnected",
       "Connected": "Connected",
-      "Authorization failed": "Authorization failed",
-      "Try connecting again.": "Try connecting again.",
-      "Discord token exchange blocked": "Discord token exchange blocked",
-      "Public Client PKCE could not complete from this widget.": "Public Client PKCE could not complete from this widget.",
-      "Retry": "Retry"
+      "Authorization failed": "Authorization failed"
     }
   },
   "de": {
@@ -74,18 +61,9 @@
       "VOICE CHANNEL": "SPRACHKANAL",
       "Connecting to Discord": "Verbindung mit Discord",
       "The panel will update automatically.": "Das Panel wird automatisch aktualisiert.",
-      "Discord setup required": "Discord-Einrichtung erforderlich",
-      "Add the PackRat Discord application Client ID before release.": "Füge vor der Veröffentlichung die Client-ID der PackRat Discord-Anwendung hinzu.",
-      "Discord desktop not connected": "Discord Desktop nicht verbunden",
-      "Start Discord desktop and the panel will reconnect.": "Starte Discord Desktop. Das Panel verbindet sich automatisch erneut.",
       "Discord authorization required": "Discord-Autorisierung erforderlich",
-      "Authorize voice read and voice write to continue.": "Erlaube Sprach-Lese- und Schreibzugriff, um fortzufahren.",
       "Connect Discord": "Discord verbinden",
-      "Authorization approved": "Autorisierung bestätigt",
-      "Secure token exchange is still required before release.": "Vor der Veröffentlichung ist noch ein sicherer Token-Austausch erforderlich.",
       "Not in a voice channel": "In keinem Sprachkanal",
-      "Join a voice channel in Discord": "Tritt einem Sprachkanal in Discord bei",
-      "Panel updates automatically when you join.": "Das Panel wird beim Beitritt automatisch aktualisiert.",
       "member": "Mitglied",
       "members": "Mitglieder",
       "Mute": "Stummschalten",
@@ -116,11 +94,7 @@
       "No username available": "Kein Benutzername verfügbar",
       "Disconnected": "Getrennt",
       "Connected": "Verbunden",
-      "Authorization failed": "Autorisierung fehlgeschlagen",
-      "Try connecting again.": "Versuche die Verbindung erneut.",
-      "Discord token exchange blocked": "Discord-Token-Austausch blockiert",
-      "Public Client PKCE could not complete from this widget.": "Public Client PKCE konnte aus diesem Widget nicht abgeschlossen werden.",
-      "Retry": "Erneut versuchen"
+      "Authorization failed": "Autorisierung fehlgeschlagen"
     }
   },
   "es": {
@@ -136,18 +110,9 @@
       "VOICE CHANNEL": "CANAL DE VOZ",
       "Connecting to Discord": "Conectando con Discord",
       "The panel will update automatically.": "El panel se actualizará automáticamente.",
-      "Discord setup required": "Se requiere configurar Discord",
-      "Add the PackRat Discord application Client ID before release.": "Añade el Client ID de la aplicación PackRat Discord antes del lanzamiento.",
-      "Discord desktop not connected": "Discord de escritorio no conectado",
-      "Start Discord desktop and the panel will reconnect.": "Inicia Discord de escritorio y el panel se volverá a conectar.",
       "Discord authorization required": "Se requiere autorización de Discord",
-      "Authorize voice read and voice write to continue.": "Autoriza lectura y escritura de voz para continuar.",
       "Connect Discord": "Conectar Discord",
-      "Authorization approved": "Autorización aprobada",
-      "Secure token exchange is still required before release.": "Todavía se requiere un intercambio seguro de token antes del lanzamiento.",
       "Not in a voice channel": "No estás en un canal de voz",
-      "Join a voice channel in Discord": "Únete a un canal de voz en Discord",
-      "Panel updates automatically when you join.": "El panel se actualiza automáticamente al unirte.",
       "member": "miembro",
       "members": "miembros",
       "Mute": "Silenciar",
@@ -178,11 +143,7 @@
       "No username available": "Nombre de usuario no disponible",
       "Disconnected": "Desconectado",
       "Connected": "Conectado",
-      "Authorization failed": "La autorización falló",
-      "Try connecting again.": "Intenta conectarte de nuevo.",
-      "Discord token exchange blocked": "Intercambio de token de Discord bloqueado",
-      "Public Client PKCE could not complete from this widget.": "Public Client PKCE no pudo completarse desde este widget.",
-      "Retry": "Reintentar"
+      "Authorization failed": "La autorización falló"
     }
   },
   "fr": {
@@ -198,18 +159,9 @@
       "VOICE CHANNEL": "SALON VOCAL",
       "Connecting to Discord": "Connexion à Discord",
       "The panel will update automatically.": "Le panneau se mettra à jour automatiquement.",
-      "Discord setup required": "Configuration Discord requise",
-      "Add the PackRat Discord application Client ID before release.": "Ajoutez l'identifiant client de l'application PackRat Discord avant la publication.",
-      "Discord desktop not connected": "Discord pour ordinateur non connecté",
-      "Start Discord desktop and the panel will reconnect.": "Lancez Discord pour ordinateur et le panneau se reconnectera.",
       "Discord authorization required": "Autorisation Discord requise",
-      "Authorize voice read and voice write to continue.": "Autorisez la lecture et l'écriture vocales pour continuer.",
       "Connect Discord": "Connecter Discord",
-      "Authorization approved": "Autorisation approuvée",
-      "Secure token exchange is still required before release.": "Un échange de jeton sécurisé est encore requis avant la publication.",
       "Not in a voice channel": "Aucun salon vocal rejoint",
-      "Join a voice channel in Discord": "Rejoignez un salon vocal dans Discord",
-      "Panel updates automatically when you join.": "Le panneau se met à jour automatiquement à votre arrivée.",
       "member": "membre",
       "members": "membres",
       "Mute": "Couper le micro",
@@ -240,11 +192,7 @@
       "No username available": "Nom d'utilisateur indisponible",
       "Disconnected": "Déconnecté",
       "Connected": "Connecté",
-      "Authorization failed": "Échec de l'autorisation",
-      "Try connecting again.": "Essayez de vous reconnecter.",
-      "Discord token exchange blocked": "Échange de jeton Discord bloqué",
-      "Public Client PKCE could not complete from this widget.": "Public Client PKCE n'a pas pu être effectué depuis ce widget.",
-      "Retry": "Réessayer"
+      "Authorization failed": "Échec de l'autorisation"
     }
   }
 }
