@@ -5,10 +5,19 @@ import { COMPETITIVE_METRICS, FACEIT_METRICS } from "./actions/online-format.js"
 import { SessionMetricActionBase } from "./actions/session-metric.js";
 import { StatusActionBase } from "./actions/status.js";
 import { PRO_LIVE_METRICS } from "./core/types.js";
-import { ensureAutomaticGsi } from "./gsi/auto-setup.js";
+import { hostDiagnostics } from "./diagnostics/host.js";
+import { GsiHostService } from "./gsi/host-service.js";
+import { ONLINE_PROFILE_REFRESH_MS } from "./providers/config.js";
 import { DashboardRuntime } from "./runtime.js";
+import {
+  applyRuntimeUserSettings,
+  patchRuntimeStatus,
+  refreshRuntimeOnline,
+  resetRuntimeSession
+} from "./runtime-bridge.js";
 
 const runtime = new DashboardRuntime({ onlineEnabled: true });
+const gsiHost = new GsiHostService(runtime);
 streamDeck.logger.setLevel("info");
 
 type UserGlobalSettings = {
@@ -20,7 +29,7 @@ type UserGlobalSettings = {
 };
 
 let cachedUserSettings: UserGlobalSettings = {};
-let settingsSync = Promise.resolve();
+let onlineRefreshTimer: NodeJS.Timeout | undefined;
 
 function userSettings(settings: object): UserGlobalSettings {
   const source = settings as Record<string, unknown>;
@@ -33,41 +42,41 @@ function userSettings(settings: object): UserGlobalSettings {
   };
 }
 
-function queueUserSettings(next: UserGlobalSettings): void {
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function applySettings(next: UserGlobalSettings, initial = false): void {
   const previous = cachedUserSettings;
   cachedUserSettings = next;
+  applyRuntimeUserSettings(runtime, next);
 
-  settingsSync = settingsSync.then(async () => {
-    if (previous.steamProfile !== next.steamProfile) {
-      await runtime.handlePiCommand({ type: "set-steam-profile", steamProfile: next.steamProfile ?? "" });
-    }
+  if (!initial && previous.sessionResetNonce !== next.sessionResetNonce && next.sessionResetNonce !== undefined) {
+    resetRuntimeSession(runtime);
+    hostDiagnostics.event("session reset requested through native global settings");
+  }
 
-    if (previous.faceitApiKey !== next.faceitApiKey && !next.faceitApiKey) {
-      await runtime.handlePiCommand({ type: "clear-provider-key", provider: "faceit" });
-    }
-    if (previous.leetifyApiKey !== next.leetifyApiKey && !next.leetifyApiKey) {
-      await runtime.handlePiCommand({ type: "clear-provider-key", provider: "leetify" });
-    }
-    if (
-      (previous.faceitApiKey !== next.faceitApiKey && next.faceitApiKey) ||
-      (previous.leetifyApiKey !== next.leetifyApiKey && next.leetifyApiKey)
-    ) {
-      await runtime.handlePiCommand({
-        type: "set-provider-keys",
-        faceitApiKey: next.faceitApiKey,
-        leetifyApiKey: next.leetifyApiKey
-      });
-    }
+  if (!initial && previous.refreshNonce !== next.refreshNonce && next.refreshNonce !== undefined) {
+    void refreshRuntimeOnline(runtime, true).catch((error) => hostDiagnostics.error("manual provider refresh failed", error));
+  }
 
-    if (previous.sessionResetNonce !== next.sessionResetNonce && next.sessionResetNonce !== undefined) {
-      await runtime.handlePiCommand({ type: "reset-session" });
-    }
-    if (previous.refreshNonce !== next.refreshNonce && next.refreshNonce !== undefined) {
-      await runtime.handlePiCommand({ type: "refresh-online" });
-    }
-  }).catch((error) => {
-    streamDeck.logger.error("CS2 Dashboard: applying Property Inspector settings failed", error);
-  });
+  const providerChanged =
+    previous.steamProfile !== next.steamProfile ||
+    previous.faceitApiKey !== next.faceitApiKey ||
+    previous.leetifyApiKey !== next.leetifyApiKey;
+  if (!initial && providerChanged && next.steamProfile) {
+    void refreshRuntimeOnline(runtime, true).catch((error) => hostDiagnostics.error("provider refresh after settings change failed", error));
+  }
 }
 
 @action({ UUID: "com.packrat.cs2-competitive-dashboard-pro.live" })
@@ -108,12 +117,58 @@ streamDeck.system.onApplicationDidTerminate((ev) => {
   if (ev.application.toLowerCase() === "cs2.exe") runtime.setCs2Running(false);
 });
 
-await streamDeck.connect();
-await runtime.initialize();
+hostDiagnostics.event("Stream Deck connection started", undefined, { setupStage: "streamdeck-connect" });
+try {
+  await streamDeck.connect();
+  hostDiagnostics.event("Stream Deck connection succeeded", undefined, { streamDeckConnected: true });
+} catch (error) {
+  hostDiagnostics.error("Stream Deck connection failed", error, { streamDeckConnected: false });
+  throw error;
+}
 
-cachedUserSettings = userSettings(await streamDeck.settings.getGlobalSettings());
+// The local GSI path is deliberately first and contains no Stream Deck settings reads/writes.
+// A broken or slow settings channel can no longer prevent CS2 live tracking from working.
+try {
+  await gsiHost.start();
+} catch (error) {
+  hostDiagnostics.error("automatic GSI host startup failed", error);
+  patchRuntimeStatus(runtime, {
+    gsiConfigured: false,
+    gsiConnected: false,
+    setupStage: "idle",
+    error: error instanceof Error ? error.message : String(error)
+  });
+}
+
+hostDiagnostics.event("global settings load started");
+try {
+  const raw = await withTimeout(streamDeck.settings.getGlobalSettings(), 2_500, "Stream Deck global settings read");
+  cachedUserSettings = userSettings(raw);
+  applySettings(cachedUserSettings, true);
+  hostDiagnostics.event("global settings loaded", {
+    steamProfileConfigured: Boolean(cachedUserSettings.steamProfile),
+    faceitKeyConfigured: Boolean(cachedUserSettings.faceitApiKey),
+    leetifyKeyConfigured: Boolean(cachedUserSettings.leetifyApiKey)
+  }, { settingsChannel: "responsive" });
+  if (cachedUserSettings.steamProfile) {
+    void refreshRuntimeOnline(runtime, true).catch((error) => hostDiagnostics.error("initial provider refresh failed", error));
+  }
+} catch (error) {
+  const timeout = error instanceof Error && /timed out/i.test(error.message);
+  hostDiagnostics.error("global settings load failed; local GSI remains active", error, {
+    settingsChannel: timeout ? "timeout" : "error"
+  });
+}
+
 streamDeck.settings.onDidReceiveGlobalSettings((ev) => {
-  queueUserSettings(userSettings(ev.settings));
+  hostDiagnostics.event("native global settings update received");
+  applySettings(userSettings(ev.settings));
+  if (hostDiagnostics.snapshot().settingsChannel !== "responsive") {
+    hostDiagnostics.patch({ settingsChannel: "responsive" });
+  }
 });
 
-void ensureAutomaticGsi(runtime);
+onlineRefreshTimer = setInterval(() => {
+  void refreshRuntimeOnline(runtime, false).catch((error) => hostDiagnostics.error("scheduled provider refresh failed", error));
+}, ONLINE_PROFILE_REFRESH_MS);
+onlineRefreshTimer.unref?.();
