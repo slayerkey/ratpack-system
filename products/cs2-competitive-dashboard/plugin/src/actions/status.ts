@@ -8,7 +8,9 @@ export class StatusActionBase extends SingletonAction {
 
   constructor(private readonly runtime: DashboardRuntime) {
     super();
-    this.runtime.subscribe(() => void this.refreshAll());
+    this.runtime.subscribe(() => {
+      setTimeout(() => void this.refreshAll(), 0);
+    });
   }
 
   override async onWillAppear(ev: any): Promise<void> {
@@ -22,7 +24,7 @@ export class StatusActionBase extends SingletonAction {
   }
 
   override async onSendToPlugin(ev: any): Promise<void> {
-    const response = await this.runtime.handlePiCommand(ev.payload);
+    const response = await this.runtime.handlePiCommand(ev.payload, (progress) => ev.action.sendToPropertyInspector(progress));
     await ev.action.sendToPropertyInspector(response);
   }
 
