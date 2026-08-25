@@ -52,7 +52,7 @@ foreach ($relative in @(
     [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
     if ($errors.Count) {
         $parserFailures += $relative
-        $errors | ForEach-Object { Write-Host "$relative:$($_.Extent.StartLineNumber) $($_.Message)" }
+        $errors | ForEach-Object { Write-Host "${relative}:$($_.Extent.StartLineNumber) $($_.Message)" }
     }
 }
 if ($parserFailures.Count) {
