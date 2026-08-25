@@ -1,0 +1,14 @@
+{
+  "slug": "claude-auto-queue",
+  "name": "Auto Queue for Claude Code",
+  "type": "plugin",
+  "price_usd": null,
+  "pricing_status": "REQUIRES_EXPLICIT_APPROVAL_BEFORE_MAKER_CONSOLE_DRAFT",
+  "version": "0.1.0.0",
+  "marketplace_language": ["English"],
+  "marketplace_operating_systems": ["Windows"],
+  "marketplace_tags": ["Productivity", "Developer Tools", "Claude Code"],
+  "marketplace_auto_publish": true,
+  "description": "Keep Claude working without going back to your keyboard.\n\nAuto Queue for Claude Code lets you line up follow-up work from Stream Deck while Claude is already busy. The next request is saved locally and handed to the same Claude Code chat when the current turn finishes.\n\nSee when Claude is working, finished, waiting for you, or hit an error. See the next queued request and pending count, and remove, rotate, or clear the queue from Stream Deck. Auto follows the Claude chat you used most recently, with optional per-key chat binding.\n\nReady-made profiles are included for Stream Deck, Stream Deck Mini, Stream Deck XL, Stream Deck +, and Stream Deck Neo. Every Queue Prompt key can be renamed and edited.\n\nSetup is one-time: open Setup and click Connect Claude Code. Existing Claude settings and other hooks are preserved. Claude Code 2.1.163 or newer is required.\n\nQueued prompts stay on this computer. PackRat does not read or modify Claude credentials and does not upload your prompts.\n\nWindows 10 or newer. Works with the official Claude Code VS Code extension and common Windows CLI installations.\n\nPart of the PackRat ecosystem.",
+  "release_notes": "Initial release. Queue follow-up Claude Code work from Stream Deck without interrupting the current turn. Live working, finished, attention and error states. Active-chat Auto targeting with optional explicit chat binding. Local persistent queue with remove, rotate and clear controls. Ready-made profiles for Stream Deck, Mini, XL, Plus and Neo. One-time supported Claude Code hook setup with local-only prompt storage."
+}
