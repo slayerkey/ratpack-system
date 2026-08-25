@@ -9,37 +9,25 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows-streamdeck:
     runs-on: windows-latest
     steps:
-      - name: Checkout product branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: product/claude-auto-queue
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: plugins/claude-auto-queue/package-lock.json
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         working-directory: plugins/claude-auto-queue
-        run: npm install --no-fund --no-audit
-
-      - name: Commit generated package lock once
-        shell: pwsh
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add plugins/claude-auto-queue/package-lock.json
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
-            git commit -m "Lock Claude Auto Queue dependencies"
-            git push origin HEAD:product/claude-auto-queue
-          }
+        run: npm ci --no-fund --no-audit
 
       - name: Build plugin
         working-directory: plugins/claude-auto-queue
