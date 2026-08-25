@@ -45,6 +45,12 @@ jobs:
         working-directory: plugins/claude-auto-queue
         run: npm test
 
+      - name: Verify packaged plugin icon dimensions
+        working-directory: plugins/claude-auto-queue
+        shell: pwsh
+        run: |
+          python -c "from PIL import Image; from pathlib import Path; p=Path('com.packrat.claude-auto-queue.sdPlugin/imgs/plugin'); expected={'marketplace.png':(256,256),'marketplace@2x.png':(512,512)}; bad=[(n,Image.open(p/n).size,s) for n,s in expected.items() if Image.open(p/n).size!=s]; assert not bad,bad; print('PLUGIN ICON PASS')"
+
       - name: Validate with official Stream Deck CLI
         working-directory: plugins/claude-auto-queue
         run: npx streamdeck validate com.packrat.claude-auto-queue.sdPlugin --no-update-check
