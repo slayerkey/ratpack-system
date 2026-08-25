@@ -11,6 +11,64 @@ import { DashboardRuntime } from "./runtime.js";
 const runtime = new DashboardRuntime({ onlineEnabled: true });
 streamDeck.logger.setLevel("info");
 
+type UserGlobalSettings = {
+  steamProfile?: string;
+  faceitApiKey?: string;
+  leetifyApiKey?: string;
+  sessionResetNonce?: number;
+  refreshNonce?: number;
+};
+
+let cachedUserSettings: UserGlobalSettings = {};
+let settingsSync = Promise.resolve();
+
+function userSettings(settings: Record<string, unknown>): UserGlobalSettings {
+  return {
+    steamProfile: typeof settings.steamProfile === "string" ? settings.steamProfile : undefined,
+    faceitApiKey: typeof settings.faceitApiKey === "string" ? settings.faceitApiKey : undefined,
+    leetifyApiKey: typeof settings.leetifyApiKey === "string" ? settings.leetifyApiKey : undefined,
+    sessionResetNonce: typeof settings.sessionResetNonce === "number" ? settings.sessionResetNonce : undefined,
+    refreshNonce: typeof settings.refreshNonce === "number" ? settings.refreshNonce : undefined
+  };
+}
+
+function queueUserSettings(next: UserGlobalSettings): void {
+  const previous = cachedUserSettings;
+  cachedUserSettings = next;
+
+  settingsSync = settingsSync.then(async () => {
+    if (previous.steamProfile !== next.steamProfile) {
+      await runtime.handlePiCommand({ type: "set-steam-profile", steamProfile: next.steamProfile ?? "" });
+    }
+
+    if (previous.faceitApiKey !== next.faceitApiKey && !next.faceitApiKey) {
+      await runtime.handlePiCommand({ type: "clear-provider-key", provider: "faceit" });
+    }
+    if (previous.leetifyApiKey !== next.leetifyApiKey && !next.leetifyApiKey) {
+      await runtime.handlePiCommand({ type: "clear-provider-key", provider: "leetify" });
+    }
+    if (
+      (previous.faceitApiKey !== next.faceitApiKey && next.faceitApiKey) ||
+      (previous.leetifyApiKey !== next.leetifyApiKey && next.leetifyApiKey)
+    ) {
+      await runtime.handlePiCommand({
+        type: "set-provider-keys",
+        faceitApiKey: next.faceitApiKey,
+        leetifyApiKey: next.leetifyApiKey
+      });
+    }
+
+    if (previous.sessionResetNonce !== next.sessionResetNonce && next.sessionResetNonce !== undefined) {
+      await runtime.handlePiCommand({ type: "reset-session" });
+    }
+    if (previous.refreshNonce !== next.refreshNonce && next.refreshNonce !== undefined) {
+      await runtime.handlePiCommand({ type: "refresh-online" });
+    }
+  }).catch((error) => {
+    streamDeck.logger.error("CS2 Dashboard: applying Property Inspector settings failed", error);
+  });
+}
+
 @action({ UUID: "com.packrat.cs2-competitive-dashboard-pro.live" })
 class ProLiveMetricAction extends LiveMetricActionBase {
   constructor() { super(runtime, PRO_LIVE_METRICS, "score"); }
@@ -51,4 +109,10 @@ streamDeck.system.onApplicationDidTerminate((ev) => {
 
 await streamDeck.connect();
 await runtime.initialize();
+
+cachedUserSettings = userSettings(await streamDeck.settings.getGlobalSettings<Record<string, unknown>>());
+streamDeck.settings.onDidReceiveGlobalSettings<Record<string, unknown>>((ev) => {
+  queueUserSettings(userSettings(ev.settings));
+});
+
 void ensureAutomaticGsi(runtime);
