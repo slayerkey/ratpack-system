@@ -6,7 +6,8 @@ import {
   compareVersions,
   isClaudeVersionSupported,
   parseClaudeVersion,
-  resolveClaudeCommand
+  resolveClaudeCommand,
+  resolveVsCodeBundledClaude
 } from "../src/core/claude-client.js";
 
 test("parses normal Claude Code version output", () => {
@@ -33,27 +34,75 @@ test("requires the Claude Code release that introduced Stop additionalContext", 
   assert.equal(isClaudeVersionSupported("unknown"), false);
 });
 
+test("finds the newest Claude Code CLI bundled with VS Code", () => {
+  const home = "C:\\Users\\Ada";
+  const vscodeRoot = "C:\\Users\\Ada\\.vscode\\extensions";
+  const newest = "C:\\Users\\Ada\\.vscode\\extensions\\anthropic.claude-code-2.1.241-win32-x64\\resources\\native-binary\\claude.exe";
+  const dirsByRoot = new Map([
+    [vscodeRoot, [
+      { name: "anthropic.claude-code-2.1.216-win32-x64", isDirectory: () => true },
+      { name: "anthropic.claude-code-2.1.241-win32-x64", isDirectory: () => true },
+      { name: "some.other-extension-1.0.0", isDirectory: () => true }
+    ]]
+  ]);
+
+  assert.equal(
+    resolveVsCodeBundledClaude({
+      platform: "win32",
+      home,
+      readDir: (root) => {
+        if (!dirsByRoot.has(root)) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return dirsByRoot.get(root);
+      },
+      exists: (value) => value === newest || value.includes("anthropic.claude-code-2.1.216-win32-x64")
+    }),
+    newest
+  );
+});
+
 test("resolves common Windows Claude installs before relying on a possibly stale PATH", () => {
   const home = "C:\\Users\\Ada";
   const env = {
     APPDATA: "C:\\Users\\Ada\\AppData\\Roaming",
     LOCALAPPDATA: "C:\\Users\\Ada\\AppData\\Local"
   };
+  const noExtensions = () => { throw Object.assign(new Error("missing"), { code: "ENOENT" }); };
 
   const native = "C:\\Users\\Ada\\.local\\bin\\claude.exe";
   assert.equal(
-    resolveClaudeCommand({ platform: "win32", home, env, exists: (value) => value === native }),
+    resolveClaudeCommand({ platform: "win32", home, env, readDir: noExtensions, exists: (value) => value === native }),
     native
   );
 
   const npm = "C:\\Users\\Ada\\AppData\\Roaming\\npm\\claude.cmd";
   assert.equal(
-    resolveClaudeCommand({ platform: "win32", home, env, exists: (value) => value === npm }),
+    resolveClaudeCommand({ platform: "win32", home, env, readDir: noExtensions, exists: (value) => value === npm }),
     npm
   );
 
   assert.equal(
-    resolveClaudeCommand({ platform: "win32", home, env, exists: () => false }),
+    resolveClaudeCommand({ platform: "win32", home, env, readDir: noExtensions, exists: () => false }),
     "claude"
+  );
+});
+
+test("prefers the VS Code bundled CLI when no native Claude install exists", () => {
+  const home = "C:\\Users\\Ada";
+  const extensionRoot = "C:\\Users\\Ada\\.vscode\\extensions";
+  const bundled = "C:\\Users\\Ada\\.vscode\\extensions\\anthropic.claude-code-2.1.241-win32-x64\\resources\\native-binary\\claude.exe";
+  const npm = "C:\\Users\\Ada\\AppData\\Roaming\\npm\\claude.cmd";
+
+  assert.equal(
+    resolveClaudeCommand({
+      platform: "win32",
+      home,
+      env: { APPDATA: "C:\\Users\\Ada\\AppData\\Roaming" },
+      readDir: (root) => {
+        if (root !== extensionRoot) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return [{ name: "anthropic.claude-code-2.1.241-win32-x64", isDirectory: () => true }];
+      },
+      exists: (value) => value === bundled || value === npm
+    }),
+    bundled
   );
 });
