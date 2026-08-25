@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="theme.css" />
   <script src="build-config.js"></script>
   <script src="pi.js"></script>
+  <script src="diagnostics.js" defer></script>
 </head>
 <body>
   <main class="pi-shell">
@@ -35,7 +36,7 @@
       <div class="profile-summary" id="profile-summary">Ready to use layouts are included for supported Stream Deck models.</div>
       <p class="hint">Profiles remain fully editable. Start with the PackRat layout, then change any key you want.</p>
       <button class="secondary full-width plugin-command" id="open-profiles">Open bundled profile files</button>
-      <p class="action-feedback" id="profile-feedback">If the profiles do not appear automatically, open this folder and double click the profile for your Stream Deck model.</p>
+      <p class="action-feedback" id="profile-feedback">Development fallback for manually importing a bundled profile.</p>
     </section>
 
     <section class="panel">
@@ -46,41 +47,51 @@
         </div>
         <span class="pill" id="port-pill">LOCAL</span>
       </div>
+      <p class="hint">Automatic. PackRat starts its local Valve GSI listener and installs the CS2 config when the plugin starts. If this is the first install while CS2 is already open, restart CS2 once.</p>
+      <p class="privacy-note">Live tracking stays on this PC and does not need Steam, Leetify, or FACEIT API keys.</p>
 
-      <div class="setup-guide">
-        <div class="sub-label">Automatic setup</div>
-        <ol class="setup-steps">
-          <li>PackRat automatically finds Steam and CS2, starts its local listener, and installs its Valve GSI config when the plugin starts.</li>
-          <li>There is no Enable button and no API key required for live tracking.</li>
-          <li>If this is the first install while CS2 is already open, restart CS2 once so the game loads the new config.</li>
-          <li>Enter Deathmatch, Premier, Competitive, or another game mode. When CS2 sends its first game-state update, this changes to <strong>Connected to CS2</strong>.</li>
-        </ol>
-        <p class="privacy-note">Live tracking stays on this PC. CS2 sends Valve GSI data only to the plugin's 127.0.0.1 listener.</p>
-      </div>
-
-      <!-- Kept in the DOM for backwards-compatible development commands, but normal users never need these controls. -->
+      <!-- Legacy controls stay hidden for backwards compatibility while the host path is proven. -->
       <div hidden>
-        <label class="field-label small-gap" for="manual-path">CS2 path override <span class="optional">optional</span></label>
-        <input id="manual-path" type="text" spellcheck="false" placeholder="Auto detect, CS2 install folder, or game\csgo\cfg" />
-        <p class="hint">Leave blank for automatic detection. If needed, paste either the Counter-Strike Global Offensive install folder or the exact game\csgo\cfg folder. Both are accepted.</p>
-        <div class="button-row">
-          <button class="primary plugin-command" id="enable-gsi">Enable Live CS2 Tracking</button>
-          <button class="secondary plugin-command" id="disable-gsi">Disable</button>
-        </div>
+        <label for="manual-path">CS2 path override</label>
+        <input id="manual-path" type="text" />
+        <button id="enable-gsi" class="plugin-command">Enable</button>
+        <button id="disable-gsi" class="plugin-command">Disable</button>
+        <button id="run-diagnostics" class="plugin-command">Run diagnostics</button>
+        <textarea id="diagnostic-output"></textarea>
+        <button id="copy-diagnostics">Copy</button>
+        <p id="diagnostic-feedback"></p>
       </div>
-      <p class="action-feedback" id="gsi-feedback">Automatic tracking setup is starting…</p>
+      <p class="action-feedback" id="gsi-feedback">Waiting for local host status…</p>
       <div class="error-copy" id="setup-error" hidden></div>
     </section>
 
-    <!-- The old command-driven diagnostics are intentionally hidden. Live setup no longer depends on PI button RPC. -->
-    <section class="panel" id="diagnostics-panel" hidden>
-      <div class="field-label">Advanced Diagnostics</div>
-      <p class="hint">Developer diagnostics.</p>
-      <button class="secondary full-width plugin-command" id="run-diagnostics">Run Advanced Diagnostics</button>
-      <p class="action-feedback" id="diagnostic-feedback">No diagnostic report yet.</p>
-      <textarea id="diagnostic-output" class="diagnostic-output" rows="14" readonly hidden aria-label="CS2 diagnostic report"></textarea>
-      <button class="secondary full-width" id="copy-diagnostics" hidden>Copy Diagnostic Report</button>
-      <p class="privacy-note">The report intentionally omits API keys and the GSI auth token.</p>
+    <section class="panel" id="host-diagnostics-panel">
+      <div class="section-row">
+        <div>
+          <div class="field-label">Advanced Diagnostics</div>
+          <div class="status-line"><span class="status-dot" id="host-diag-dot"></span><span id="host-diag-status">Finding local diagnostic service…</span></div>
+        </div>
+        <button class="text-link" id="refresh-host-diagnostics">Refresh</button>
+      </div>
+      <p class="hint">This reads directly from the localhost GSI service. It does not use the Property Inspector command channel.</p>
+      <div class="diagnostic-grid">
+        <div><span>Plugin process</span><strong id="diag-plugin">Checking</strong></div>
+        <div><span>Stream Deck</span><strong id="diag-streamdeck">Checking</strong></div>
+        <div><span>CS2 install</span><strong id="diag-cs2-install">Checking</strong></div>
+        <div><span>CFG folder</span><strong id="diag-cfg">Checking</strong></div>
+        <div><span>GSI config</span><strong id="diag-config">Checking</strong></div>
+        <div><span>Local listener</span><strong id="diag-listener">Checking</strong></div>
+        <div><span>CS2 process</span><strong id="diag-cs2-process">Checking</strong></div>
+        <div><span>Last GSI packet</span><strong id="diag-last-packet">None</strong></div>
+        <div><span>GSI connected</span><strong id="diag-connected">No</strong></div>
+        <div><span>Last error</span><strong id="diag-error">None</strong></div>
+      </div>
+      <p class="diagnostic-path" id="diag-log">Persistent log: %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log</p>
+      <div class="button-row">
+        <button class="secondary" id="open-host-log">Open Log Folder</button>
+        <button class="secondary" id="copy-host-diagnostics">Copy Diagnostic Summary</button>
+      </div>
+      <p class="action-feedback" id="host-diag-feedback">The panel refreshes automatically every two seconds.</p>
     </section>
 
     <section class="panel" id="pro-account-panel" hidden>
@@ -97,7 +108,7 @@
 
     <section class="panel" id="provider-setup-panel" hidden>
       <div class="field-label">Pro Provider API Setup</div>
-      <p class="hint setup-intro"><strong>Leetify powers Premier and Competitive stats.</strong> <strong>FACEIT powers FACEIT stats only.</strong> Each provider uses your own free key, so another user's usage cannot consume your allowance.</p>
+      <p class="hint setup-intro"><strong>Leetify powers Premier and Competitive stats.</strong> <strong>FACEIT powers FACEIT stats only.</strong> Each provider uses your own free key.</p>
 
       <div class="provider-card">
         <div class="provider-card-head">
@@ -135,7 +146,7 @@
           <li>Open API Keys and create a Client Side key.</li>
           <li>Copy the key and paste it below.</li>
         </ol>
-        <p class="hint provider-note">FACEIT may require account verification or two-step verification depending on your account. Those requirements come from FACEIT, not PackRat.</p>
+        <p class="hint provider-note">FACEIT may require account verification or two step verification depending on your account. Those requirements come from FACEIT, not PackRat.</p>
         <button class="text-link docs-link" id="faceit-key-guide">Official FACEIT key guide ↗</button>
         <div class="secret-row">
           <input id="faceit-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste FACEIT API key" />
