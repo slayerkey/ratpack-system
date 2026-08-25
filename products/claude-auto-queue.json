@@ -22,14 +22,14 @@
     "official .streamDeckPlugin packaging: PASS",
     "256x256 and 512x512 packaged plugin icon dimensions: PASS",
     "five deterministic bundled profiles for Standard, Mini, XL, Plus, and Neo: PASS",
-    "deterministic Marketplace cover, four gallery frames, and search icon render/dimension gate: PASS",
+    "deterministic Marketplace cover, four gallery frames, search icon render/dimension gate, and visual Rat Art review: PASS",
     "RatPack context CI: PASS",
     "real VS Code Claude 2.1.243 hook connection and active-session identification: PASS",
     "real same-session Auto Queue continuation with queue 1 -> 0 and chain 1/6: PASS",
+    "shared Rat Ship Stream Deck plugin kit, Maker Console routing, price guard, and Windows regression gate merged to main: PASS",
     "permission NEED YOU state, restart persistence on a real Stream Deck host, explicit two-session physical routing, and Disconnect host smoke: REQUIRED",
-    "Marketplace price approval before Maker Console draft: REQUIRED",
-    "shared Rat Ship Stream Deck plugin routing merge: IN PROGRESS"
+    "Marketplace price approval before Maker Console draft: REQUIRED"
   ],
   "final_boundary": "remaining physical Stream Deck host smoke tests, explicit Marketplace price approval, and final Maker Console staging/submission",
-  "notes": "Core architecture is GO and the product is a Windows release candidate. A real Windows VS Code Claude Code 2.1.243 session received a PackRat-owned queued request through the documented Stop-hook continuation path and continued in the same conversation. Normal session UI uses a short preview of the latest real user prompt and keeps exact session identifiers in advanced diagnostics only. The installer bundles ready-made profiles for five Stream Deck families. PackRat stores queued prompts locally, preserves existing Claude settings and third-party hooks, never reads Claude credentials, and does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling, locked dependencies, and direct discovery of native Windows Claude Code plus the CLI bundled with VS Code and common VS Code forks."
+  "notes": "Core architecture is GO and the product is a Windows release candidate. A real Windows VS Code Claude Code 2.1.243 session received a PackRat-owned queued request through the documented Stop-hook continuation path and continued in the same conversation. Normal session UI uses a short preview of the latest real user prompt and keeps exact session identifiers in advanced diagnostics only. The installer bundles ready-made profiles for five Stream Deck families. PackRat stores queued prompts locally, preserves existing Claude settings and third-party hooks, never reads Claude credentials, and does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling, locked dependencies, and direct discovery of native Windows Claude Code plus the CLI bundled with VS Code and common VS Code forks. Canonical Rat Ship now routes registered Stream Deck plugins through official Elgato validation and packaging, deterministic product art, resilient local Maker Console automation, and an explicit monetization guard."
 }
