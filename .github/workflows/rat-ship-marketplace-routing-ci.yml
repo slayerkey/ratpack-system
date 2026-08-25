@@ -1,0 +1,57 @@
+name: Rat Ship Marketplace Routing CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rat.cmd'
+      - 'tools/local/rat-marketplace.ps1'
+      - 'tools/local/rat-maker-console.ps1'
+      - 'tools/local/rat-ship-plugin.ps1'
+      - 'tools/ship/maker_console.mjs'
+      - 'tools/ship/maker_console_core.mjs'
+      - 'tools/ship/maker_console_runtime_patch*.mjs'
+      - 'tools/ship/maker_console_patch_test.mjs'
+      - '.github/workflows/rat-ship-marketplace-routing-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-routing:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate Maker Console widget and plugin patch
+        run: node tools/ship/maker_console_patch_test.mjs
+
+      - name: Parse Marketplace PowerShell helpers
+        shell: pwsh
+        run: |
+          $files = @(
+            'tools/local/rat-marketplace.ps1',
+            'tools/local/rat-maker-console.ps1',
+            'tools/local/rat-ship-plugin.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) {
+              $errors | ForEach-Object { Write-Error "$file: $($_.Message)" }
+              throw "PowerShell parse failed: $file"
+            }
+            Write-Host "POWERSHELL PASS: $file"
+          }
+
+      - name: Exercise rat.cmd help path
+        shell: cmd
+        run: call rat.cmd help
