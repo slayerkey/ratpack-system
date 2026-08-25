@@ -9,14 +9,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-streamdeck:
     runs-on: windows-latest
     steps:
-      - name: Checkout
+      - name: Checkout product branch
         uses: actions/checkout@v4
+        with:
+          ref: product/claude-auto-queue
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -27,13 +29,17 @@ jobs:
         working-directory: plugins/claude-auto-queue
         run: npm install --no-fund --no-audit
 
-      - name: Emit generated package lock
-        working-directory: plugins/claude-auto-queue
+      - name: Commit generated package lock once
         shell: pwsh
         run: |
-          Write-Host "PACKRAT_LOCKFILE_BEGIN"
-          [Convert]::ToBase64String([IO.File]::ReadAllBytes("package-lock.json")) | Write-Host
-          Write-Host "PACKRAT_LOCKFILE_END"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugins/claude-auto-queue/package-lock.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Lock Claude Auto Queue dependencies"
+            git push origin HEAD:product/claude-auto-queue
+          }
 
       - name: Build plugin
         working-directory: plugins/claude-auto-queue
