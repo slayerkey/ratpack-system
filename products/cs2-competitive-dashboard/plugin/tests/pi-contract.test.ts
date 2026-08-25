@@ -68,7 +68,9 @@ test("Property Inspector registers and requests ordinary plugin state over WebSo
 
   const windowObject: Record<string, unknown> = {
     PACKRAT_BUILD: { flavor: "pro", name: "CS2 Competitive Dashboard Pro", liveMetrics: [], sessionMetrics: ["record", "kd"] },
-    setTimeout: (handler: () => void) => { handler(); return 1; }
+    setTimeout: (handler: () => void) => { handler(); return 1; },
+    setInterval: () => 1,
+    clearInterval: () => undefined
   };
 
   const context = vm.createContext({
@@ -153,8 +155,8 @@ test("Property Inspector makes provider ownership explicit", () => {
   assert.match(html, /FACEIT · FACEIT Stats/);
   assert.match(html, /Leetify powers Premier and Competitive stats/);
   assert.match(html, /FACEIT powers FACEIT stats only/);
-  assert.match(pi, /Leetify-backed Competitive stat/);
-  assert.match(pi, /comes from FACEIT/);
+  assert.match(pi, /LEETIFY_DEVELOPER_PAGE/);
+  assert.match(pi, /FACEIT_DEVELOPER_PORTAL/);
 });
 
 test("Property Inspector keeps a manual bundled profile fallback for Rat Dev", () => {
