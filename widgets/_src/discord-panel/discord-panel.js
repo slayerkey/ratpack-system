@@ -43,6 +43,7 @@ function installTestHooks() {
     voiceState: function (raw) { upsertVoiceState(raw); render(); },
     remove: function (raw) { removeVoiceState(raw); render(); },
     channel: function (channel) { setChannel(channel || null); },
+    snapshot: function (snapshot) { applyBridgeSnapshot(snapshot || null); },
     selfVoice: function (voice) {
       if (voice && typeof voice.mute === "boolean") model.voice.mute = voice.mute;
       if (voice && typeof voice.deaf === "boolean") model.voice.deaf = voice.deaf;
@@ -86,13 +87,7 @@ window.addEventListener("click", function (event) {
 setInterval(function () {
   applySettings();
   if (model.activity.length) renderActivity();
-  if (!fixtureMode) {
-    var cfg = bridgeSettings();
-    if (validDiscordId(cfg.guildId) && validDiscordId(cfg.channelId)) {
-      if (rpcSocket && rpcSocket.readyState === WebSocket.OPEN) configureBridge(false);
-      else startLiveConnection();
-    }
-  }
+  if (!fixtureMode && (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN)) startLiveConnection();
 }, 1000);
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
