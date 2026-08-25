@@ -5,6 +5,7 @@
   "price_usd": null,
   "pricing_status": "REQUIRES_EXPLICIT_APPROVAL_BEFORE_MAKER_CONSOLE_DRAFT",
   "version": "0.1.0.0",
+  "marketplace_category": ["Productivity"],
   "marketplace_language": ["English"],
   "marketplace_operating_systems": ["Windows"],
   "marketplace_tags": ["Productivity", "Developer Tools", "Claude Code"],
