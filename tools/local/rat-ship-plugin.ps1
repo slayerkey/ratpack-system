@@ -53,9 +53,6 @@ $submission = Get-Content $submissionPath -Raw | ConvertFrom-Json
 if ($submission.type -ne "plugin" -or $submission.slug -ne $PluginSlug) {
     throw "submission.json does not match Stream Deck plugin '$PluginSlug'."
 }
-if ($null -eq $submission.price_usd) {
-    throw "Marketplace price has not been explicitly approved for '$PluginSlug'. Set submission.price_usd before Rat Ship creates a Maker Console draft."
-}
 
 Require-Command "node" "Install Node.js 24 or newer."
 Require-Command "npm" "Install Node.js 24 or newer."
@@ -110,13 +107,17 @@ else {
     Write-Host "Local Rat Ship plugin: no product rat-art.ps1 yet; package kit created without Marketplace media." -ForegroundColor Yellow
 }
 
-$requiredMedia = @("01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png")
+$requiredMedia = @("01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png", "06_gallery_04.png")
 $missingMedia = @($requiredMedia | Where-Object { -not (Test-Path (Join-Path $Destination $_)) })
 if ($missingMedia.Count) {
     Write-Host "Plugin kit package is valid, but Marketplace media is incomplete: $($missingMedia -join ', ')" -ForegroundColor Yellow
 }
 else {
     Write-Host "Plugin kit media preflight passed." -ForegroundColor Green
+}
+
+if ($null -eq $submission.price_usd) {
+    Write-Host "Plugin kit is ready, but Maker Console staging/submission is intentionally blocked until submission.price_usd is explicitly set." -ForegroundColor Yellow
 }
 
 Write-Host "Stream Deck plugin ship kit ready at:`n$Destination" -ForegroundColor Green
