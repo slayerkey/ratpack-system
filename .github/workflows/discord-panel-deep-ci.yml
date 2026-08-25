@@ -119,19 +119,33 @@ jobs:
           if missing:
               raise SystemExit(f'package missing required files: {missing}')
           index = (out / 'index.html').read_text(encoding='utf-8')
+          translations = (out / 'translation.json').read_text(encoding='utf-8')
           manifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))
+          package_text = index + '\n' + translations
+          obsolete = [
+              '1540927508302536724',
+              '207646673902501888',
+              'discord.com/api/oauth2/token',
+              'rpc.voice.read',
+              'rpc.voice.write',
+              'DISCORD_PORT_FIRST',
+              'DISCORD_PORT_LAST',
+              'Public Client PKCE',
+              'Client ID before release',
+          ]
           checks = {
               'loopback_transport': 'ws://127.0.0.1:17483' in index,
               'flattened_no_external_js': 'discord-panel-rpc.js' not in index and 'discord-panel-ui.js' not in index and 'discord-panel.js' not in index,
               'flattened_no_external_css': 'discord-panel.css' not in index,
               'no_fixed_server_setting': 'discordServerId' not in index,
               'no_fixed_channel_setting': 'discordVoiceChannelId' not in index,
-              'no_client_secret': 'client_secret' not in index.lower(),
+              'no_client_secret': 'client_secret' not in package_text.lower(),
+              'no_obsolete_direct_discord_auth': not any(value in package_text for value in obsolete),
               'interactive_manifest': manifest.get('interactive') is True,
               'packrat_author': manifest.get('author') == 'PackRat 🐀',
           }
           failed = [name for name, ok in checks.items() if not ok]
-          (out / 'package-audit.json').write_text(json.dumps({'files': sorted(names), 'manifest': manifest, 'checks': checks}, indent=2), encoding='utf-8')
+          (out / 'package-audit.json').write_text(json.dumps({'files': sorted(names), 'manifest': manifest, 'checks': checks, 'forbidden_signatures': obsolete}, indent=2), encoding='utf-8')
           if failed:
               raise SystemExit(f'package audit failed: {failed}')
           print(json.dumps(checks, indent=2))
