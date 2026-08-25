@@ -63,12 +63,18 @@ jobs:
           retention-days: 30
 
   browser-and-streamspell:
-    name: Eight size, stress, loopback, packaged, StreamSpell
+    name: Eight size, stress, real companion, packaged, StreamSpell
     needs: official-package
     runs-on: ubuntu-latest
     steps:
       - name: Checkout product branch
         uses: actions/checkout@v4
+
+      - name: Checkout actual Discord Bridge companion
+        uses: actions/checkout@v4
+        with:
+          ref: product/discord-bridge
+          path: companion-source
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -93,10 +99,10 @@ jobs:
           mkdir -p /tmp/ratpack-discord-panel-audit
           cd /tmp/ratpack-discord-panel-audit
           npm init -y >/dev/null 2>&1
-          npm install --save-dev playwright@1.62.1 ws@8.21.3
+          npm install --save-dev playwright@1.62.1
           npm audit --audit-level=high
           cd "$GITHUB_WORKSPACE"
-          npm install --no-save playwright@1.62.1 ws@8.21.3
+          npm install --no-save playwright@1.62.1
           npx playwright install --with-deps chromium
 
       - name: Run eight size source browser gate
@@ -165,8 +171,8 @@ jobs:
       - name: Run crowded roster and accessibility packaged stress
         run: node widgets/_src/discord-panel/stress-smoke.mjs artifacts/unpacked/index.html artifacts/packaged-stress
 
-      - name: Run packaged file-origin loopback transport gate
-        run: node widgets/_src/discord-panel/network-smoke.mjs artifacts/unpacked/index.html artifacts/network-smoke
+      - name: Run packaged file-origin through actual PackRat companion bridge
+        run: node widgets/_src/discord-panel/network-smoke.mjs artifacts/unpacked/index.html artifacts/network-smoke companion-source/plugins/discord-bridge/src/local-bridge.js
 
       - name: Start StreamSpell community builder locally
         shell: bash
