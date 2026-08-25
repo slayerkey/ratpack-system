@@ -5,7 +5,8 @@ import {
   MIN_CLAUDE_VERSION,
   compareVersions,
   isClaudeVersionSupported,
-  parseClaudeVersion
+  parseClaudeVersion,
+  resolveClaudeCommand
 } from "../src/core/claude-client.js";
 
 test("parses normal Claude Code version output", () => {
@@ -30,4 +31,29 @@ test("requires the Claude Code release that introduced Stop additionalContext", 
   assert.equal(isClaudeVersionSupported("2.1.216"), true);
   assert.equal(isClaudeVersionSupported("3.0.0"), true);
   assert.equal(isClaudeVersionSupported("unknown"), false);
+});
+
+test("resolves common Windows Claude installs before relying on a possibly stale PATH", () => {
+  const home = "C:\\Users\\Ada";
+  const env = {
+    APPDATA: "C:\\Users\\Ada\\AppData\\Roaming",
+    LOCALAPPDATA: "C:\\Users\\Ada\\AppData\\Local"
+  };
+
+  const native = "C:\\Users\\Ada\\.local\\bin\\claude.exe";
+  assert.equal(
+    resolveClaudeCommand({ platform: "win32", home, env, exists: (value) => value === native }),
+    native
+  );
+
+  const npm = "C:\\Users\\Ada\\AppData\\Roaming\\npm\\claude.cmd";
+  assert.equal(
+    resolveClaudeCommand({ platform: "win32", home, env, exists: (value) => value === npm }),
+    npm
+  );
+
+  assert.equal(
+    resolveClaudeCommand({ platform: "win32", home, env, exists: () => false }),
+    "claude"
+  );
 });
