@@ -50,19 +50,19 @@ async function readJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-function diagnosticsPage() {
+function setupPage() {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Claude Auto Queue Spike</title>
+<title>Auto Queue for Claude Code</title>
 <style>
 :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 *{box-sizing:border-box}body{margin:0;background:#080a0e;color:#f4f6f8;min-height:100vh}
 main{width:min(960px,calc(100% - 32px));margin:40px auto 80px}
-.hero{padding:28px 30px;border:1px solid #242a33;border-radius:22px;background:linear-gradient(145deg,#141820,#0d1015);box-shadow:0 24px 60px #0008}
-.eyebrow{font-size:12px;font-weight:800;letter-spacing:.18em;color:#2be86a}.hero h1{font-size:34px;margin:8px 0 8px}.hero p{margin:0;color:#aeb6c2;max-width:700px;line-height:1.55}
+.hero{padding:28px 30px;border:1px solid #242a33;border-radius:22px;background:radial-gradient(circle at 90% 0%,#2be86a1c,transparent 38%),linear-gradient(145deg,#141820,#0d1015);box-shadow:0 24px 60px #0008}
+.eyebrow,.step{font-size:12px;font-weight:800;letter-spacing:.16em;color:#2be86a}.hero h1{font-size:34px;margin:8px 0}.hero p{margin:0;color:#aeb6c2;max-width:700px;line-height:1.55}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
 .card{background:#10141a;border:1px solid #242a33;border-radius:18px;padding:20px}.card h2{margin:0 0 14px;font-size:16px}.muted{color:#8f98a6}
 .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#171d24;border:1px solid #2a333f;font-size:12px;font-weight:700}
@@ -70,24 +70,24 @@ main{width:min(960px,calc(100% - 32px));margin:40px auto 80px}
 button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:11px;padding:10px 13px;background:#2be86a;color:#051009;font-weight:800}button.secondary{background:#202731;color:#edf1f5}button.danger{background:#3a1d23;color:#ffb7be}button:disabled{cursor:not-allowed;opacity:.45}
 .row{display:flex;gap:8px;flex-wrap:wrap}.queueForm{display:flex;gap:8px}.queueForm input{flex:1;min-width:0;background:#0a0d11;color:white;border:1px solid #2a333f;border-radius:10px;padding:10px 11px}
 .field{margin:0 0 10px}.field label{display:block;margin:0 0 6px;color:#aeb6c2;font-size:12px;font-weight:700}.field select{width:100%;background:#0a0d11;color:white;border:1px solid #2a333f;border-radius:10px;padding:10px 11px}
-pre{white-space:pre-wrap;word-break:break-word;background:#090c10;border:1px solid #20262f;border-radius:12px;padding:12px;color:#cbd2da;max-height:360px;overflow:auto}
 .session{border-top:1px solid #222933;padding:14px 0}.session:first-of-type{border-top:0}.title{font-weight:800;color:#f4f6f8}.state{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#2be86a}.meta{font-size:12px;color:#8f98a6;margin-top:3px}
 .notice{margin-top:14px;padding:13px 15px;border-radius:13px;background:#121821;border:1px solid #253142;color:#aeb8c5;font-size:13px;line-height:1.45}.notice.good{border-color:#245f39;color:#c8f6d5}.notice.bad{border-color:#6b3037;color:#ffc5ca}
+details{margin-top:14px}summary{cursor:pointer;color:#aeb6c2;font-weight:700;font-size:13px;padding:4px 0}pre{white-space:pre-wrap;word-break:break-word;background:#090c10;border:1px solid #20262f;border-radius:12px;padding:12px;color:#cbd2da;max-height:360px;overflow:auto}
 </style>
 </head>
 <body>
 <main>
 <section class="hero">
-<div class="eyebrow">PACKRAT FEASIBILITY SPIKE</div>
-<h1>Claude Auto Queue</h1>
-<p>This page exists only to prove the supported Claude Code integration before the premium Stream Deck UI is finalized. Everything here stays on this computer.</p>
+<div class="eyebrow">PACKRAT</div>
+<h1>Auto Queue for Claude Code</h1>
+<p>Keep Claude working without going back to the keyboard. Connect Claude Code once, then queue follow-up work from your Stream Deck while Claude finishes the current turn.</p>
 </section>
 <div class="grid">
-<section class="card"><h2>Claude Code</h2><div id="claude" class="pill"><span class="dot"></span><span>Checking…</span></div><div id="versionHelp" class="notice">Checking Claude Code compatibility…</div><div style="height:10px"></div><div id="integration" class="pill"><span class="dot"></span><span>Checking hooks…</span></div><div class="row" style="margin-top:14px"><button id="connect">Connect Claude Code</button><button id="disconnect" class="secondary">Disconnect</button></div></section>
-<section class="card"><h2>Queue next work</h2><div class="field"><label for="session">Target session</label><select id="session"><option value="">Auto: active Claude session</option></select></div><form id="queueForm" class="queueForm"><input id="prompt" placeholder="Run tests and fix failures" required><button>Queue next</button></form><div class="row" style="margin-top:10px"><button id="remove" class="secondary">Remove next</button><button id="clear" class="danger">Clear queue</button></div><div id="queueFeedback" class="notice">Queue next does not send immediately. It saves the request for that Claude chat and runs it when Claude reaches the next Stop boundary.</div></section>
+<section class="card"><div class="step">ONE TIME SETUP</div><h2 style="margin-top:6px">Connect Claude Code</h2><div id="claude" class="pill"><span class="dot"></span><span>Checking…</span></div><div id="versionHelp" class="notice">Checking Claude Code compatibility…</div><div style="height:10px"></div><div id="integration" class="pill"><span class="dot"></span><span>Checking connection…</span></div><div class="notice">Auto Queue uses Claude Code's supported hooks to identify the active chat and hand off queued work. Click Connect once, then use Claude normally. Existing Claude settings and other hooks are preserved.</div><div class="row" style="margin-top:14px"><button id="connect">Connect Claude Code</button><button id="disconnect" class="secondary">Disconnect</button></div></section>
+<section class="card"><h2>Quick Queue</h2><div class="field"><label for="session">Target chat</label><select id="session"><option value="">Auto</option></select></div><form id="queueForm" class="queueForm"><input id="prompt" placeholder="Run tests and fix failures" required><button>Queue next</button></form><div class="row" style="margin-top:10px"><button id="remove" class="secondary">Remove next</button><button id="clear" class="danger">Clear queue</button></div><div id="queueFeedback" class="notice">Queue next saves the request for this Claude chat. It runs automatically when Claude finishes the current turn.</div></section>
 </div>
-<section class="card" style="margin-top:14px"><h2>Detected sessions</h2><div id="sessions" class="muted">No session data yet.</div></section>
-<section class="card" style="margin-top:14px"><h2>Raw diagnostic state</h2><pre id="raw">{}</pre></section>
+<section class="card" style="margin-top:14px"><h2>Claude Chats</h2><div id="sessions" class="muted">No Claude chats detected yet.</div></section>
+<details class="card"><summary>Advanced diagnostics</summary><p class="muted" style="font-size:12px;line-height:1.5;margin-top:10px">Use this only for troubleshooting. Exact session IDs and raw hook state stay local on this computer.</p><pre id="raw">{}</pre></details>
 </main>
 <script>
 async function request(url, options={}) {
@@ -99,16 +99,13 @@ async function request(url, options={}) {
 function esc(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
 function statePill(text){return '<span class="dot"></span><span>'+esc(text)+'</span>'}
 function targetSession(){return document.getElementById('session').value||null}
-function shortId(session){return session.shortId||String(session.id||'').slice(0,8)}
-function humanLabel(session){return session.lastUserPromptPreview||session.humanLabel||session.name||session.projectLabel||session.cwd||session.id}
-function sessionOptionLabel(session,activeSessionId){
+function humanLabel(session){return session.lastUserPromptPreview||session.humanLabel||session.projectLabel||session.name||'Claude chat'}
+function displayLabel(session,activeSessionId,includeState=true){
   const parts=[];
   if(session.id===activeSessionId)parts.push('ACTIVE');
-  else if(session.state==='working')parts.push('WORKING');
-  else if(session.state==='need_you')parts.push('NEEDS YOU');
-  const human=humanLabel(session);if(human)parts.push(session.lastUserPromptPreview?'“'+human+'”':human);
-  if(session.projectLabel&&session.projectLabel!==human)parts.push(session.projectLabel);
-  const id=shortId(session);if(id)parts.push('#'+id);
+  else if(includeState&&session.state==='working')parts.push('WORKING');
+  else if(includeState&&session.state==='need_you')parts.push('NEEDS YOU');
+  const human=humanLabel(session);parts.push(session.lastUserPromptPreview?'“'+human+'”':human);
   return parts.join(' · ');
 }
 function refreshSessionSelect(sessions,activeSessionId){
@@ -118,12 +115,12 @@ function refreshSessionSelect(sessions,activeSessionId){
   const engaged=sessions.filter(session=>session.state==='working'||session.state==='need_you');
   const active=sessions.find(session=>session.id===activeSessionId);
   const auto=document.createElement('option');auto.value='';
-  if(active)auto.textContent='Auto: '+sessionOptionLabel(active,activeSessionId);
-  else if(engaged.length===1)auto.textContent='Auto: only active · '+sessionOptionLabel(engaged[0],null);
-  else auto.textContent='Auto: wait for active Claude session';
+  if(active)auto.textContent='Auto · '+displayLabel(active,activeSessionId,false);
+  else if(engaged.length===1)auto.textContent='Auto · '+displayLabel(engaged[0],null,true);
+  else auto.textContent='Auto · waiting for active Claude chat';
   select.appendChild(auto);
   for(const session of sessions){
-    const option=document.createElement('option');option.value=session.id;option.textContent=sessionOptionLabel(session,activeSessionId);select.appendChild(option);
+    const option=document.createElement('option');option.value=session.id;option.textContent=displayLabel(session,activeSessionId,true);select.appendChild(option);
   }
   if(previous&&sessions.some(session=>session.id===previous))select.value=previous;
 }
@@ -135,20 +132,19 @@ async function refresh(){
     const data=await request('/api/status');
     const ready=data.claude.ok&&data.claude.compatible;
     const c=document.getElementById('claude');c.className='pill '+(ready?'good':'bad');c.innerHTML=statePill(data.claude.ok?(data.claude.version||'Unknown version'):(data.claude.error||'Not detected'));
-    const vh=document.getElementById('versionHelp');vh.textContent=ready?'Compatible with Auto Queue Stop continuation.':(data.claude.error||('Claude Code '+data.claude.minimumVersion+' or newer is required.'));
+    const vh=document.getElementById('versionHelp');vh.textContent=ready?'Claude Code is compatible with Auto Queue.':(data.claude.error||('Claude Code '+data.claude.minimumVersion+' or newer is required.'));
     document.getElementById('connect').disabled=!ready;
     const i=document.getElementById('integration');
     const hookLive=Boolean(data.lastHookAt);
-    const integrationText=data.integration.needsReconnect?'Reconnect to upgrade hook auth':(data.integration.connected?(hookLive?'Claude hooks live':'Hooks configured · waiting for Claude'):'Hooks not configured');
+    const integrationText=data.integration.needsReconnect?'Reconnect required':(data.integration.connected?(hookLive?'Connected · Claude is live':'Connected · waiting for Claude activity'):'Not connected');
     i.className='pill '+(data.integration.connected&&!data.integration.needsReconnect&&hookLive?'good':'warn');i.innerHTML=statePill(integrationText);
     const sessions=data.queue.sessions||[];refreshSessionSelect(sessions,data.queue.activeSessionId||null);
     document.getElementById('sessions').innerHTML=sessions.length?sessions.map(s=>{
       const active=s.id===data.queue.activeSessionId;
-      const title=s.lastUserPromptPreview?'“'+esc(s.lastUserPromptPreview)+'”':esc(s.humanLabel||s.name||s.cwd||s.id);
-      const project=esc(s.projectLabel||s.name||'Claude Code');
-      const id=esc(shortId(s));
-      return '<div class="session"><div class="title">'+(active?'ACTIVE · ':'')+title+'</div><div class="state">'+esc(s.state)+(s.waitingFor?' · '+esc(s.waitingFor):'')+'</div><div class="meta">'+project+' · #'+id+' · Queue '+s.queue.length+' · Chain '+s.continuationCount+'/6</div>'+(s.queue[0]?'<div class="muted">Next: '+esc(s.queue[0].prompt)+'</div>':'')+'</div>';
-    }).join(''):'No Claude sessions detected yet.';
+      const human=humanLabel(s);
+      const title=(active?'ACTIVE · ':'')+(s.lastUserPromptPreview?'“'+esc(human)+'”':esc(human));
+      return '<div class="session"><div class="title">'+title+'</div><div class="state">'+esc(s.state)+(s.waitingFor?' · '+esc(s.waitingFor):'')+'</div><div class="meta">Queue '+s.queue.length+' · Chain '+s.continuationCount+'/6</div>'+(s.queue[0]?'<div class="muted">Next: '+esc(s.queue[0].prompt)+'</div>':'')+'</div>';
+    }).join(''):'No Claude chats detected yet. Send a normal Claude prompt after connecting and it will appear here.';
     document.getElementById('raw').textContent=JSON.stringify(data,null,2);
   }catch(error){document.getElementById('raw').textContent=String(error)}
 }
@@ -158,8 +154,9 @@ document.getElementById('queueForm').onsubmit=async(e)=>{
   e.preventDefault();const input=document.getElementById('prompt');
   try{
     const queued=await request('/api/queue',{method:'POST',body:JSON.stringify({prompt:input.value,sessionId:targetSession()})});
-    const select=document.getElementById('session');const match=[...select.options].find(option=>option.value===queued.sessionId);
-    const label=match?.textContent||('#'+String(queued.sessionId||'').slice(0,8));
+    const status=await request('/api/status');
+    const match=(status.queue.sessions||[]).find(session=>session.id===queued.sessionId);
+    const label=match?(match.lastUserPromptPreview?'“'+humanLabel(match)+'”':humanLabel(match)):'the selected Claude chat';
     input.value='';setQueueFeedback('Queued #'+queued.position+' for '+label+'. It will run when Claude finishes the current turn.','good');await refresh();
   }catch(error){setQueueFeedback(String(error?.message||error),'bad')}
 };
@@ -253,7 +250,7 @@ export class LocalServer {
         }
 
         if (req.method === "GET" && url.pathname === "/") {
-          const body = diagnosticsPage();
+          const body = setupPage();
           res.writeHead(200, {
             "Content-Type": "text/html; charset=utf-8",
             "Content-Length": Buffer.byteLength(body),
@@ -267,7 +264,7 @@ export class LocalServer {
 
         return json(res, 404, { error: "Not found." });
       } catch (error) {
-        this.logger?.error?.("Claude Auto Queue local server error", error);
+        this.logger?.error?.("Auto Queue local server error", error);
         return json(res, 400, { error: String(error?.message ?? error) });
       }
     });
