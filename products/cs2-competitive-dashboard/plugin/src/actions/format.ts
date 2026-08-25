@@ -16,8 +16,22 @@ function compactWeapon(name?: string): string {
   return name.replace(/^weapon_/, "").replaceAll("_", " ").toUpperCase();
 }
 
+function setupStageLabel(status: RuntimeStatus): string {
+  switch (status.setupStage) {
+    case "finding-cs2": return "FINDING CS2";
+    case "starting-listener": return "STARTING LOCAL";
+    case "writing-config": return "INSTALLING GSI";
+    case "saving-settings": return "SAVING SETUP";
+    case "checking-cs2": return "CHECKING CS2";
+    default: return "AUTOMATIC";
+  }
+}
+
 export function liveDisplay(metric: LiveMetric, live: LiveState | undefined, session: SessionMetrics, status: RuntimeStatus): DisplayValue {
-  if (!status.gsiConfigured) return { label: "CS2 LIVE", value: "SETUP", subtitle: "ENABLE LIVE", tone: "warn" };
+  if (!status.gsiConfigured) {
+    if (status.error) return { label: "CS2 LIVE", value: "ERROR", subtitle: "OPEN SETUP", tone: "danger" };
+    return { label: "CS2 LIVE", value: "SETTING UP", subtitle: setupStageLabel(status), tone: "warn" };
+  }
   if (!live || !status.gsiConnected) {
     if (status.gsiRestartRequired && status.cs2Running) return { label: "CS2 LIVE", value: "RESTART", subtitle: "CS2 ONCE", tone: "warn" };
     if (status.gsiRestartRequired && !status.cs2Running) return { label: "CS2 LIVE", value: "READY", subtitle: "LAUNCH CS2", tone: "warn" };
@@ -63,7 +77,7 @@ export function sessionDisplay(metric: string, session: SessionMetrics): Display
 
 export function statusDisplay(status: RuntimeStatus): DisplayValue {
   if (status.error) return { label: "CS2 STATUS", value: "ERROR", subtitle: "OPEN SETUP", tone: "danger" };
-  if (!status.gsiConfigured) return { label: "CS2 STATUS", value: "SETUP", subtitle: "ENABLE LIVE", tone: "warn" };
+  if (!status.gsiConfigured) return { label: "CS2 STATUS", value: "SETTING UP", subtitle: setupStageLabel(status), tone: "warn" };
   if (status.gsiConnected) return { label: "CS2 STATUS", value: "LIVE", subtitle: "CONNECTED", tone: "good" };
   if (status.gsiRestartRequired && status.cs2Running) return { label: "CS2 STATUS", value: "RESTART", subtitle: "CS2 ONCE", tone: "warn" };
   if (status.gsiRestartRequired) return { label: "CS2 STATUS", value: "READY", subtitle: "LAUNCH CS2", tone: "warn" };
