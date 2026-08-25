@@ -3,32 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Claude Auto Queue</title>
+  <title>Auto Queue for Claude Code</title>
   <link rel="stylesheet" href="pi.css">
 </head>
 <body>
   <main>
     <section class="hero">
       <div class="eyebrow">PACKRAT</div>
-      <h1>Claude Auto Queue</h1>
+      <h1>Auto Queue for Claude Code</h1>
       <p>Queue the next job without interrupting what Claude is already doing.</p>
     </section>
 
     <section class="card setup">
       <div>
-        <h2>Claude Code Integration</h2>
-        <p class="help">Open the local setup page to connect supported Claude Code hooks and run the feasibility checks.</p>
+        <div class="step">ONE TIME SETUP</div>
+        <h2>Connect Claude Code</h2>
+        <p class="help">Auto Queue uses Claude Code's supported hooks to identify the active chat and hand off queued work. Open Setup, click Connect Claude Code once, then use Claude normally.</p>
       </div>
-      <button id="openSetup" type="button">Open Local Setup</button>
+      <button id="openSetup" type="button">Open Setup</button>
     </section>
 
     <section class="card">
-      <h2>Target Session</h2>
-      <label for="session">Claude Code session</label>
+      <h2>Target Chat</h2>
+      <label for="session">Claude Code chat</label>
       <select id="session">
-        <option value="">Auto: active Claude session</option>
+        <option value="">Auto</option>
       </select>
-      <div id="sessionHelp" class="help">Auto follows the session most recently identified by Claude hooks. If multiple sessions are ambiguous, queueing fails safely instead of guessing.</div>
+      <div id="sessionHelp" class="help">Auto follows the Claude chat you used most recently. Choose a chat only when you want this key permanently bound to one session.</div>
     </section>
 
     <section id="promptCard" class="card hidden">
@@ -37,7 +38,7 @@
       <input id="label" type="text" maxlength="18" placeholder="RUN TESTS">
       <label for="prompt">Prompt</label>
       <textarea id="prompt" rows="7" maxlength="9000" placeholder="Run the test suite and fix any failures."></textarea>
-      <div class="help">Pressing this key stores the prompt locally. Claude receives it only after the current turn finishes. Maximum 9,000 characters.</div>
+      <div class="help">Pressing this key saves the request locally. Claude receives it after the current turn finishes. Maximum 9,000 characters.</div>
     </section>
 
     <section id="controlCard" class="card hidden">
