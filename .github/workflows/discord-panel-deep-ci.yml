@@ -1,0 +1,180 @@
+name: Discord Panel Deep QA
+
+on:
+  push:
+    branches:
+      - product/discord-panel
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-package:
+    name: Official CORSAIR package
+    runs-on: windows-latest
+    steps:
+      - name: Checkout product branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run source transport regression
+        shell: pwsh
+        run: node widgets/_src/discord-panel/verify.mjs .
+
+      - name: Build flattened shipping widget
+        shell: pwsh
+        run: python tools/xeneon/inline.py discord-panel
+
+      - name: Validate with official CORSAIR CLI
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 validate widgets/discord-panel
+
+      - name: Package with official CORSAIR CLI
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 package widgets/discord-panel
+
+      - name: Collect official package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $pkg = Get-ChildItem -Path widgets -Filter *.icuewidget -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $pkg) { throw 'CORSAIR CLI did not produce an .icuewidget package' }
+          Copy-Item $pkg.FullName artifacts/discord-panel.icuewidget
+          Get-FileHash artifacts/discord-panel.icuewidget -Algorithm SHA256 | Format-List
+
+      - name: Upload official package
+        uses: actions/upload-artifact@v4
+        with:
+          name: discord-panel-official-package
+          path: artifacts/discord-panel.icuewidget
+          if-no-files-found: error
+          retention-days: 30
+
+  browser-and-streamspell:
+    name: Eight size, loopback, packaged, StreamSpell
+    needs: official-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout product branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Download official package
+        uses: actions/download-artifact@v4
+        with:
+          name: discord-panel-official-package
+          path: artifacts/package
+
+      - name: Install audited browser dependencies
+        shell: bash
+        run: |
+          rm -rf /tmp/ratpack-discord-panel-audit
+          mkdir -p /tmp/ratpack-discord-panel-audit
+          cd /tmp/ratpack-discord-panel-audit
+          npm init -y >/dev/null 2>&1
+          npm install --save-dev playwright@1.62.1 ws@8.21.3
+          npm audit --audit-level=high
+          cd "$GITHUB_WORKSPACE"
+          npm install --no-save playwright@1.62.1 ws@8.21.3
+          npx playwright install --with-deps chromium
+
+      - name: Run eight size source browser gate
+        run: node widgets/_src/discord-panel/visual-smoke.mjs widgets/_src/discord-panel/index.html artifacts/source-visual
+
+      - name: Unpack and audit official package
+        shell: bash
+        run: |
+          rm -rf artifacts/unpacked
+          mkdir -p artifacts/unpacked
+          python - <<'PY'
+          import json, pathlib, zipfile
+          package = pathlib.Path('artifacts/package/discord-panel.icuewidget')
+          out = pathlib.Path('artifacts/unpacked')
+          with zipfile.ZipFile(package) as archive:
+              names = set(archive.namelist())
+              archive.extractall(out)
+          required = {'index.html', 'manifest.json', 'translation.json'}
+          missing = sorted(required - names)
+          if missing:
+              raise SystemExit(f'package missing required files: {missing}')
+          index = (out / 'index.html').read_text(encoding='utf-8')
+          manifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8'))
+          checks = {
+              'loopback_transport': 'ws://127.0.0.1:17483' in index,
+              'flattened_no_external_js': 'discord-panel-rpc.js' not in index and 'discord-panel-ui.js' not in index and 'discord-panel.js' not in index,
+              'flattened_no_external_css': 'discord-panel.css' not in index,
+              'no_fixed_server_setting': 'discordServerId' not in index,
+              'no_fixed_channel_setting': 'discordVoiceChannelId' not in index,
+              'no_client_secret': 'client_secret' not in index.lower(),
+              'interactive_manifest': manifest.get('interactive') is True,
+              'packrat_author': manifest.get('author') == 'PackRat 🐀',
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          (out / 'package-audit.json').write_text(json.dumps({'files': sorted(names), 'manifest': manifest, 'checks': checks}, indent=2), encoding='utf-8')
+          if failed:
+              raise SystemExit(f'package audit failed: {failed}')
+          print(json.dumps(checks, indent=2))
+          PY
+
+      - name: Run eight size packaged browser gate
+        run: node widgets/_src/discord-panel/visual-smoke.mjs artifacts/unpacked/index.html artifacts/packaged-visual
+
+      - name: Run packaged file-origin loopback transport gate
+        run: node widgets/_src/discord-panel/network-smoke.mjs artifacts/unpacked/index.html artifacts/network-smoke
+
+      - name: Start StreamSpell community builder locally
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/streamspell/xeneon-edge-widget-builder.git /tmp/xeneon-edge-widget-builder
+          cd /tmp/xeneon-edge-widget-builder
+          npm install
+          nohup npm run dev > /tmp/streamspell-server.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8090/ > /dev/null; then
+              echo 'StreamSpell local builder is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/streamspell-server.log
+          exit 1
+
+      - name: Verify official package with StreamSpell at all eight presets
+        env:
+          STREAMSPELL_URL: http://127.0.0.1:8090/
+        run: node tools/xeneon/streamspell.mjs artifacts/package/discord-panel.icuewidget artifacts/streamspell
+
+      - name: Upload deep QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discord-panel-deep-qa
+          path: |
+            artifacts/source-visual/
+            artifacts/packaged-visual/
+            artifacts/network-smoke/
+            artifacts/streamspell/
+            artifacts/unpacked/package-audit.json
+          if-no-files-found: warn
+          retention-days: 30
