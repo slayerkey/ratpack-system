@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -30,11 +30,71 @@ export function isClaudeVersionSupported(value) {
   return comparison !== null && comparison >= 0;
 }
 
+function extensionVersion(name) {
+  const match = String(name ?? "").match(/^anthropic\.claude-code-(\d+\.\d+\.\d+)(?:-.+)?$/i);
+  return match?.[1] ?? null;
+}
+
+export function resolveVsCodeBundledClaude({
+  platform = process.platform,
+  home = os.homedir(),
+  exists = existsSync,
+  readDir = readdirSync
+} = {}) {
+  if (platform !== "win32") return null;
+
+  const win = path.win32;
+  const roots = [
+    win.join(home, ".vscode", "extensions"),
+    win.join(home, ".vscode-insiders", "extensions"),
+    win.join(home, ".cursor", "extensions"),
+    win.join(home, ".windsurf", "extensions")
+  ];
+  const matches = [];
+
+  for (const root of roots) {
+    let entries;
+    try {
+      entries = readDir(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const name = typeof entry === "string" ? entry : entry?.name;
+      if (!name || !/^anthropic\.claude-code-/i.test(name)) continue;
+      if (typeof entry?.isDirectory === "function" && !entry.isDirectory()) continue;
+      const binary = win.join(root, name, "resources", "native-binary", "claude.exe");
+      try {
+        if (!exists(binary)) continue;
+      } catch {
+        continue;
+      }
+      matches.push({ binary, version: extensionVersion(name), name });
+    }
+  }
+
+  matches.sort((left, right) => {
+    if (left.version && right.version) {
+      const comparison = compareVersions(right.version, left.version);
+      if (comparison !== null && comparison !== 0) return comparison;
+    } else if (left.version) {
+      return -1;
+    } else if (right.version) {
+      return 1;
+    }
+    return right.name.localeCompare(left.name);
+  });
+
+  return matches[0]?.binary ?? null;
+}
+
 export function resolveClaudeCommand({
   platform = process.platform,
   home = os.homedir(),
   env = process.env,
-  exists = existsSync
+  exists = existsSync,
+  readDir = readdirSync
 } = {}) {
   const candidates = [];
 
@@ -45,6 +105,10 @@ export function resolveClaudeCommand({
       win.join(home, ".local", "bin", "claude.cmd"),
       win.join(home, ".local", "bin", "claude")
     );
+
+    const bundled = resolveVsCodeBundledClaude({ platform, home, exists, readDir });
+    if (bundled) candidates.push(bundled);
+
     if (env.APPDATA) {
       candidates.push(
         win.join(env.APPDATA, "npm", "claude.cmd"),
@@ -110,7 +174,7 @@ export async function getClaudeVersion() {
       compatible: false,
       minimumVersion: MIN_CLAUDE_VERSION,
       error: error?.code === "ENOENT"
-        ? "Claude Code was not found. PackRat checked the native install location and PATH."
+        ? "Claude Code was not found. PackRat checked the native install, VS Code extension bundle, npm/WinGet installs, and PATH."
         : String(error?.message ?? error)
     };
   }
