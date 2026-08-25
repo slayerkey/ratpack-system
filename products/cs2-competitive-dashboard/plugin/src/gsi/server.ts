@@ -1,12 +1,15 @@
 import http, { type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { hostDiagnostics } from "../diagnostics/host.js";
 import type { RawGsiPayload } from "../core/types.js";
 import { isCs2Payload } from "./normalize.js";
 
 const HOST = "127.0.0.1";
-const DEFAULT_PORT = 32123;
+export const DEFAULT_GSI_PORT = 32123;
 const MAX_PORT_ATTEMPTS = 24;
 const MAX_BODY_BYTES = 512 * 1024;
 const SHUTDOWN_GRACE_MS = 750;
+const DIAGNOSTICS_PATH = "/packrat/diagnostics";
+const OPEN_LOG_PATH = "/packrat/open-log-folder";
 
 export interface GsiServerOptions {
   token: string;
@@ -29,7 +32,9 @@ export class GsiServer {
   async start(options: GsiServerOptions): Promise<number> {
     if (this.server?.listening && this.activePort) return this.activePort;
 
-    const firstPort = options.preferredPort ?? DEFAULT_PORT;
+    const firstPort = options.preferredPort ?? DEFAULT_GSI_PORT;
+    hostDiagnostics.event("listener bind started", { host: HOST, preferredPort: firstPort }, { setupStage: "listener-bind" });
+
     for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
       const port = firstPort + offset;
       const server = http.createServer((req, res) => {
@@ -40,21 +45,35 @@ export class GsiServer {
         await this.listen(server, port);
         this.server = server;
         this.activePort = port;
+        const url = `http://${HOST}:${port}/`;
+        hostDiagnostics.event("listener bind succeeded", { host: HOST, port, url }, {
+          listenerRunning: true,
+          listenerPort: port,
+          listenerUrl: url,
+          setupStage: "listener-ready"
+        });
         return port;
       } catch (error) {
         server.close();
         const code = (error as NodeJS.ErrnoException).code;
-        if (code !== "EADDRINUSE" && code !== "EACCES") throw error;
+        hostDiagnostics.event("listener bind attempt failed", { port, code, error });
+        if (code !== "EADDRINUSE" && code !== "EACCES") {
+          hostDiagnostics.error("listener bind failed", error);
+          throw error;
+        }
       }
     }
 
-    throw new Error(`Unable to bind a local CS2 GSI listener starting at port ${firstPort}`);
+    const error = new Error(`Unable to bind a local CS2 GSI listener starting at port ${firstPort}`);
+    hostDiagnostics.error("listener bind failed", error, { listenerRunning: false });
+    throw error;
   }
 
   async stop(): Promise<void> {
     const server = this.server;
     this.server = undefined;
     this.activePort = undefined;
+    hostDiagnostics.patch({ listenerRunning: false, listenerPort: undefined, listenerUrl: undefined });
     if (!server?.listening) return;
 
     await new Promise<void>((resolve, reject) => {
@@ -71,7 +90,7 @@ export class GsiServer {
           server.closeIdleConnections?.();
           server.closeAllConnections?.();
         } catch {
-          // Best effort only. The close callback below remains the source of truth.
+          // Best effort only.
         }
       }, SHUTDOWN_GRACE_MS);
 
@@ -101,35 +120,99 @@ export class GsiServer {
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse, options: GsiServerOptions): Promise<void> {
-    if (req.method !== "POST" || req.url !== "/gsi") {
-      this.respond(res, 404, "Not Found");
+    const requestPath = req.url ?? "/";
+
+    if (requestPath === DIAGNOSTICS_PATH) {
+      this.cors(res);
+      if (req.method === "OPTIONS") {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method !== "GET") {
+        this.respond(res, 405, "Method Not Allowed");
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({
+        signature: "packrat-cs2-competitive-dashboard",
+        state: hostDiagnostics.snapshot(),
+        summary: hostDiagnostics.summaryText()
+      }));
       return;
     }
 
+    if (requestPath === OPEN_LOG_PATH) {
+      this.cors(res);
+      if (req.method === "OPTIONS") {
+        res.statusCode = 204;
+        res.end();
+        return;
+      }
+      if (req.method !== "POST") {
+        this.respond(res, 405, "Method Not Allowed");
+        return;
+      }
+      hostDiagnostics.openLogFolder();
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    const isGsiPath = requestPath === "/" || requestPath === "/gsi";
+    if (!isGsiPath) {
+      this.respond(res, 404, "Not Found");
+      return;
+    }
+    if (req.method !== "POST") {
+      this.respond(res, 405, "Method Not Allowed");
+      return;
+    }
+
+    hostDiagnostics.event("incoming HTTP request received", { method: req.method, url: requestPath });
+
     try {
       const body = await this.readBody(req);
-      const payload = JSON.parse(body) as RawGsiPayload;
+      hostDiagnostics.event("GSI request body received", { bytes: body.bytes, url: requestPath });
 
+      let payload: RawGsiPayload;
+      try {
+        payload = JSON.parse(body.text) as RawGsiPayload;
+        hostDiagnostics.event("GSI JSON parse succeeded", { bytes: body.bytes });
+      } catch (error) {
+        hostDiagnostics.error("GSI JSON parse failed", error);
+        this.respond(res, 400, "Bad Request");
+        return;
+      }
+
+      const providerAppId = Number(payload.provider?.appid);
       if (payload.auth?.token !== options.token) {
+        hostDiagnostics.event("GSI auth token rejected", { tokenPresent: Boolean(payload.auth?.token), providerAppId });
         this.respond(res, 401, "Unauthorized");
         return;
       }
+      hostDiagnostics.event("GSI auth token accepted", { providerAppId });
 
       if (!isCs2Payload(payload)) {
+        hostDiagnostics.event("GSI provider app id rejected", { providerAppId });
         this.respond(res, 400, "Invalid app id");
         return;
       }
+      hostDiagnostics.event("GSI provider app id accepted", { providerAppId });
 
       await options.onPayload(payload);
-      res.statusCode = 204;
+      hostDiagnostics.markPacket(body.bytes, providerAppId);
+      res.statusCode = 200;
       res.end();
     } catch (error) {
       const status = error instanceof PayloadTooLargeError ? 413 : 400;
+      hostDiagnostics.error("GSI request failed", error);
       this.respond(res, status, status === 413 ? "Payload Too Large" : "Bad Request");
     }
   }
 
-  private readBody(req: IncomingMessage): Promise<string> {
+  private readBody(req: IncomingMessage): Promise<{ text: string; bytes: number }> {
     return new Promise((resolve, reject) => {
       let size = 0;
       const chunks: Buffer[] = [];
@@ -143,9 +226,15 @@ export class GsiServer {
         }
         chunks.push(chunk);
       });
-      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+      req.on("end", () => resolve({ text: Buffer.concat(chunks).toString("utf8"), bytes: size }));
       req.on("error", reject);
     });
+  }
+
+  private cors(res: ServerResponse): void {
+    res.setHeader("access-control-allow-origin", "*");
+    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    res.setHeader("access-control-allow-headers", "content-type");
   }
 
   private respond(res: ServerResponse, statusCode: number, message: string): void {
