@@ -156,11 +156,40 @@ function commonSteamRoots(): string[] {
   return [...roots];
 }
 
+export function normalizeManualCs2Path(manualPath: string): { installDir: string; cfgDir: string } {
+  const normalized = path.resolve(manualPath.trim().replace(/^"|"$/g, ""));
+  const base = path.basename(normalized).toLowerCase();
+  const parent = path.basename(path.dirname(normalized)).toLowerCase();
+  const grandParent = path.basename(path.dirname(path.dirname(normalized))).toLowerCase();
+
+  if (base === "cfg" && parent === "csgo" && grandParent === "game") {
+    return {
+      installDir: path.dirname(path.dirname(path.dirname(normalized))),
+      cfgDir: normalized
+    };
+  }
+
+  if (base === "csgo" && parent === "game") {
+    const installDir = path.dirname(path.dirname(normalized));
+    return { installDir, cfgDir: path.join(normalized, "cfg") };
+  }
+
+  if (base === "game") {
+    const installDir = path.dirname(normalized);
+    return { installDir, cfgDir: path.join(normalized, "csgo", "cfg") };
+  }
+
+  return {
+    installDir: normalized,
+    cfgDir: path.join(normalized, "game", "csgo", "cfg")
+  };
+}
+
 export async function locateCs2Install(manualPath?: string): Promise<Cs2Install> {
   if (manualPath) {
     const direct = await resolveManualInstall(manualPath);
     if (direct) return direct;
-    throw new Error("The selected path does not contain a valid CS2 installation");
+    throw new Error("The selected path is not a valid CS2 install. You can paste either the Counter-Strike Global Offensive install folder or its game\\csgo\\cfg folder.");
   }
 
   const registryInstall = await cs2InstallFromRegistry();
@@ -178,18 +207,17 @@ export async function locateCs2Install(manualPath?: string): Promise<Cs2Install>
     if (result) return result;
   }
 
-  throw new Error("Could not find Counter-Strike 2 automatically. Use CS2 path override and select the Counter-Strike Global Offensive install folder.");
+  throw new Error("Could not find Counter-Strike 2 automatically. Use CS2 path override and paste either the Counter-Strike Global Offensive install folder or its game\\csgo\\cfg folder.");
 }
 
 async function resolveManualInstall(manualPath: string): Promise<Cs2Install | undefined> {
-  const normalized = path.resolve(manualPath);
-  const cfgDir = path.join(normalized, "game", "csgo", "cfg");
-  if (!(await exists(cfgDir))) return undefined;
+  const normalized = normalizeManualCs2Path(manualPath);
+  if (!(await exists(normalized.cfgDir))) return undefined;
   return {
     steamRoot: "manual",
     libraryRoot: "manual",
-    installDir: normalized,
-    cfgDir
+    installDir: normalized.installDir,
+    cfgDir: normalized.cfgDir
   };
 }
 
