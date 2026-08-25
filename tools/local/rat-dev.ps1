@@ -210,21 +210,44 @@ function Resolve-ExternalTarget {
     throw "Could not resolve external development ref '$Ref' for $Slug."
 }
 
+function Test-ExternalCheckout {
+    if (-not (Test-Path $Worktree -PathType Container)) { return $false }
+    $gitDir = Join-Path $Worktree ".git"
+    if (-not (Test-Path $gitDir -PathType Container)) { return $false }
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & git -C $Worktree rev-parse --is-inside-work-tree *> $null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Sync-ExternalCheckout {
     param($Source)
 
     New-Item -ItemType Directory -Force -Path $WorktreeRoot | Out-Null
-    $gitDir = Join-Path $Worktree ".git"
-    $canReuse = $false
+    $canReuse = Test-ExternalCheckout
 
-    if ((Test-Path $Worktree) -and (Test-Path $gitDir -PathType Container)) {
+    if ($canReuse) {
+        # The slug owns this checkout path. Reuse a healthy Git checkout in place even when
+        # Windows/Stream Deck currently has the .sdPlugin directory open. Deleting the checkout
+        # while the linked plugin is running causes the exact access-denied failure Rat Dev is
+        # designed to avoid. Reconcile origin to the canonical registration instead.
         $remoteUrl = (& git -C $Worktree remote get-url origin 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -eq 0 -and [string]$remoteUrl -eq [string]$Source.Repository) {
-            $canReuse = $true
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$remoteUrl)) {
+            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "remote", "add", "origin", [string]$Source.Repository) -Failure "Could not configure external product origin"
         }
+        elseif ([string]$remoteUrl -ne [string]$Source.Repository) {
+            Write-Host "Reconciling external product origin..." -ForegroundColor DarkGray
+            Invoke-Checked -Command "git" -Arguments @("-C", $Worktree, "remote", "set-url", "origin", [string]$Source.Repository) -Failure "Could not update external product origin"
+        }
+        Write-Host "Reusing external product checkout in place..." -ForegroundColor DarkGray
     }
-
-    if (-not $canReuse) {
+    else {
         if (Test-Path $Worktree) {
             Remove-ExistingCheckout
         }
