@@ -73,21 +73,20 @@ function addOption(select, value, label) {
   select.appendChild(option);
 }
 
-function shortSessionLabel(session, { includeState = true } = {}) {
+function humanChatLabel(session) {
+  if (session.lastUserPromptPreview) return `“${session.lastUserPromptPreview}”`;
+  if (session.projectLabel) return session.projectLabel;
+  if (session.label) return session.label;
+  return "Claude chat";
+}
+
+function sessionOptionLabel(session, { includeState = true } = {}) {
   const parts = [];
   if (session.id === activeSessionId) parts.push("ACTIVE");
   else if (includeState && session.state === "working") parts.push("WORKING");
   else if (includeState && session.state === "need_you") parts.push("NEEDS YOU");
-
-  if (session.lastUserPromptPreview) parts.push(`“${session.lastUserPromptPreview}”`);
-  else if (session.label) parts.push(session.label);
-
-  if (session.projectLabel && session.projectLabel !== session.label) {
-    parts.push(session.projectLabel);
-  }
-  const shortId = session.shortId || String(session.id ?? "").slice(0, 8);
-  if (shortId) parts.push(`#${shortId}`);
-  return parts.join(" · ") || "Claude session";
+  parts.push(humanChatLabel(session));
+  return parts.join(" · ");
 }
 
 function renderSessionSelect() {
@@ -98,17 +97,17 @@ function renderSessionSelect() {
 
   const active = sessionRows.find((session) => session.id === activeSessionId);
   const engaged = sessionRows.filter((session) => session.state === "working" || session.state === "need_you");
-  let autoLabel = "Auto: wait for active Claude session";
-  if (active) autoLabel = `Auto: ${shortSessionLabel(active, { includeState: false })}`;
-  else if (engaged.length === 1) autoLabel = `Auto: only active · ${shortSessionLabel(engaged[0], { includeState: false })}`;
+  let autoLabel = "Auto · waiting for active Claude chat";
+  if (active) autoLabel = `Auto · ${sessionOptionLabel(active, { includeState: false })}`;
+  else if (engaged.length === 1) autoLabel = `Auto · ${sessionOptionLabel(engaged[0], { includeState: true })}`;
   addOption(select, "", autoLabel);
 
   for (const session of sessionRows) {
-    addOption(select, session.id, shortSessionLabel(session));
+    addOption(select, session.id, sessionOptionLabel(session));
   }
 
   if (selected && !sessionRows.some((session) => session.id === selected)) {
-    addOption(select, selected, "Selected session unavailable");
+    addOption(select, selected, "Selected Claude chat unavailable");
   }
   select.value = selected;
 
@@ -117,16 +116,16 @@ function renderSessionSelect() {
     if (selected) {
       const match = sessionRows.find((session) => session.id === selected);
       help.textContent = match
-        ? `Bound to ${shortSessionLabel(match, { includeState: false })}. Queue: ${match.queueCount ?? 0}.`
-        : "This key is bound to a Claude session that is not currently visible. Choose Auto or another session to rebind it.";
+        ? `Bound to ${humanChatLabel(match)}. Queue: ${match.queueCount ?? 0}.`
+        : "This key is bound to a Claude chat that is not currently visible. Choose Auto or another chat to rebind it.";
     } else if (active) {
-      help.textContent = `Auto follows ${shortSessionLabel(active, { includeState: false })}. A new real Claude prompt automatically changes the active session.`;
+      help.textContent = `Auto follows ${humanChatLabel(active)}. Sending a real prompt in another Claude chat makes that chat active automatically.`;
     } else if (engaged.length === 1) {
-      help.textContent = `Auto can safely use the only active session: ${shortSessionLabel(engaged[0], { includeState: false })}.`;
+      help.textContent = `Auto can safely use the only active chat: ${humanChatLabel(engaged[0])}.`;
     } else if (sessionRows.length > 1) {
-      help.textContent = "Multiple Claude sessions are idle or active at once. Start the intended Claude chat or choose one explicitly; PackRat will not guess.";
+      help.textContent = "Multiple Claude chats are ambiguous. Use the chat you want first or choose one explicitly. Auto never guesses between equally likely chats.";
     } else {
-      help.textContent = "Auto follows the session most recently identified by Claude hooks. If sessions are ambiguous, queueing fails safely instead of guessing.";
+      help.textContent = "Auto follows the Claude chat you use most recently. Choose a chat only when you want this key permanently bound to one session.";
     }
   }
 }
