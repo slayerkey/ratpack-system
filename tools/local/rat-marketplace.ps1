@@ -96,13 +96,12 @@ for ($i = 0; $i -lt $queue.Count; $i++) {
                 $message += " Finish the product release gate, merge '$branchName' into main, then rerun: rat $Action $item"
                 throw $message
             }
+
+            throw "Product '$item' is not registered on canonical main. Expected: products/$item.json"
         }
 
-        $isPlugin = $false
-        if (Test-Path $productPath) {
-            $product = Get-Content $productPath -Raw | ConvertFrom-Json
-            $isPlugin = $product.type -eq "plugin"
-        }
+        $product = Get-Content $productPath -Raw | ConvertFrom-Json
+        $isPlugin = $product.type -eq "plugin"
 
         if (-not $isPlugin) {
             # Existing XENEON/widget products stay on the proven legacy pipeline.
