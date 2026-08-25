@@ -4,6 +4,7 @@ import { StateStore } from "./state-store.js";
 
 export const MAX_AUTOMATIC_CONTINUATIONS = 6;
 export const MAX_QUEUE_PROMPT_CHARS = 9000;
+export const MAX_SESSION_PROMPT_PREVIEW_CHARS = 72;
 
 const ATTENTION_NOTIFICATIONS = new Set([
   "permission_prompt",
@@ -26,6 +27,13 @@ function cleanPrompt(value) {
   return prompt;
 }
 
+export function makeSessionPromptPreview(value) {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (normalized.length <= MAX_SESSION_PROMPT_PREVIEW_CHARS) return normalized;
+  return `${normalized.slice(0, MAX_SESSION_PROMPT_PREVIEW_CHARS - 3).trimEnd()}...`;
+}
+
 function emptySession(id) {
   return {
     id,
@@ -38,6 +46,7 @@ function emptySession(id) {
     lastEventAt: null,
     lastError: null,
     currentTask: null,
+    lastUserPromptPreview: null,
     continuationCount: 0,
     queueLimitReached: false,
     queue: []
@@ -64,6 +73,8 @@ export class AutoQueueService {
         session.name = data?.name ?? null;
         session.cwd = data?.cwd ?? null;
         session.kind = data?.kind ?? null;
+        session.lastUserPromptPreview =
+          typeof data?.lastUserPromptPreview === "string" ? data.lastUserPromptPreview : null;
         session.continuationCount = Number.isFinite(data?.continuationCount)
           ? Math.max(0, Math.floor(data.continuationCount))
           : 0;
@@ -122,6 +133,7 @@ export class AutoQueueService {
             name: session.name,
             cwd: session.cwd,
             kind: session.kind,
+            lastUserPromptPreview: session.lastUserPromptPreview,
             continuationCount: session.continuationCount,
             queueLimitReached: session.queueLimitReached,
             queue: session.queue
@@ -133,12 +145,24 @@ export class AutoQueueService {
     return this.saveChain;
   }
 
+  decorateSession(session) {
+    const projectLabel = session.cwd
+      ? path.basename(session.cwd)
+      : session.name || "Claude Code";
+    const shortId = session.id.slice(0, 8);
+    const humanLabel = session.lastUserPromptPreview || session.name || projectLabel || `Session ${shortId}`;
+    return {
+      ...session,
+      projectLabel,
+      shortId,
+      humanLabel,
+      queue: session.queue.map((item) => ({ ...item }))
+    };
+  }
+
   getSnapshot() {
     const sessions = [...this.sessions.values()]
-      .map((session) => ({
-        ...session,
-        queue: session.queue.map((item) => ({ ...item }))
-      }))
+      .map((session) => this.decorateSession(session))
       .sort((a, b) => (b.lastEventAt ?? 0) - (a.lastEventAt ?? 0));
     return {
       activeSessionId: this.activeSessionId,
@@ -148,7 +172,7 @@ export class AutoQueueService {
 
   getSession(id) {
     const session = this.sessions.get(id);
-    return session ? { ...session, queue: session.queue.map((item) => ({ ...item })) } : null;
+    return session ? this.decorateSession(session) : null;
   }
 
   resolveTarget(explicitSessionId = null) {
@@ -161,6 +185,14 @@ export class AutoQueueService {
 
     if (this.activeSessionId && this.sessions.has(this.activeSessionId)) {
       return this.activeSessionId;
+    }
+
+    const engaged = [...this.sessions.values()].filter(
+      (session) => session.state === "working" || session.state === "need_you"
+    );
+    if (engaged.length === 1) return engaged[0].id;
+    if (engaged.length > 1) {
+      throw new Error("Multiple active Claude sessions are available. Select a session before queueing.");
     }
 
     const candidates = [...this.sessions.values()].filter(
@@ -265,6 +297,7 @@ export class AutoQueueService {
         session.waitingFor = null;
         session.turnStartedAt = this.clock();
         session.lastError = null;
+        session.lastUserPromptPreview = makeSessionPromptPreview(payload.prompt);
         session.continuationCount = 0;
         session.queueLimitReached = false;
         break;
@@ -391,8 +424,8 @@ export class AutoQueueService {
 
   getProjectLabel(session) {
     if (!session) return "No session";
-    if (session.name) return session.name;
     if (session.cwd) return path.basename(session.cwd);
+    if (session.name) return session.name;
     return "Claude Code";
   }
 }
