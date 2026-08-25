@@ -48,36 +48,39 @@
       </div>
 
       <div class="setup-guide">
-        <div class="sub-label">How live tracking works</div>
+        <div class="sub-label">Automatic setup</div>
         <ol class="setup-steps">
-          <li>Click <strong>Enable Live CS2 Tracking</strong> once. The plugin finds Steam and CS2 and writes a local Valve GSI config.</li>
-          <li>If CS2 is already open, restart CS2 once so the game loads that config.</li>
-          <li>Enter Deathmatch, Premier, Competitive, or another game mode.</li>
-          <li>When CS2 sends its first game-state update, this status changes to <strong>Connected to CS2</strong> and your live/session keys begin updating.</li>
+          <li>PackRat automatically finds Steam and CS2, starts its local listener, and installs its Valve GSI config when the plugin starts.</li>
+          <li>There is no Enable button and no API key required for live tracking.</li>
+          <li>If this is the first install while CS2 is already open, restart CS2 once so the game loads the new config.</li>
+          <li>Enter Deathmatch, Premier, Competitive, or another game mode. When CS2 sends its first game-state update, this changes to <strong>Connected to CS2</strong>.</li>
         </ol>
-        <p class="privacy-note">Live tracking is local only. It does not need Steam, Leetify, or FACEIT API keys.</p>
+        <p class="privacy-note">Live tracking stays on this PC. CS2 sends Valve GSI data only to the plugin's 127.0.0.1 listener.</p>
       </div>
 
-      <label class="field-label small-gap" for="manual-path">CS2 path override <span class="optional">optional</span></label>
-      <input id="manual-path" type="text" spellcheck="false" placeholder="Auto detect, CS2 install folder, or game\csgo\cfg" />
-      <p class="hint">Leave blank for automatic detection. If needed, paste either the <strong>Counter-Strike Global Offensive</strong> install folder or the exact <strong>game\csgo\cfg</strong> folder. Both are accepted.</p>
-
-      <div class="button-row">
-        <button class="primary plugin-command" id="enable-gsi">Enable Live CS2 Tracking</button>
-        <button class="secondary plugin-command" id="disable-gsi">Disable</button>
+      <!-- Kept in the DOM for backwards-compatible development commands, but normal users never need these controls. -->
+      <div hidden>
+        <label class="field-label small-gap" for="manual-path">CS2 path override <span class="optional">optional</span></label>
+        <input id="manual-path" type="text" spellcheck="false" placeholder="Auto detect, CS2 install folder, or game\csgo\cfg" />
+        <p class="hint">Leave blank for automatic detection. If needed, paste either the Counter-Strike Global Offensive install folder or the exact game\csgo\cfg folder. Both are accepted.</p>
+        <div class="button-row">
+          <button class="primary plugin-command" id="enable-gsi">Enable Live CS2 Tracking</button>
+          <button class="secondary plugin-command" id="disable-gsi">Disable</button>
+        </div>
       </div>
-      <p class="action-feedback" id="gsi-feedback">Tracking is currently off.</p>
+      <p class="action-feedback" id="gsi-feedback">Automatic tracking setup is starting…</p>
       <div class="error-copy" id="setup-error" hidden></div>
     </section>
 
-    <section class="panel" id="diagnostics-panel">
+    <!-- The old command-driven diagnostics are intentionally hidden. Live setup no longer depends on PI button RPC. -->
+    <section class="panel" id="diagnostics-panel" hidden>
       <div class="field-label">Advanced Diagnostics</div>
-      <p class="hint">If live setup stalls or fails, run this once. It checks the Stream Deck settings channel, cs2.exe, CS2 path resolution, cfg write access, the existing PackRat GSI config, and the localhost listener without changing your game setup.</p>
+      <p class="hint">Developer diagnostics.</p>
       <button class="secondary full-width plugin-command" id="run-diagnostics">Run Advanced Diagnostics</button>
       <p class="action-feedback" id="diagnostic-feedback">No diagnostic report yet.</p>
       <textarea id="diagnostic-output" class="diagnostic-output" rows="14" readonly hidden aria-label="CS2 diagnostic report"></textarea>
       <button class="secondary full-width" id="copy-diagnostics" hidden>Copy Diagnostic Report</button>
-      <p class="privacy-note">The report intentionally omits API keys and the GSI auth token. You can paste the complete report into support/chat.</p>
+      <p class="privacy-note">The report intentionally omits API keys and the GSI auth token.</p>
     </section>
 
     <section class="panel" id="pro-account-panel" hidden>
