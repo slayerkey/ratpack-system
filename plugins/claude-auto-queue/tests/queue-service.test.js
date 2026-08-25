@@ -7,7 +7,9 @@ import test from "node:test";
 import {
   AutoQueueService,
   MAX_AUTOMATIC_CONTINUATIONS,
-  MAX_QUEUE_PROMPT_CHARS
+  MAX_QUEUE_PROMPT_CHARS,
+  MAX_SESSION_PROMPT_PREVIEW_CHARS,
+  makeSessionPromptPreview
 } from "../src/core/queue-service.js";
 import { StateStore } from "../src/core/state-store.js";
 
@@ -22,12 +24,12 @@ async function makeService() {
   return service;
 }
 
-async function startSession(service, id = "session-a") {
+async function startSession(service, id = "session-a", prompt = "Build it") {
   await service.handleHook({
     hook_event_name: "UserPromptSubmit",
     session_id: id,
     cwd: "/work/project",
-    prompt: "Build it"
+    prompt
   });
 }
 
@@ -53,6 +55,21 @@ test("queues a prompt and injects factual user-authored context at the next Stop
   assert.equal(session.queue.length, 0);
   assert.equal(session.state, "working");
   assert.equal(session.continuationCount, 1);
+});
+
+test("captures a short human-readable preview of the last real user prompt", async () => {
+  const service = await makeService();
+  const longPrompt = `Please inspect the current project\n\n${"and explain the architecture in detail ".repeat(5)}`;
+  await startSession(service, "session-preview", longPrompt);
+
+  const session = service.getSession("session-preview");
+  assert.equal(session.lastUserPromptPreview, makeSessionPromptPreview(longPrompt));
+  assert.equal(session.humanLabel, session.lastUserPromptPreview);
+  assert.equal(session.projectLabel, "project");
+  assert.equal(session.shortId, "session-");
+  assert.ok(session.lastUserPromptPreview.length <= MAX_SESSION_PROMPT_PREVIEW_CHARS);
+  assert.doesNotMatch(session.lastUserPromptPreview, /\n/);
+  assert.ok(longPrompt.length > session.lastUserPromptPreview.length);
 });
 
 test("rejects queued prompts that would approach Claude's 10k additionalContext spill threshold", async () => {
@@ -136,6 +153,7 @@ test("a fresh user turn resets the automatic continuation safety counter", async
 
   assert.equal(service.getSession("session-a").continuationCount, 0);
   assert.equal(service.getSession("session-a").queueLimitReached, false);
+  assert.equal(service.getSession("session-a").lastUserPromptPreview, "New manual prompt");
 });
 
 test("permission and API failure states are explicit", async () => {
@@ -164,6 +182,17 @@ test("permission and API failure states are explicit", async () => {
   });
   assert.equal(service.getSession("session-a").state, "error");
   assert.equal(service.getSession("session-a").lastError, "rate_limit");
+});
+
+test("Auto uses the only working session when no hook-learned active session exists yet", async () => {
+  const service = await makeService();
+  await service.reconcileAgents([
+    { sessionId: "a", cwd: "/a", kind: "interactive", state: "working" },
+    { sessionId: "b", cwd: "/b", kind: "interactive", state: "idle" }
+  ]);
+  service.activeSessionId = null;
+
+  assert.equal(service.resolveTarget(), "a");
 });
 
 test("never guesses when multiple sessions exist and no active session is known", async () => {
@@ -214,15 +243,16 @@ test("an explicit session binding routes queued work only to that session", asyn
   assert.equal(service.getSession("b").queue.length, 0);
 });
 
-test("queue survives a service restart", async () => {
+test("queue and human prompt preview survive a service restart", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "claude-auto-queue-persist-"));
   const file = path.join(dir, "state.json");
   const first = new AutoQueueService({ store: new StateStore(file) });
   await first.initialize();
-  await startSession(first, "persisted");
+  await startSession(first, "persisted", "Please document the implementation choices");
   await first.enqueue("Document the implementation");
 
   const second = new AutoQueueService({ store: new StateStore(file) });
   await second.initialize();
   assert.equal(second.getSession("persisted").queue[0].prompt, "Document the implementation");
+  assert.equal(second.getSession("persisted").lastUserPromptPreview, "Please document the implementation choices");
 });
