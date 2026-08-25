@@ -1,4 +1,4 @@
-name: Claude Auto Queue Spike CI
+name: Auto Queue for Claude Code CI
 
 on:
   pull_request:
@@ -29,17 +29,21 @@ jobs:
         working-directory: plugins/claude-auto-queue
         run: npm ci --no-fund --no-audit
 
-      - name: Build plugin
+      - name: Build plugin and bundled profiles
         working-directory: plugins/claude-auto-queue
         run: npm run build
 
-      - name: Run feasibility fixtures
+      - name: Run product fixtures
         working-directory: plugins/claude-auto-queue
         run: npm test
 
       - name: Validate with official Stream Deck CLI
         working-directory: plugins/claude-auto-queue
-        run: npx streamdeck validate com.packrat.claude-auto-queue.sdPlugin
+        run: npx streamdeck validate com.packrat.claude-auto-queue.sdPlugin --no-update-check
+
+      - name: Package release candidate with official Stream Deck CLI
+        working-directory: plugins/claude-auto-queue
+        run: npx streamdeck pack com.packrat.claude-auto-queue.sdPlugin --output dist --force --no-update-check --no-file-list
 
       - name: Reproduce Rat Dev build from Windows path with spaces
         shell: pwsh
@@ -54,6 +58,7 @@ jobs:
           Copy-Item (Join-Path $source 'rollup.config.mjs') $target
           Copy-Item (Join-Path $source 'tsconfig.json') $target
           Copy-Item (Join-Path $source 'src') $target -Recurse
+          Copy-Item (Join-Path $source 'scripts') $target -Recurse
           Push-Location $target
           try {
             npm ci --no-fund --no-audit
@@ -64,3 +69,10 @@ jobs:
           finally {
             Pop-Location
           }
+
+      - name: Upload packaged release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-queue-for-claude-code
+          path: plugins/claude-auto-queue/dist/*.streamDeckPlugin
+          if-no-files-found: error
