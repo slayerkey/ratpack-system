@@ -82,4 +82,9 @@ button:disabled { cursor: not-allowed; opacity: .5; filter: none !important; }
 .secret-row .compact { margin-top: 0; }
 .remove-key { min-width: 62px; }
 .privacy-note { margin: 8px 0 0; border-left: 2px solid #335f42; padding-left: 8px; color: #77867d; font-size: 8.5px; line-height: 1.45; }
+.diagnostic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.diagnostic-grid div { min-width: 0; border: 1px solid #29372f; border-radius: 7px; padding: 7px; background: #0e1410; }
+.diagnostic-grid span { display: block; color: #74837a; font-size: 7.5px; text-transform: uppercase; letter-spacing: .55px; }
+.diagnostic-grid strong { display: block; margin-top: 3px; color: #d4ded8; font-size: 8.5px; line-height: 1.3; font-weight: 650; overflow-wrap: anywhere; }
+.diagnostic-path { margin: 9px 0 0; padding: 7px; border-radius: 6px; background: #0a0f0c; color: #819087; font-family: Consolas, "SFMono-Regular", monospace; font-size: 7.5px; line-height: 1.45; overflow-wrap: anywhere; }
 [hidden] { display: none !important; }
