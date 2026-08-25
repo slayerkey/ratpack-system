@@ -10,6 +10,7 @@ const MAX_BODY_BYTES = 512 * 1024;
 const SHUTDOWN_GRACE_MS = 750;
 const DIAGNOSTICS_PATH = "/packrat/diagnostics";
 const OPEN_LOG_PATH = "/packrat/open-log-folder";
+const PACKET_TRACE_EVERY = 300;
 
 export interface GsiServerOptions {
   token: string;
@@ -170,16 +171,18 @@ export class GsiServer {
       return;
     }
 
-    hostDiagnostics.event("incoming HTTP request received", { method: req.method, url: requestPath });
+    const nextPacket = hostDiagnostics.snapshot().requestCount + 1;
+    const traceSuccess = nextPacket === 1 || nextPacket % PACKET_TRACE_EVERY === 0;
+    if (traceSuccess) hostDiagnostics.event("incoming HTTP request received", { method: req.method, url: requestPath, packet: nextPacket });
 
     try {
       const body = await this.readBody(req);
-      hostDiagnostics.event("GSI request body received", { bytes: body.bytes, url: requestPath });
+      if (traceSuccess) hostDiagnostics.event("GSI request body received", { bytes: body.bytes, url: requestPath, packet: nextPacket });
 
       let payload: RawGsiPayload;
       try {
         payload = JSON.parse(body.text) as RawGsiPayload;
-        hostDiagnostics.event("GSI JSON parse succeeded", { bytes: body.bytes });
+        if (traceSuccess) hostDiagnostics.event("GSI JSON parse succeeded", { bytes: body.bytes, packet: nextPacket });
       } catch (error) {
         hostDiagnostics.error("GSI JSON parse failed", error);
         this.respond(res, 400, "Bad Request");
@@ -192,14 +195,14 @@ export class GsiServer {
         this.respond(res, 401, "Unauthorized");
         return;
       }
-      hostDiagnostics.event("GSI auth token accepted", { providerAppId });
+      if (traceSuccess) hostDiagnostics.event("GSI auth token accepted", { providerAppId, packet: nextPacket });
 
       if (!isCs2Payload(payload)) {
         hostDiagnostics.event("GSI provider app id rejected", { providerAppId });
         this.respond(res, 400, "Invalid app id");
         return;
       }
-      hostDiagnostics.event("GSI provider app id accepted", { providerAppId });
+      if (traceSuccess) hostDiagnostics.event("GSI provider app id accepted", { providerAppId, packet: nextPacket });
 
       await options.onPayload(payload);
       hostDiagnostics.markPacket(body.bytes, providerAppId);
