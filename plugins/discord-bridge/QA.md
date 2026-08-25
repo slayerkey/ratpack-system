@@ -16,11 +16,11 @@ PASS: direct XENEON browser to legacy Discord WebSocket RPC is not viable becaus
 
 PASS: the PackRat-owned Discord application reaches native RPC authorization, but Discord rejects its `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing a code.
 
-## Active StreamKit public RPC feasibility path
+## StreamKit public RPC feasibility result
 
 Build `0.3.0.0` no longer uses the PackRat Discord application for voice authorization.
 
-The production build now:
+The production build:
 
 1. handshakes Discord native IPC with StreamKit client ID `207646673902501888`
 2. requests `rpc`, `rpc.voice.read`, and `rpc.voice.write` through native RPC `AUTHORIZE`
@@ -31,6 +31,28 @@ The production build now:
 7. forwards only normalized state to XENEON over the loopback bridge
 
 The StreamKit token is stored only in Stream Deck global settings for local reuse and is never included in `/state` or XENEON snapshots. No Discord Client Secret is embedded.
+
+### Real host proof on 2026-08-24
+
+PASS: `rat dev discord-bridge` installed build `0.3.0.0` and the local status endpoint reported protocol `3` and `streamkit.mode: public_rpc`.
+
+PASS: Discord native IPC connected through `discord-ipc-0` and reached `handshake: ready`.
+
+PASS: StreamKit native RPC authorization succeeded instead of returning `invalid_scope`.
+
+PASS: StreamKit token exchange succeeded and `tokenCached: true`.
+
+PASS: Discord RPC `AUTHENTICATE` succeeded with `discord.authenticated: true` and `streamkit.stage: ready`.
+
+PASS: granted scopes include `rpc`, `rpc.voice.read`, and `rpc.voice.write`.
+
+PASS: while already in a real Discord voice channel, `/state` automatically populated the current voice channel and `voice_states` without any configured Server ID or Channel ID.
+
+PASS: real local mute/deafen state populated as booleans.
+
+PASS: live speaking state populated for the current voice member.
+
+The core Discord-side feasibility question is therefore proven. Remaining physical work is the XENEON loopback/render/control test plus restart persistence checks.
 
 ## Automated coverage in source
 
@@ -52,37 +74,26 @@ PASS: normal operational states communicate through the Stream Deck key title in
 
 The old hidden Edge overlay and keyboard-shortcut helpers remain in source only as an experimental fallback. The deterministic production build does not copy them into the plugin package.
 
-## Current real-machine gate
+## Current physical XENEON gate
 
 Run:
 
 ```text
-rat dev discord-bridge
+rat dev discord-panel
 ```
 
-Rat Dev must pass the product build, all Node tests, and official Stream Deck CLI validation before linking build `0.3.0.0`.
+Then prove on the physical XENEON Edge:
 
-Expected pre-authorization state:
-
-- `buildVersion: 0.3.0.0`
-- `protocol: 3`
-- `streamkit.mode: public_rpc`
-- `discord.ready: true`
-- `discord.authenticated: false`
-
-Press the Stream Deck Bridge Status key once if it says `Press to Authorize`.
-
-A technical feasibility pass requires:
-
-- Discord accepts StreamKit RPC `AUTHORIZE`
-- StreamKit token endpoint returns an access token
-- Discord RPC `AUTHENTICATE` succeeds
-- `/state` shows `streamkit.stage: ready`
-- `/state` shows `discord.authenticated: true`
-- joining any Discord voice channel automatically populates `channel.voice_states`
-- `speaking` changes on real speech
-- mute/deafen commands update Discord and the returned voice state
-- cached authentication survives a normal Stream Deck plugin restart
+1. the iCUE widget connects to `ws://127.0.0.1:17483`
+2. the current Discord voice channel appears automatically
+3. real roster members render correctly
+4. speaking changes animate and promote correctly
+5. avatar rendering and initials fallback both remain valid
+6. Mute touch changes Discord through RPC and the returned state updates
+7. Deafen touch changes Discord through RPC and the returned state updates
+8. changing Discord voice channels updates the panel automatically
+9. the bridge/widget recover after normal Stream Deck, Discord, and iCUE restarts
+10. cached StreamKit authentication survives a normal linked-plugin restart
 
 ## Release caveat
 
