@@ -11,10 +11,6 @@ const installer = readFileSync("src/gsi/installer.ts", "utf8");
 const autoSetup = readFileSync("src/gsi/auto-setup.ts", "utf8");
 const pluginPro = readFileSync("src/plugin-pro.ts", "utf8");
 const pluginLite = readFileSync("src/plugin-lite.ts", "utf8");
-const liveAction = readFileSync("src/actions/live-metric.ts", "utf8");
-const sessionAction = readFileSync("src/actions/session-metric.ts", "utf8");
-const onlineAction = readFileSync("src/actions/online-metric.ts", "utf8");
-const statusAction = readFileSync("src/actions/status.ts", "utf8");
 
 const emptySession = {
   matches: 0,
@@ -38,7 +34,7 @@ test("Property Inspector exposes its Stream Deck callback before DOM load", () =
   assert.match(pi, /window\.connectElgatoStreamDeckSocket\s*=/);
 });
 
-test("Property Inspector registers and requests plugin state over WebSocket", () => {
+test("Property Inspector registers, reads native settings, and polls read only runtime status", () => {
   const sent: Array<Record<string, unknown>> = [];
   let createdSocket: FakeWebSocket | undefined;
 
@@ -71,7 +67,8 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
 
   const windowObject: Record<string, unknown> = {
     PACKRAT_BUILD: { flavor: "pro", name: "CS2 Competitive Dashboard Pro", liveMetrics: [], sessionMetrics: ["record", "kd"] },
-    setTimeout: (handler: () => void) => { handler(); return 1; }
+    setTimeout: (handler: () => void) => { handler(); return 1; },
+    setInterval: () => 1
   };
 
   const context = vm.createContext({
@@ -85,6 +82,7 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
     navigator: {},
     WebSocket: FakeWebSocket,
     clearTimeout: () => undefined,
+    clearInterval: () => undefined,
     console
   });
 
@@ -115,6 +113,10 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
     context: "action-context"
   });
   assert.deepEqual(sent[2], {
+    event: "getGlobalSettings",
+    context: "property-inspector-uuid"
+  });
+  assert.deepEqual(sent[3], {
     event: "sendToPlugin",
     action: "com.packrat.cs2-competitive-dashboard-pro.session",
     context: "action-context",
@@ -122,7 +124,7 @@ test("Property Inspector registers and requests plugin state over WebSocket", ()
   });
 });
 
-test("live tracking is automatic and does not depend on a Property Inspector button", () => {
+test("live tracking configures itself on plugin boot and never depends on an Enable button", () => {
   assert.match(html, /Automatic setup/);
   assert.match(html, /automatically finds Steam and CS2/);
   assert.match(html, /There is no Enable button/);
@@ -137,20 +139,17 @@ test("dashboard GSI config cannot overwrite the older CS2 Live Stats config", ()
   assert.doesNotMatch(installer, /GSI_FILENAME = "gamestate_integration_packrat_cs2\.cfg"/);
 });
 
-test("Property Inspector reports command progress instead of silently stalling", () => {
-  assert.match(html, /id="transport-text"/);
-  assert.match(pi, /setInteractiveState\(false\)/);
-  assert.match(pi, /Stream Deck disconnected · retrying/);
-  assert.match(pi, /Waiting for Stream Deck connection/);
-  assert.match(pi, /COMMAND_WATCHDOG_MS\s*=\s*15_000/);
-  assert.match(pi, /No progress for 15 seconds/);
-  assert.match(pi, /command-progress/);
-  assert.match(runtime, /emitProgress/);
-  assert.match(runtime, /Plugin received/);
-  for (const actionFile of [liveAction, sessionAction, onlineAction, statusAction]) {
-    assert.match(actionFile, /handlePiCommand\(ev\.payload, \(progress\)/);
-    assert.match(actionFile, /setTimeout\(\(\) => void this\.refreshAll\(\), 0\)/);
-  }
+test("Pro account setup uses Stream Deck native global settings instead of custom button RPC", () => {
+  assert.match(pi, /event: "getGlobalSettings"/);
+  assert.match(pi, /event: "setGlobalSettings"/);
+  assert.match(pi, /refreshNonce/);
+  assert.match(pi, /sessionResetNonce/);
+  assert.match(pluginPro, /onDidReceiveGlobalSettings/);
+  assert.match(pluginPro, /queueUserSettings/);
+  assert.doesNotMatch(pi, /type:\s*"set-steam-profile"/);
+  assert.doesNotMatch(pi, /type:\s*"set-provider-keys"/);
+  assert.doesNotMatch(pi, /type:\s*"clear-provider-key"/);
+  assert.doesNotMatch(pi, /type:\s*"refresh-online"/);
 });
 
 test("Property Inspector explains the complete automatic live tracking path", () => {
@@ -165,12 +164,11 @@ test("manual CS2 override remains accepted internally for support fallback", () 
   assert.match(html, /CS2 path override/);
   assert.match(html, /game\\csgo\\cfg/);
   assert.match(html, /Both are accepted/);
+  assert.match(runtime, /manualCs2Path/);
 });
 
-test("Advanced Diagnostics remain available internally but are no longer required for normal setup", () => {
+test("command driven diagnostics remain internal and are not required for normal setup", () => {
   assert.match(html, /id="diagnostics-panel" hidden/);
-  assert.match(html, /id="run-diagnostics"/);
-  assert.match(pi, /run-diagnostics/);
   assert.match(runtime, /runDiagnostics/);
   assert.match(runtime, /Secrets are intentionally omitted/);
 });
@@ -180,15 +178,14 @@ test("Property Inspector makes provider ownership explicit", () => {
   assert.match(html, /FACEIT · FACEIT Stats/);
   assert.match(html, /Leetify powers Premier and Competitive stats/);
   assert.match(html, /FACEIT powers FACEIT stats only/);
-  assert.match(pi, /Leetify-backed Competitive stat/);
+  assert.match(pi, /powered by Leetify/);
   assert.match(pi, /comes from FACEIT/);
 });
 
-test("Property Inspector exposes a manual bundled-profile fallback", () => {
-  assert.match(html, /id="open-profiles"/);
+test("Property Inspector communicates bundled profile behavior without making it a setup dependency", () => {
+  assert.match(html, /Included Profiles/);
   assert.match(html, /Open bundled profile files/);
-  assert.match(pi, /open-profiles-folder/);
-  assert.match(runtime, /openProfilesFolder/);
+  assert.match(pi, /Bundled profiles install with the normal plugin package/);
 });
 
 test("session metric labels are customer facing and immediately distinct", () => {
