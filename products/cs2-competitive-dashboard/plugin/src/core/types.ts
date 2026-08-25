@@ -1,47 +1,18 @@
-export type Team = "CT" | "T" | "SPECTATOR" | "UNKNOWN";
-
-export type WeaponState = "active" | "holstered" | "reloading" | string;
-
-export interface RawGsiWeapon {
-  name?: string;
-  paintkit?: string;
-  type?: string;
-  state?: WeaponState;
-  ammo_clip?: number;
-  ammo_clip_max?: number;
-  ammo_reserve?: number;
-}
-
 export interface RawGsiPayload {
-  provider?: {
-    name?: string;
-    appid?: number | string;
-    version?: number | string;
-    steamid?: string;
-    timestamp?: number;
-  };
-  auth?: { token?: string };
+  provider?: { appid?: number; timestamp?: number; steamid?: string; name?: string };
   map?: {
-    mode?: string;
     name?: string;
+    mode?: string;
     phase?: string;
     round?: number;
-    team_ct?: { score?: number; consecutive_round_losses?: number; timeouts_remaining?: number; matches_won_this_series?: number };
-    team_t?: { score?: number; consecutive_round_losses?: number; timeouts_remaining?: number; matches_won_this_series?: number };
-    num_matches_to_win_series?: number;
-    current_spectators?: number;
-    souvenirs_total?: number;
+    team_ct?: { score?: number };
+    team_t?: { score?: number };
+    round_wins?: Record<string, string>;
   };
-  round?: {
-    phase?: string;
-    win_team?: string;
-    bomb?: string;
-  };
+  round?: { phase?: string; win_team?: string; bomb?: string };
   player?: {
     steamid?: string;
-    name?: string;
     team?: string;
-    activity?: string;
     state?: {
       health?: number;
       armor?: number;
@@ -56,7 +27,15 @@ export interface RawGsiPayload {
       equip_value?: number;
       defusekit?: boolean;
     };
-    weapons?: Record<string, RawGsiWeapon>;
+    weapons?: Record<string, {
+      name?: string;
+      paintkit?: string;
+      type?: string;
+      state?: string;
+      ammo_clip?: number;
+      ammo_clip_max?: number;
+      ammo_reserve?: number;
+    }>;
     match_stats?: {
       kills?: number;
       assists?: number;
@@ -65,54 +44,44 @@ export interface RawGsiPayload {
       score?: number;
     };
   };
-  previously?: unknown;
-  added?: unknown;
-}
-
-export interface NormalizedWeapon {
-  key: string;
-  name: string;
-  type?: string;
-  state?: string;
-  ammoClip?: number;
-  ammoClipMax?: number;
-  ammoReserve?: number;
+  auth?: { token?: string };
 }
 
 export interface LiveState {
   receivedAt: number;
-  steamId?: string;
-  playerName?: string;
-  playerTeam: Team;
-  activity?: string;
-  mapName?: string;
-  mapMode?: string;
+  providerSteamId?: string;
+  map?: string;
+  mode?: string;
   mapPhase?: string;
-  roundNumber?: number;
+  round?: number;
+  ctScore?: number;
+  tScore?: number;
   roundPhase?: string;
-  roundWinner?: Team;
+  roundWinner?: string;
   bombState?: string;
-  ctScore: number;
-  tScore: number;
+  playerSteamId?: string;
+  team?: string;
   health?: number;
   armor?: number;
   helmet?: boolean;
   money?: number;
+  roundKills?: number;
+  roundHeadshots?: number;
+  roundDamage?: number;
   equipmentValue?: number;
   defuseKit?: boolean;
-  flashed?: number;
-  smoked?: number;
-  burning?: number;
-  roundKills: number;
-  roundHeadshotKills: number;
-  roundTotalDamage: number;
-  kills: number;
-  deaths: number;
-  assists: number;
-  mvps: number;
-  score: number;
-  weapons: NormalizedWeapon[];
-  currentWeapon?: NormalizedWeapon;
+  kills?: number;
+  assists?: number;
+  deaths?: number;
+  mvps?: number;
+  score?: number;
+  activeWeapon?: {
+    name: string;
+    type?: string;
+    ammoClip?: number;
+    ammoClipMax?: number;
+    ammoReserve?: number;
+  };
 }
 
 export interface SessionMetrics {
@@ -131,11 +100,22 @@ export interface SessionMetrics {
   inMatch: boolean;
 }
 
+export type SetupStage =
+  | "idle"
+  | "finding-cs2"
+  | "starting-listener"
+  | "writing-config"
+  | "saving-settings"
+  | "checking-cs2"
+  | "ready";
+
 export interface RuntimeStatus {
   cs2Running: boolean;
   gsiConfigured: boolean;
   gsiConnected: boolean;
   gsiRestartRequired?: boolean;
+  setupStage?: SetupStage;
+  detectedCs2Path?: string;
   lastPayloadAt?: number;
   configPath?: string;
   listenerPort?: number;
