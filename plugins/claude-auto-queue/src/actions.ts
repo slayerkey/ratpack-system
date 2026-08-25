@@ -31,8 +31,7 @@ const renderPromptKey = renderQueuePrompt as (
 
 async function paintStatusKey(key: KeyAction<QueueSettings>, settings: QueueSettings) {
   const session = service.getDisplaySession(settings?.sessionId ?? null);
-  const label = service.getProjectLabel(session);
-  await key.setImage(keyImage(renderStatus(session, label)));
+  await key.setImage(keyImage(renderStatus(session)));
 }
 
 @action({ UUID: "com.packrat.claude-auto-queue.status" })
