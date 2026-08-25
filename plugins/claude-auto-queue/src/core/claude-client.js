@@ -1,4 +1,7 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -27,14 +30,58 @@ export function isClaudeVersionSupported(value) {
   return comparison !== null && comparison >= 0;
 }
 
-export async function runClaude(args, { timeout = 5000 } = {}) {
+export function resolveClaudeCommand({
+  platform = process.platform,
+  home = os.homedir(),
+  env = process.env,
+  exists = existsSync
+} = {}) {
+  const candidates = [];
+
+  if (platform === "win32") {
+    const win = path.win32;
+    candidates.push(
+      win.join(home, ".local", "bin", "claude.exe"),
+      win.join(home, ".local", "bin", "claude.cmd"),
+      win.join(home, ".local", "bin", "claude")
+    );
+    if (env.APPDATA) {
+      candidates.push(
+        win.join(env.APPDATA, "npm", "claude.cmd"),
+        win.join(env.APPDATA, "npm", "claude.exe")
+      );
+    }
+    if (env.LOCALAPPDATA) {
+      candidates.push(win.join(env.LOCALAPPDATA, "Microsoft", "WinGet", "Links", "claude.exe"));
+    }
+  } else {
+    const posix = path.posix;
+    candidates.push(posix.join(home, ".local", "bin", "claude"));
+    if (platform === "darwin") {
+      candidates.push("/opt/homebrew/bin/claude", "/usr/local/bin/claude");
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (exists(candidate)) return candidate;
+    } catch {
+      // Ignore an inaccessible optional location and continue to PATH lookup.
+    }
+  }
+  return "claude";
+}
+
+export async function runClaude(args, { timeout = 5000, command = resolveClaudeCommand() } = {}) {
+  const needsShell = process.platform === "win32" &&
+    (command === "claude" || /\.(?:cmd|bat)$/i.test(command));
   const options = {
     timeout,
     windowsHide: true,
     maxBuffer: 1024 * 1024,
-    shell: process.platform === "win32"
+    shell: needsShell
   };
-  return execFileAsync("claude", args, options);
+  return execFileAsync(command, args, options);
 }
 
 export async function getClaudeVersion() {
@@ -62,7 +109,9 @@ export async function getClaudeVersion() {
       parsedVersion: null,
       compatible: false,
       minimumVersion: MIN_CLAUDE_VERSION,
-      error: error?.code === "ENOENT" ? "Claude Code was not found on PATH." : String(error?.message ?? error)
+      error: error?.code === "ENOENT"
+        ? "Claude Code was not found. PackRat checked the native install location and PATH."
+        : String(error?.message ?? error)
     };
   }
 }
