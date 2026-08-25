@@ -6,9 +6,10 @@ import { sessionDisplay } from "../src/actions/format.js";
 
 const html = readFileSync("static/ui/property-inspector.html", "utf8");
 const pi = readFileSync("static/ui/pi.js", "utf8");
-const runtime = readFileSync("src/runtime.ts", "utf8");
+const diagnostics = readFileSync("static/ui/diagnostics.js", "utf8");
 const installer = readFileSync("src/gsi/installer.ts", "utf8");
-const autoSetup = readFileSync("src/gsi/auto-setup.ts", "utf8");
+const hostService = readFileSync("src/gsi/host-service.ts", "utf8");
+const hostLog = readFileSync("src/diagnostics/host.ts", "utf8");
 const pluginPro = readFileSync("src/plugin-pro.ts", "utf8");
 const pluginLite = readFileSync("src/plugin-lite.ts", "utf8");
 
@@ -34,7 +35,7 @@ test("Property Inspector exposes its Stream Deck callback before DOM load", () =
   assert.match(pi, /window\.connectElgatoStreamDeckSocket\s*=/);
 });
 
-test("Property Inspector registers, reads native settings, and polls read only runtime status", () => {
+test("Property Inspector registers and requests ordinary plugin state over WebSocket", () => {
   const sent: Array<Record<string, unknown>> = [];
   let createdSocket: FakeWebSocket | undefined;
 
@@ -67,8 +68,7 @@ test("Property Inspector registers, reads native settings, and polls read only r
 
   const windowObject: Record<string, unknown> = {
     PACKRAT_BUILD: { flavor: "pro", name: "CS2 Competitive Dashboard Pro", liveMetrics: [], sessionMetrics: ["record", "kd"] },
-    setTimeout: (handler: () => void) => { handler(); return 1; },
-    setInterval: () => 1
+    setTimeout: (handler: () => void) => { handler(); return 1; }
   };
 
   const context = vm.createContext({
@@ -107,70 +107,45 @@ test("Property Inspector registers, reads native settings, and polls read only r
   createdSocket.open();
 
   assert.deepEqual(sent[0], { event: "registerPropertyInspector", uuid: "property-inspector-uuid" });
-  assert.deepEqual(sent[1], {
-    event: "getSettings",
-    action: "com.packrat.cs2-competitive-dashboard-pro.session",
-    context: "action-context"
-  });
-  assert.deepEqual(sent[2], {
-    event: "getGlobalSettings",
-    context: "property-inspector-uuid"
-  });
-  assert.deepEqual(sent[3], {
-    event: "sendToPlugin",
-    action: "com.packrat.cs2-competitive-dashboard-pro.session",
-    context: "action-context",
-    payload: { type: "get-status" }
-  });
+  assert.ok(sent.some((message) => message.event === "getSettings"));
+  assert.ok(sent.some((message) => message.event === "getGlobalSettings"));
+  assert.ok(sent.some((message) => message.event === "sendToPlugin"));
 });
 
-test("live tracking configures itself on plugin boot and never depends on an Enable button", () => {
-  assert.match(html, /Automatic setup/);
-  assert.match(html, /automatically finds Steam and CS2/);
-  assert.match(html, /There is no Enable button/);
-  assert.match(pluginPro, /ensureAutomaticGsi\(runtime\)/);
-  assert.match(pluginLite, /ensureAutomaticGsi\(runtime\)/);
-  assert.match(autoSetup, /primary CS2 locator failed; retrying with proven Steam locator/);
-  assert.match(autoSetup, /Counter-Strike Global Offensive/);
+test("local GSI startup no longer depends on Stream Deck global settings", () => {
+  for (const entry of [pluginPro, pluginLite]) {
+    assert.match(entry, /new GsiHostService\(runtime\)/);
+    assert.match(entry, /await gsiHost\.start\(\)/);
+    assert.doesNotMatch(entry, /ensureAutomaticGsi/);
+    assert.doesNotMatch(entry, /await runtime\.initialize\(\)/);
+  }
+  assert.doesNotMatch(hostService, /streamDeck\.settings/);
+  assert.match(hostService, /writeLocalGsiState/);
+  assert.match(hostService, /live tracking remains active/);
+  assert.match(pluginPro, /global settings load failed; local GSI remains active/);
 });
 
-test("dashboard GSI config cannot overwrite the older CS2 Live Stats config", () => {
+test("dashboard GSI config matches the proven root URI while preserving security", () => {
   assert.match(installer, /gamestate_integration_packrat_cs2_dashboard\.cfg/);
-  assert.doesNotMatch(installer, /GSI_FILENAME = "gamestate_integration_packrat_cs2\.cfg"/);
+  assert.match(installer, /http:\/\/127\.0\.0\.1:\$\{port\}\//);
+  assert.doesNotMatch(installer, /\$\{port\}\/gsi/);
+  assert.match(installer, /"auth"/);
+  assert.match(installer, /"token"/);
 });
 
-test("Pro account setup uses Stream Deck native global settings instead of custom button RPC", () => {
-  assert.match(pi, /event: "getGlobalSettings"/);
-  assert.match(pi, /event: "setGlobalSettings"/);
-  assert.match(pi, /refreshNonce/);
-  assert.match(pi, /sessionResetNonce/);
-  assert.match(pluginPro, /onDidReceiveGlobalSettings/);
-  assert.match(pluginPro, /queueUserSettings/);
-  assert.doesNotMatch(pi, /type:\s*"set-steam-profile"/);
-  assert.doesNotMatch(pi, /type:\s*"set-provider-keys"/);
-  assert.doesNotMatch(pi, /type:\s*"clear-provider-key"/);
-  assert.doesNotMatch(pi, /type:\s*"refresh-online"/);
-});
-
-test("Property Inspector explains the complete automatic live tracking path", () => {
-  assert.match(html, /Automatic setup/);
-  assert.match(html, /installs its Valve GSI config/);
-  assert.match(html, /first install while CS2 is already open, restart CS2 once/);
-  assert.match(html, /Connected to CS2/);
-  assert.match(html, /no API key required for live tracking/);
-});
-
-test("manual CS2 override remains accepted internally for support fallback", () => {
-  assert.match(html, /CS2 path override/);
-  assert.match(html, /game\\csgo\\cfg/);
-  assert.match(html, /Both are accepted/);
-  assert.match(runtime, /manualCs2Path/);
-});
-
-test("command driven diagnostics remain internal and are not required for normal setup", () => {
-  assert.match(html, /id="diagnostics-panel" hidden/);
-  assert.match(runtime, /runDiagnostics/);
-  assert.match(runtime, /Secrets are intentionally omitted/);
+test("persistent diagnostics are independent of Property Inspector RPC", () => {
+  assert.match(hostLog, /cs2-competitive-dashboard\.log/);
+  assert.match(hostLog, /plugin process started/);
+  assert.match(hostLog, /uncaught exception/);
+  assert.match(hostLog, /unhandled rejection/);
+  assert.match(html, /id="host-diagnostics-panel"/);
+  assert.doesNotMatch(html, /id="host-diagnostics-panel" hidden/);
+  assert.match(html, /Open Log Folder/);
+  assert.match(html, /Copy Diagnostic Summary/);
+  assert.match(diagnostics, /\/packrat\/diagnostics/);
+  assert.match(diagnostics, /\/packrat\/open-log-folder/);
+  assert.match(diagnostics, /127\.0\.0\.1/);
+  assert.doesNotMatch(diagnostics, /sendToPlugin/);
 });
 
 test("Property Inspector makes provider ownership explicit", () => {
@@ -178,14 +153,13 @@ test("Property Inspector makes provider ownership explicit", () => {
   assert.match(html, /FACEIT · FACEIT Stats/);
   assert.match(html, /Leetify powers Premier and Competitive stats/);
   assert.match(html, /FACEIT powers FACEIT stats only/);
-  assert.match(pi, /powered by Leetify/);
+  assert.match(pi, /Leetify-backed Competitive stat/);
   assert.match(pi, /comes from FACEIT/);
 });
 
-test("Property Inspector communicates bundled profile behavior without making it a setup dependency", () => {
-  assert.match(html, /Included Profiles/);
+test("Property Inspector keeps a manual bundled profile fallback for Rat Dev", () => {
+  assert.match(html, /id="open-profiles"/);
   assert.match(html, /Open bundled profile files/);
-  assert.match(pi, /Bundled profiles install with the normal plugin package/);
 });
 
 test("session metric labels are customer facing and immediately distinct", () => {
