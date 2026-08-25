@@ -2,11 +2,12 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import streamDeck from "@elgato/streamdeck";
-import type { LiveState, RuntimeStatus, SessionMetrics } from "./core/types.js";
+import type { LiveState, RuntimeStatus, SessionMetrics, SetupStage } from "./core/types.js";
 import { StateStore } from "./core/store.js";
 import { createGsiToken, installGsiConfig, removeGsiConfig } from "./gsi/installer.js";
 import { normalizeGsiPayload } from "./gsi/normalize.js";
 import { GsiServer } from "./gsi/server.js";
+import { locateCs2Install } from "./gsi/steam-locator.js";
 import { ONLINE_PROFILE_REFRESH_MS } from "./providers/config.js";
 import { ProviderClient } from "./providers/direct-client.js";
 import { emptyOnlineSnapshot, type OnlineProfileSnapshot } from "./providers/types.js";
@@ -14,6 +15,10 @@ import { SessionTracker } from "./session/session-tracker.js";
 
 const execFileAsync = promisify(execFile);
 const PI_COMMAND_TIMEOUT_MS = 10_000;
+const LOCATE_CS2_TIMEOUT_MS = 7_000;
+const LISTENER_START_TIMEOUT_MS = 2_500;
+const CONFIG_WRITE_TIMEOUT_MS = 3_000;
+const SETTINGS_SAVE_TIMEOUT_MS = 3_000;
 const PROFILES_DIR = fileURLToPath(new URL("../profiles/", import.meta.url));
 
 export interface DashboardSnapshot {
@@ -60,7 +65,8 @@ export class DashboardRuntime {
     status: {
       cs2Running: false,
       gsiConfigured: false,
-      gsiConnected: false
+      gsiConnected: false,
+      setupStage: "idle"
     },
     online: emptyOnlineSnapshot()
   });
@@ -108,12 +114,14 @@ export class DashboardRuntime {
         this.updateStatus({
           gsiConfigured: Boolean(this.globals.gsiConfigPath),
           gsiRestartRequired: false,
+          setupStage: this.globals.gsiConfigPath ? "ready" : "idle",
+          detectedCs2Path: this.globals.cs2InstallPath,
           listenerPort: port,
           configPath: this.globals.gsiConfigPath,
           error: undefined
         });
       } catch (error) {
-        this.updateStatus({ error: this.errorMessage(error) });
+        this.updateStatus({ setupStage: "idle", error: this.errorMessage(error) });
       }
     }
 
@@ -147,12 +155,13 @@ export class DashboardRuntime {
         case "get-status":
           return this.publicState();
         case "enable-gsi":
-          await this.withTimeout(
-            this.enableGsi(command.manualCs2Path),
-            PI_COMMAND_TIMEOUT_MS,
-            "Live tracking setup took too long. Check the CS2 path or try again."
+          await this.enableGsi(command.manualCs2Path);
+          return this.commandState(
+            "enable-gsi",
+            this.store.get().status.gsiRestartRequired
+              ? "GSI installed. Restart CS2 once, then enter a game mode."
+              : "Live tracking is enabled. Enter a game mode and wait for Connected to CS2."
           );
-          return this.commandState("enable-gsi", "Live tracking is enabled.");
         case "disable-gsi":
           await this.withTimeout(
             this.disableGsi(),
@@ -207,41 +216,92 @@ export class DashboardRuntime {
   }
 
   private async enableGsi(manualCs2Path?: string): Promise<void> {
+    const manualPath = manualCs2Path?.trim() || this.globals.manualCs2Path;
     const token = this.globals.gsiToken ?? createGsiToken();
-    const port = await this.server.start({
-      token,
-      preferredPort: this.globals.gsiPort,
-      onPayload: (payload) => this.ingest(payload)
-    });
+    let listenerStarted = false;
+    let newConfigPath: string | undefined;
 
-    const installed = await installGsiConfig({
-      port,
-      token,
-      manualCs2Path: manualCs2Path?.trim() || this.globals.manualCs2Path
-    });
+    try {
+      this.setSetupStage("finding-cs2");
+      const cs2 = await this.withTimeout(
+        locateCs2Install(manualPath),
+        LOCATE_CS2_TIMEOUT_MS,
+        "CS2 detection timed out. If CS2 is on another or disconnected Steam library, use CS2 path override and select the Counter-Strike Global Offensive install folder."
+      );
+      this.updateStatus({ detectedCs2Path: cs2.installDir });
 
-    const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
-    const alreadyConnected = this.store.get().status.gsiConnected;
+      this.setSetupStage("starting-listener");
+      const port = await this.withTimeout(
+        this.server.start({
+          token,
+          preferredPort: this.globals.gsiPort,
+          onPayload: (payload) => this.ingest(payload)
+        }),
+        LISTENER_START_TIMEOUT_MS,
+        "The local CS2 listener could not start in time. Close other development copies of this plugin and try again."
+      );
+      listenerStarted = true;
+      this.updateStatus({ listenerPort: port });
 
-    this.globals = {
-      ...this.globals,
-      gsiEnabled: true,
-      gsiPort: port,
-      gsiToken: token,
-      gsiConfigPath: installed.configPath,
-      cs2InstallPath: installed.cs2.installDir,
-      manualCs2Path: manualCs2Path?.trim() || this.globals.manualCs2Path
-    };
-    await this.saveGlobals();
+      this.setSetupStage("writing-config");
+      const installed = await this.withTimeout(
+        installGsiConfig({ port, token, cs2 }),
+        CONFIG_WRITE_TIMEOUT_MS,
+        `PackRat found CS2 at ${cs2.installDir}, but writing the GSI config timed out. Check folder permissions or antivirus protection.`
+      );
+      newConfigPath = installed.configPath;
+      this.updateStatus({ configPath: installed.configPath });
 
-    this.updateStatus({
-      cs2Running,
-      gsiConfigured: true,
-      gsiRestartRequired: cs2Running && !alreadyConnected,
-      listenerPort: port,
-      configPath: installed.configPath,
-      error: undefined
-    });
+      this.globals = {
+        ...this.globals,
+        gsiEnabled: true,
+        gsiPort: port,
+        gsiToken: token,
+        gsiConfigPath: installed.configPath,
+        cs2InstallPath: installed.cs2.installDir,
+        manualCs2Path: manualPath
+      };
+
+      this.setSetupStage("saving-settings");
+      await this.withTimeout(
+        this.saveGlobals(),
+        SETTINGS_SAVE_TIMEOUT_MS,
+        "The GSI config was written, but Stream Deck did not save the plugin settings in time."
+      );
+
+      this.setSetupStage("checking-cs2");
+      const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
+      const alreadyConnected = this.store.get().status.gsiConnected;
+
+      this.updateStatus({
+        cs2Running,
+        gsiConfigured: true,
+        gsiRestartRequired: cs2Running && !alreadyConnected,
+        setupStage: "ready",
+        detectedCs2Path: installed.cs2.installDir,
+        listenerPort: port,
+        configPath: installed.configPath,
+        error: undefined
+      });
+    } catch (error) {
+      if (listenerStarted) {
+        try { await this.server.stop(); } catch { }
+      }
+      if (newConfigPath) {
+        try { await removeGsiConfig(newConfigPath); } catch { }
+      }
+      this.globals.gsiEnabled = false;
+      this.globals.gsiConfigPath = undefined;
+      this.updateStatus({
+        gsiConfigured: false,
+        gsiConnected: false,
+        gsiRestartRequired: false,
+        listenerPort: undefined,
+        configPath: undefined,
+        error: this.errorMessage(error)
+      });
+      throw error;
+    }
   }
 
   private async disableGsi(): Promise<void> {
@@ -254,6 +314,7 @@ export class DashboardRuntime {
       gsiConfigured: false,
       gsiConnected: false,
       gsiRestartRequired: false,
+      setupStage: "idle",
       listenerPort: undefined,
       configPath: undefined,
       error: undefined
@@ -273,6 +334,7 @@ export class DashboardRuntime {
         gsiConnected: true,
         gsiConfigured: true,
         gsiRestartRequired: false,
+        setupStage: "ready",
         lastPayloadAt: live.receivedAt,
         error: undefined
       }
@@ -335,7 +397,10 @@ export class DashboardRuntime {
 
   private async detectCs2Running(): Promise<boolean> {
     try {
-      const { stdout } = await execFileAsync("tasklist.exe", ["/FI", "IMAGENAME eq cs2.exe", "/NH"], { windowsHide: true });
+      const { stdout } = await execFileAsync("tasklist.exe", ["/FI", "IMAGENAME eq cs2.exe", "/NH"], {
+        windowsHide: true,
+        timeout: 1_500
+      });
       return /(^|\s)cs2\.exe(\s|$)/im.test(stdout);
     } catch {
       return false;
@@ -365,6 +430,10 @@ export class DashboardRuntime {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  private setSetupStage(stage: SetupStage): void {
+    this.updateStatus({ setupStage: stage, error: undefined });
   }
 
   private updateStatus(patch: Partial<RuntimeStatus>): void {
