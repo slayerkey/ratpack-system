@@ -4,7 +4,7 @@ You only need to remember a few commands for normal use.
 
 ## `rat ship <slug> [slug...]`
 
-This is the main release command.
+This is the main release command for both XENEON widgets and registered Stream Deck plugins.
 
 Single product:
 
@@ -18,11 +18,41 @@ Multiple products in one queue:
 rat ship weather-timeline-pro weather-timeline snake desk-notes
 ```
 
-Rat Ship now runs local first. At the start of the queue it switches the local checkout to the latest canonical `main` once. It then processes every product sequentially on the Windows PC so one authenticated Maker Console browser profile is never driven by two submissions at the same time.
+Rat Ship runs local first. At the start of the queue it switches the local checkout to the latest canonical `main` once. It then processes every product sequentially on the Windows PC so one authenticated Maker Console browser profile is never driven by two submissions at the same time.
+
+The Marketplace router reads `products/<slug>.json` and chooses the correct canonical release path. XENEON widgets stay on the proven CORSAIR pipeline. Stream Deck plugins use the official Elgato Stream Deck CLI and `.streamDeckPlugin` package path. Mixed queues are supported.
 
 If one product fails, Rat Ship records that failure, continues the remaining queue, and prints a failure summary at the end.
 
-What it does for each product:
+Every product kit is written under:
+
+```text
+out\ship\<slug>
+```
+
+The normal path does not start a GitHub Actions runner. GitHub remains the source of truth because the queue syncs canonical `main` before it builds anything.
+
+### Stream Deck plugin release path
+
+For a registered Stream Deck plugin, Rat Ship:
+
+1. Reads the canonical `products/<slug>.json` registry entry and product source path.
+2. Installs locked dependencies with `npm ci` when a lockfile exists.
+3. Runs the product build and tests.
+4. Runs the official Elgato Stream Deck CLI validator.
+5. Creates the official `.streamDeckPlugin` package.
+6. Runs the product's deterministic `rat-art.ps1` when present.
+7. Builds the local ship kit with description, release notes, package, search icon, cover, and gallery media.
+8. Reuses the persistent local Maker Console browser runtime and login.
+9. Creates or safely resumes the correct Plugin product type in Maker Console.
+10. Sets the applicable plugin metadata, pricing, language, media, release notes, and auto publish policy.
+11. Submits the product.
+
+`rat kit <slug>` is allowed before Marketplace pricing is chosen because it does not create a Maker Console product. `rat stage <slug>` and `rat ship <slug>` fail closed when `submission.price_usd` is still unset, because Maker Console monetization can become irreversible after product creation.
+
+### XENEON widget release path
+
+For a XENEON widget, Rat Ship keeps the existing canonical flow:
 
 1. Reuses the already synced canonical `main` checkout.
 2. Checks the required local runtime and installs only missing pieces.
@@ -33,12 +63,7 @@ What it does for each product:
 7. Captures the real widget locally for Rat Art.
 8. Renders deterministic Rat Art locally.
 9. Renders the canonical marketplace search icon.
-10. Builds and validates the Maker Console `SHIP_KIT` under:
-
-```text
-out\ship\<slug>
-```
-
+10. Builds and validates the Maker Console ship kit.
 11. Reuses the persistent local Maker Console browser runtime and login.
 12. Fills the product draft from the canonical ship kit.
 13. Uploads the official package and Rat Art.
@@ -46,13 +71,11 @@ out\ship\<slug>
 15. Uploads gallery media in the canonical order.
 16. Submits the product.
 
-The normal path does not start a GitHub Actions runner. GitHub remains the source of truth because the queue syncs canonical `main` before it builds anything.
-
 ### Local dependency behavior
 
 Rat Ship expects Git, Python, Node, npm, and npx to exist on the Windows machine. It checks pinned runtime pieces such as Pillow and Playwright, and installs them only if missing. Chromium is checked by executable path and is only installed when the existing Playwright runtime cannot find it.
 
-The official CORSAIR CLI remains pinned through `npx`, so validation and packaging use the expected CLI version even when the rest of the runtime is reused locally.
+Stream Deck plugins use their locked local `@elgato/cli` dependency through `npx` for validation and packaging. XENEON widgets use the pinned CORSAIR iCUE Widget CLI.
 
 ### Gallery order
 
@@ -66,9 +89,11 @@ The XENEON marketplace sequence is intentionally:
 
 The cover is separate from the gallery. Rat Ship uploads the four gallery images as one ordered FileList when Maker Console exposes a multi file input. If Maker Console only exposes a single file uploader, Rat Ship uses the compatibility ordering needed to preserve the final visible gallery sequence.
 
+Stream Deck plugin products can provide their own deterministic Rat Art sequence, but the local plugin ship kit expects the same canonical file names: `01_search_icon.png`, `02_cover.png`, and `03_gallery_01.png` through `06_gallery_04.png`.
+
 ### Crash and recovery behavior
 
-Recoverable Maker Console or Chromium failures are retried with saved resume state up to three times.
+Recoverable Maker Console or Chromium failures are retried with saved resume state up to three times for both supported product types.
 
 Rat Ship does not blindly retry a draft whose irreversible state is wrong. For example, if a paid product is found in a Maker Console draft or listing whose monetization is already locked to Free, Rat Ship stops immediately and explains that the incorrect draft must be removed before recreating it.
 
@@ -90,25 +115,25 @@ GitHub Actions never receives Maker Console cookies, passwords, browser profile 
 
 ## Clean GitHub runner commands
 
-The old hosted build path is still available when a fresh external environment is useful.
+The old hosted XENEON build path is still available when a fresh external environment is useful.
 
 ### `rat ship-cloud <slug> [slug...]`
 
-Explicitly runs the full Rat Ship GitHub Actions workflow, downloads the resulting ship kit, and then uses the local authenticated Maker Console bridge to submit it.
+Explicitly runs the XENEON Rat Ship GitHub Actions workflow, downloads the resulting ship kit, and then uses the local authenticated Maker Console bridge to submit it.
 
-Use this when you specifically want a clean GitHub hosted build rather than the normal local build.
+Use this when you specifically want a clean GitHub hosted XENEON build rather than the normal local build.
 
 ### `rat kit-cloud <slug> [slug...]`
 
-Runs the same clean GitHub Actions build and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
+Runs the same clean XENEON GitHub Actions build and downloads the resulting marketplace ship kit, but does not open Maker Console or submit anything.
 
 The full Rat Ship, Rat Art, and deep XENEON workflows are manual dispatch workflows only. They do not run automatically on ordinary pull requests.
 
 ## Automatic CI
 
-Normal pushes and pull requests use only `RatPack Lightweight CI`. It validates canonical context, parses JSON, and checks the syntax of local PowerShell helpers on an Ubuntu runner.
+Normal pushes and pull requests use `RatPack Lightweight CI` plus any product or shared tooling gate whose path matches the changes. Lightweight CI validates canonical context, parses JSON, and checks the syntax of local helpers without running a full Marketplace submission.
 
-It intentionally does not install Chromium, render Rat Art, package XENEON widgets, run StreamSpell, or create ship kits. Those expensive checks happen locally during normal shipping or through an explicit cloud workflow when requested.
+Expensive rendering, packaging, host smoke tests, and Maker Console work happen in product release gates, locally during normal shipping, or through an explicit cloud workflow when requested.
 
 ## `rat dev <slug>`
 
@@ -183,15 +208,15 @@ Opens the reusable local development folder for a product without rebuilding or 
 
 ### `rat kit <slug> [slug...]`
 
-Runs the full canonical shipping pipeline locally and opens the resulting ship kit, but does not open Maker Console or submit anything.
+Runs the full canonical shipping pipeline locally and opens the resulting ship kit, but does not open Maker Console or submit anything. For Stream Deck plugins this can be used before pricing is finalized.
 
 ### `rat stage <slug> [slug...]`
 
-Runs the same local shipping process, launches Maker Console, fills the listing, uploads the package and media, and stops before final Submit.
+Runs the same local shipping process, launches Maker Console, fills the listing, uploads the package and media, and stops before final Submit. Stream Deck plugin staging requires an explicit `submission.price_usd` before Maker Console is opened.
 
 ### `rat submit <slug> [slug...]`
 
-Alias for `rat ship` and therefore uses the normal local first path.
+Alias for `rat ship` and therefore uses the normal local first, product-type-aware path.
 
 ### `rat update`
 
