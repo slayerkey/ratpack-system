@@ -22,13 +22,14 @@ type UserGlobalSettings = {
 let cachedUserSettings: UserGlobalSettings = {};
 let settingsSync = Promise.resolve();
 
-function userSettings(settings: Record<string, unknown>): UserGlobalSettings {
+function userSettings(settings: object): UserGlobalSettings {
+  const source = settings as Record<string, unknown>;
   return {
-    steamProfile: typeof settings.steamProfile === "string" ? settings.steamProfile : undefined,
-    faceitApiKey: typeof settings.faceitApiKey === "string" ? settings.faceitApiKey : undefined,
-    leetifyApiKey: typeof settings.leetifyApiKey === "string" ? settings.leetifyApiKey : undefined,
-    sessionResetNonce: typeof settings.sessionResetNonce === "number" ? settings.sessionResetNonce : undefined,
-    refreshNonce: typeof settings.refreshNonce === "number" ? settings.refreshNonce : undefined
+    steamProfile: typeof source.steamProfile === "string" ? source.steamProfile : undefined,
+    faceitApiKey: typeof source.faceitApiKey === "string" ? source.faceitApiKey : undefined,
+    leetifyApiKey: typeof source.leetifyApiKey === "string" ? source.leetifyApiKey : undefined,
+    sessionResetNonce: typeof source.sessionResetNonce === "number" ? source.sessionResetNonce : undefined,
+    refreshNonce: typeof source.refreshNonce === "number" ? source.refreshNonce : undefined
   };
 }
 
@@ -110,8 +111,8 @@ streamDeck.system.onApplicationDidTerminate((ev) => {
 await streamDeck.connect();
 await runtime.initialize();
 
-cachedUserSettings = userSettings(await streamDeck.settings.getGlobalSettings<Record<string, unknown>>());
-streamDeck.settings.onDidReceiveGlobalSettings<Record<string, unknown>>((ev) => {
+cachedUserSettings = userSettings(await streamDeck.settings.getGlobalSettings());
+streamDeck.settings.onDidReceiveGlobalSettings((ev) => {
   queueUserSettings(userSettings(ev.settings));
 });
 
