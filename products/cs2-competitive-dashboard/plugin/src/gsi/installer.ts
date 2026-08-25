@@ -47,8 +47,9 @@ export async function installGsiConfig(options: {
   port: number;
   token?: string;
   manualCs2Path?: string;
+  cs2?: Cs2Install;
 }): Promise<GsiInstallResult> {
-  const cs2 = await locateCs2Install(options.manualCs2Path);
+  const cs2 = options.cs2 ?? await locateCs2Install(options.manualCs2Path);
   const token = options.token ?? createGsiToken();
   const configPath = path.join(cs2.cfgDir, GSI_FILENAME);
   const temporaryPath = `${configPath}.tmp`;
