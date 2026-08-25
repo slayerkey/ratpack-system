@@ -1,18 +1,47 @@
+export type Team = "CT" | "T" | "SPECTATOR" | "UNKNOWN";
+
+export type WeaponState = "active" | "holstered" | "reloading" | string;
+
+export interface RawGsiWeapon {
+  name?: string;
+  paintkit?: string;
+  type?: string;
+  state?: WeaponState;
+  ammo_clip?: number;
+  ammo_clip_max?: number;
+  ammo_reserve?: number;
+}
+
 export interface RawGsiPayload {
-  provider?: { appid?: number; timestamp?: number; steamid?: string; name?: string };
-  map?: {
+  provider?: {
     name?: string;
+    appid?: number | string;
+    version?: number | string;
+    steamid?: string;
+    timestamp?: number;
+  };
+  auth?: { token?: string };
+  map?: {
     mode?: string;
+    name?: string;
     phase?: string;
     round?: number;
-    team_ct?: { score?: number };
-    team_t?: { score?: number };
-    round_wins?: Record<string, string>;
+    team_ct?: { score?: number; consecutive_round_losses?: number; timeouts_remaining?: number; matches_won_this_series?: number };
+    team_t?: { score?: number; consecutive_round_losses?: number; timeouts_remaining?: number; matches_won_this_series?: number };
+    num_matches_to_win_series?: number;
+    current_spectators?: number;
+    souvenirs_total?: number;
   };
-  round?: { phase?: string; win_team?: string; bomb?: string };
+  round?: {
+    phase?: string;
+    win_team?: string;
+    bomb?: string;
+  };
   player?: {
     steamid?: string;
+    name?: string;
     team?: string;
+    activity?: string;
     state?: {
       health?: number;
       armor?: number;
@@ -27,15 +56,7 @@ export interface RawGsiPayload {
       equip_value?: number;
       defusekit?: boolean;
     };
-    weapons?: Record<string, {
-      name?: string;
-      paintkit?: string;
-      type?: string;
-      state?: string;
-      ammo_clip?: number;
-      ammo_clip_max?: number;
-      ammo_reserve?: number;
-    }>;
+    weapons?: Record<string, RawGsiWeapon>;
     match_stats?: {
       kills?: number;
       assists?: number;
@@ -44,44 +65,54 @@ export interface RawGsiPayload {
       score?: number;
     };
   };
-  auth?: { token?: string };
+  previously?: unknown;
+  added?: unknown;
+}
+
+export interface NormalizedWeapon {
+  key: string;
+  name: string;
+  type?: string;
+  state?: string;
+  ammoClip?: number;
+  ammoClipMax?: number;
+  ammoReserve?: number;
 }
 
 export interface LiveState {
   receivedAt: number;
-  providerSteamId?: string;
-  map?: string;
-  mode?: string;
+  steamId?: string;
+  playerName?: string;
+  playerTeam: Team;
+  activity?: string;
+  mapName?: string;
+  mapMode?: string;
   mapPhase?: string;
-  round?: number;
-  ctScore?: number;
-  tScore?: number;
+  roundNumber?: number;
   roundPhase?: string;
-  roundWinner?: string;
+  roundWinner?: Team;
   bombState?: string;
-  playerSteamId?: string;
-  team?: string;
+  ctScore: number;
+  tScore: number;
   health?: number;
   armor?: number;
   helmet?: boolean;
   money?: number;
-  roundKills?: number;
-  roundHeadshots?: number;
-  roundDamage?: number;
   equipmentValue?: number;
   defuseKit?: boolean;
-  kills?: number;
-  assists?: number;
-  deaths?: number;
-  mvps?: number;
-  score?: number;
-  activeWeapon?: {
-    name: string;
-    type?: string;
-    ammoClip?: number;
-    ammoClipMax?: number;
-    ammoReserve?: number;
-  };
+  flashed?: number;
+  smoked?: number;
+  burning?: number;
+  roundKills: number;
+  roundHeadshotKills: number;
+  roundTotalDamage: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  mvps: number;
+  score: number;
+  weapons: NormalizedWeapon[];
+  currentWeapon?: NormalizedWeapon;
 }
 
 export interface SessionMetrics {
