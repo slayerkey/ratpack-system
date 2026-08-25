@@ -13,6 +13,7 @@ import { locateCs2Install, type Cs2Install } from "./steam-locator.js";
 const execFileAsync = promisify(execFile);
 const PROCESS_POLL_MS = 2_000;
 const STALE_PACKET_MS = 15_000;
+const PACKET_TRACE_EVERY = 300;
 
 function knownSteamCandidates(): string[] {
   const values = new Set<string>();
@@ -52,7 +53,6 @@ async function proveCfgWritable(cs2: Cs2Install): Promise<boolean> {
 export class GsiHostService {
   private readonly server = new GsiServer();
   private monitor?: NodeJS.Timeout;
-  private lastRuntimePacketAt = 0;
 
   constructor(private readonly runtime: DashboardRuntime) {}
 
@@ -117,15 +117,16 @@ export class GsiHostService {
       token,
       preferredPort: saved?.port,
       onPayload: async (payload) => {
-        hostDiagnostics.event("payload normalization started", { providerAppId: payload.provider?.appid });
+        const nextPacket = hostDiagnostics.snapshot().requestCount + 1;
+        const traceSuccess = nextPacket === 1 || nextPacket % PACKET_TRACE_EVERY === 0;
+        if (traceSuccess) hostDiagnostics.event("payload normalization started", { providerAppId: payload.provider?.appid, packet: nextPacket });
         try {
           ingestGsi(this.runtime, payload);
-          this.lastRuntimePacketAt = Date.now();
-          hostDiagnostics.event("payload normalization succeeded", { providerAppId: payload.provider?.appid }, {
-            gsiConnected: true,
-            setupStage: "connected"
-          });
-          hostDiagnostics.event("runtime marked connected");
+          hostDiagnostics.patch({ gsiConnected: true, setupStage: "connected" });
+          if (traceSuccess) {
+            hostDiagnostics.event("payload normalization succeeded", { providerAppId: payload.provider?.appid, packet: nextPacket });
+            hostDiagnostics.event("runtime marked connected", { packet: nextPacket });
+          }
         } catch (error) {
           hostDiagnostics.error("payload normalization failed", error);
           throw error;
