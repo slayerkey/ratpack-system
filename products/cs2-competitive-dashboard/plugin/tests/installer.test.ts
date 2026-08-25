@@ -4,9 +4,10 @@ import path from "node:path";
 import { generateGsiConfig } from "../src/gsi/installer.js";
 import { normalizeManualCs2Path, parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
 
-test("GSI config binds to localhost and requests only approved normal-player components", () => {
+test("GSI config binds to localhost root and requests only approved normal-player components", () => {
   const config = generateGsiConfig(32123, "secret-token");
-  assert.match(config, /127\.0\.0\.1:32123\/gsi/);
+  assert.match(config, /"uri" "http:\/\/127\.0\.0\.1:32123\/"/);
+  assert.doesNotMatch(config, /32123\/gsi/);
   assert.match(config, /"token" "secret-token"/);
   assert.match(config, /"player_state" "1"/);
   assert.match(config, /"player_match_stats" "1"/);
