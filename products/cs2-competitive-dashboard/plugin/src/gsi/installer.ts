@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { hostDiagnostics, tokenFingerprint } from "../diagnostics/host.js";
 import { locateCs2Install, type Cs2Install } from "./steam-locator.js";
 
 // Keep this distinct from the older PackRat CS2 Live Stats plugin so both products
@@ -21,7 +22,7 @@ export function createGsiToken(): string {
 export function generateGsiConfig(port: number, token: string): string {
   return `"PackRat CS2 Competitive Dashboard"
 {
-    "uri" "http://127.0.0.1:${port}/gsi"
+    "uri" "http://127.0.0.1:${port}/"
     "timeout" "5.0"
     "buffer" "0.1"
     "throttle" "0.1"
@@ -56,14 +57,35 @@ export async function installGsiConfig(options: {
   const configPath = path.join(cs2.cfgDir, GSI_FILENAME);
   const temporaryPath = `${configPath}.tmp`;
 
+  hostDiagnostics.event("GSI config write started", {
+    installDir: cs2.installDir,
+    cfgDir: cs2.cfgDir,
+    configPath,
+    port: options.port,
+    tokenFingerprint: tokenFingerprint(token)
+  }, {
+    cs2InstallPath: cs2.installDir,
+    cfgDir: cs2.cfgDir,
+    configPath,
+    tokenFingerprint: tokenFingerprint(token),
+    setupStage: "config-write"
+  });
+
   await mkdir(cs2.cfgDir, { recursive: true });
   await writeFile(temporaryPath, generateGsiConfig(options.port, token), { encoding: "utf8", mode: 0o600 });
   await rm(configPath, { force: true });
   await rename(temporaryPath, configPath);
+  await access(configPath);
+
+  hostDiagnostics.event("GSI config write succeeded", {
+    configPath,
+    uri: `http://127.0.0.1:${options.port}/`
+  }, { configInstalled: true, configPath });
 
   return { cs2, configPath, token, port: options.port };
 }
 
 export async function removeGsiConfig(configPath: string): Promise<void> {
   await rm(configPath, { force: true });
+  hostDiagnostics.event("GSI config removed", { configPath }, { configInstalled: false, configPath: undefined });
 }
