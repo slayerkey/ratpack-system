@@ -1,10 +1,12 @@
 import { execFile } from "node:child_process";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import streamDeck from "@elgato/streamdeck";
 import type { LiveState, RuntimeStatus, SessionMetrics, SetupStage } from "./core/types.js";
 import { StateStore } from "./core/store.js";
-import { createGsiToken, installGsiConfig, removeGsiConfig } from "./gsi/installer.js";
+import { createGsiToken, GSI_FILENAME, installGsiConfig, removeGsiConfig } from "./gsi/installer.js";
 import { normalizeGsiPayload } from "./gsi/normalize.js";
 import { GsiServer } from "./gsi/server.js";
 import { locateCs2Install } from "./gsi/steam-locator.js";
@@ -19,6 +21,7 @@ const LOCATE_CS2_TIMEOUT_MS = 7_000;
 const LISTENER_START_TIMEOUT_MS = 2_500;
 const CONFIG_WRITE_TIMEOUT_MS = 3_000;
 const SETTINGS_SAVE_TIMEOUT_MS = 3_000;
+const DIAGNOSTIC_STEP_TIMEOUT_MS = 4_000;
 const PROFILES_DIR = fileURLToPath(new URL("../profiles/", import.meta.url));
 
 export interface DashboardSnapshot {
@@ -44,12 +47,15 @@ type PiCommand =
   | { type: "get-status" }
   | { type: "enable-gsi"; manualCs2Path?: string }
   | { type: "disable-gsi" }
+  | { type: "run-diagnostics"; manualCs2Path?: string }
   | { type: "open-profiles-folder" }
   | { type: "reset-session" }
   | { type: "set-steam-profile"; steamProfile?: string }
   | { type: "set-provider-keys"; faceitApiKey?: string; leetifyApiKey?: string }
   | { type: "clear-provider-key"; provider: "faceit" | "leetify" }
   | { type: "refresh-online" };
+
+type PiProgress = (payload: Record<string, unknown>) => void | Promise<void>;
 
 export interface DashboardRuntimeOptions {
   onlineEnabled?: boolean;
@@ -75,6 +81,10 @@ export class DashboardRuntime {
   private onlineTimer?: NodeJS.Timeout;
   private onlineAbort?: AbortController;
   private onlineRefresh?: Promise<void>;
+  private setupStage: SetupStage = "idle";
+  private detectedCs2Path?: string;
+  private setupTrace: string[] = [];
+  private lastDiagnosticReport = "";
 
   constructor(options: DashboardRuntimeOptions = {}) {
     this.onlineEnabled = options.onlineEnabled ?? false;
@@ -90,6 +100,8 @@ export class DashboardRuntime {
 
   async initialize(): Promise<void> {
     this.globals = (await streamDeck.settings.getGlobalSettings()) as GlobalSettings;
+    this.detectedCs2Path = this.globals.cs2InstallPath;
+    this.setupStage = this.globals.gsiConfigPath ? "ready" : "idle";
     this.updateStatus({ cs2Running: await this.detectCs2Running() });
 
     if (this.globals.gsiEnabled && this.globals.gsiToken) {
@@ -111,16 +123,18 @@ export class DashboardRuntime {
           await this.saveGlobals();
         }
 
+        this.setupStage = this.globals.gsiConfigPath ? "ready" : "idle";
         this.updateStatus({
           gsiConfigured: Boolean(this.globals.gsiConfigPath),
           gsiRestartRequired: false,
-          setupStage: this.globals.gsiConfigPath ? "ready" : "idle",
+          setupStage: this.setupStage,
           detectedCs2Path: this.globals.cs2InstallPath,
           listenerPort: port,
           configPath: this.globals.gsiConfigPath,
           error: undefined
         });
       } catch (error) {
+        this.setupStage = "idle";
         this.updateStatus({ setupStage: "idle", error: this.errorMessage(error) });
       }
     }
@@ -146,16 +160,18 @@ export class DashboardRuntime {
     });
   }
 
-  async handlePiCommand(payload: unknown): Promise<Record<string, unknown>> {
+  async handlePiCommand(payload: unknown, onProgress?: PiProgress): Promise<Record<string, unknown>> {
     const command = this.parseCommand(payload);
     if (!command) return { ...this.publicState(), type: "error", message: "Unknown command" };
+
+    this.emitProgress(onProgress, command.type, "received", `Plugin received ${command.type}.`);
 
     try {
       switch (command.type) {
         case "get-status":
           return this.publicState();
         case "enable-gsi":
-          await this.enableGsi(command.manualCs2Path);
+          await this.enableGsi(command.manualCs2Path, onProgress);
           return this.commandState(
             "enable-gsi",
             this.store.get().status.gsiRestartRequired
@@ -163,12 +179,20 @@ export class DashboardRuntime {
               : "Live tracking is enabled. Enter a game mode and wait for Connected to CS2."
           );
         case "disable-gsi":
+          this.emitProgress(onProgress, command.type, "stopping-listener", "Stopping the local GSI listener…");
           await this.withTimeout(
             this.disableGsi(),
             PI_COMMAND_TIMEOUT_MS,
             "Disabling live tracking took too long. Restart the plugin and try again."
           );
           return this.commandState("disable-gsi", "Live tracking is disabled.");
+        case "run-diagnostics": {
+          const report = await this.runDiagnostics(command.manualCs2Path, onProgress);
+          return {
+            ...this.commandState("run-diagnostics", "Diagnostics finished. Copy the report below and send it to PackRat support."),
+            diagnostics: { report }
+          };
+        }
         case "open-profiles-folder":
           this.openProfilesFolder();
           return this.commandState("open-profiles-folder", "Opened the bundled profile files.");
@@ -205,6 +229,7 @@ export class DashboardRuntime {
       }
     } catch (error) {
       const message = this.errorMessage(error);
+      this.trace(`ERROR ${command.type}: ${message}`);
       this.updateStatus({ error: message });
       return {
         ...this.publicState(),
@@ -215,42 +240,52 @@ export class DashboardRuntime {
     }
   }
 
-  private async enableGsi(manualCs2Path?: string): Promise<void> {
+  private async enableGsi(manualCs2Path?: string, onProgress?: PiProgress): Promise<void> {
     const manualPath = manualCs2Path?.trim() || this.globals.manualCs2Path;
     const token = this.globals.gsiToken ?? createGsiToken();
     let listenerStarted = false;
     let newConfigPath: string | undefined;
+    this.setupTrace = [];
 
     try {
-      this.setSetupStage("finding-cs2");
+      this.setSetupStage("finding-cs2", onProgress, "enable-gsi", manualPath
+        ? "Checking the CS2 path you provided…"
+        : "Finding Steam and the CS2 App 730 installation…");
       const cs2 = await this.withTimeout(
         locateCs2Install(manualPath),
         LOCATE_CS2_TIMEOUT_MS,
-        "CS2 detection timed out. If CS2 is on another or disconnected Steam library, use CS2 path override and select the Counter-Strike Global Offensive install folder."
+        "CS2 detection timed out. Use Advanced Diagnostics below to see exactly which check is failing."
       );
-      this.updateStatus({ detectedCs2Path: cs2.installDir });
+      this.detectedCs2Path = cs2.installDir;
+      this.trace(`CS2 resolved: ${cs2.installDir}`);
+      this.emitProgress(onProgress, "enable-gsi", "finding-cs2", `Found CS2 at ${cs2.installDir}`, {
+        detectedCs2Path: cs2.installDir,
+        cfgDir: cs2.cfgDir
+      });
 
-      this.setSetupStage("starting-listener");
+      this.setSetupStage("starting-listener", onProgress, "enable-gsi", "Starting the local listener on 127.0.0.1…");
       const port = await this.withTimeout(
         this.server.start({
           token,
           preferredPort: this.globals.gsiPort,
-          onPayload: (payload) => this.ingest(payload)
+          onPayload: (incoming) => this.ingest(incoming)
         }),
         LISTENER_START_TIMEOUT_MS,
-        "The local CS2 listener could not start in time. Close other development copies of this plugin and try again."
+        "The local CS2 listener could not start in time. Run Advanced Diagnostics to test localhost ports."
       );
       listenerStarted = true;
-      this.updateStatus({ listenerPort: port });
+      this.trace(`Listener started: 127.0.0.1:${port}`);
+      this.emitProgress(onProgress, "enable-gsi", "starting-listener", `Local listener ready on 127.0.0.1:${port}.`, { listenerPort: port });
 
-      this.setSetupStage("writing-config");
+      this.setSetupStage("writing-config", onProgress, "enable-gsi", "Writing PackRat's Valve GSI config into CS2…");
       const installed = await this.withTimeout(
         installGsiConfig({ port, token, cs2 }),
         CONFIG_WRITE_TIMEOUT_MS,
-        `PackRat found CS2 at ${cs2.installDir}, but writing the GSI config timed out. Check folder permissions or antivirus protection.`
+        `PackRat found CS2 at ${cs2.installDir}, but writing the GSI config timed out. Run Advanced Diagnostics to test that folder.`
       );
       newConfigPath = installed.configPath;
-      this.updateStatus({ configPath: installed.configPath });
+      this.trace(`Config written: ${installed.configPath}`);
+      this.emitProgress(onProgress, "enable-gsi", "writing-config", "GSI config written successfully.", { configPath: installed.configPath });
 
       this.globals = {
         ...this.globals,
@@ -262,17 +297,19 @@ export class DashboardRuntime {
         manualCs2Path: manualPath
       };
 
-      this.setSetupStage("saving-settings");
+      this.setSetupStage("saving-settings", onProgress, "enable-gsi", "Saving the tracking setup in Stream Deck…");
       await this.withTimeout(
         this.saveGlobals(),
         SETTINGS_SAVE_TIMEOUT_MS,
         "The GSI config was written, but Stream Deck did not save the plugin settings in time."
       );
+      this.trace("Stream Deck global settings saved.");
 
-      this.setSetupStage("checking-cs2");
+      this.setSetupStage("checking-cs2", onProgress, "enable-gsi", "Checking whether cs2.exe is already running…");
       const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
       const alreadyConnected = this.store.get().status.gsiConnected;
 
+      this.setupStage = "ready";
       this.updateStatus({
         cs2Running,
         gsiConfigured: true,
@@ -283,12 +320,18 @@ export class DashboardRuntime {
         configPath: installed.configPath,
         error: undefined
       });
+      this.trace(`Setup ready. CS2 running: ${cs2Running ? "yes" : "no"}.`);
+      this.emitProgress(onProgress, "enable-gsi", "ready", cs2Running && !alreadyConnected
+        ? "Setup complete. CS2 is already open, so restart it once."
+        : "Setup complete. Launch CS2 and enter a game mode.");
     } catch (error) {
+      const failedStage = this.setupStage;
+      this.trace(`FAILED at ${failedStage}: ${this.errorMessage(error)}`);
       if (listenerStarted) {
-        try { await this.server.stop(); } catch { }
+        try { await this.withTimeout(this.server.stop(), 2_000, "Listener cleanup timed out"); } catch { }
       }
       if (newConfigPath) {
-        try { await removeGsiConfig(newConfigPath); } catch { }
+        try { await this.withTimeout(removeGsiConfig(newConfigPath), 2_000, "Config cleanup timed out"); } catch { }
       }
       this.globals.gsiEnabled = false;
       this.globals.gsiConfigPath = undefined;
@@ -296,10 +339,13 @@ export class DashboardRuntime {
         gsiConfigured: false,
         gsiConnected: false,
         gsiRestartRequired: false,
+        setupStage: failedStage,
+        detectedCs2Path: this.detectedCs2Path,
         listenerPort: undefined,
         configPath: undefined,
-        error: this.errorMessage(error)
+        error: `${this.errorMessage(error)} Failed stage: ${failedStage}.`
       });
+      this.emitProgress(onProgress, "enable-gsi", failedStage, `Failed: ${this.errorMessage(error)}`);
       throw error;
     }
   }
@@ -310,6 +356,7 @@ export class DashboardRuntime {
     this.globals.gsiEnabled = false;
     this.globals.gsiConfigPath = undefined;
     await this.saveGlobals();
+    this.setupStage = "idle";
     this.updateStatus({
       gsiConfigured: false,
       gsiConnected: false,
@@ -321,10 +368,112 @@ export class DashboardRuntime {
     });
   }
 
+  private async runDiagnostics(manualCs2Path?: string, onProgress?: PiProgress): Promise<string> {
+    const manualPath = manualCs2Path?.trim() || this.globals.manualCs2Path;
+    const lines: string[] = [];
+    const started = Date.now();
+    const add = (label: string, ok: boolean, detail: string, elapsed?: number) => {
+      lines.push(`${ok ? "PASS" : "FAIL"} | ${label}${elapsed === undefined ? "" : ` | ${elapsed}ms`} | ${detail}`);
+    };
+    const timed = async <T>(label: string, operation: () => Promise<T>, timeoutMs = DIAGNOSTIC_STEP_TIMEOUT_MS): Promise<T | undefined> => {
+      const stepStart = Date.now();
+      this.emitProgress(onProgress, "run-diagnostics", "diagnostics", `Testing ${label}…`);
+      try {
+        const result = await this.withTimeout(operation(), timeoutMs, `${label} timed out after ${timeoutMs}ms`);
+        add(label, true, "OK", Date.now() - stepStart);
+        return result;
+      } catch (error) {
+        add(label, false, this.errorMessage(error), Date.now() - stepStart);
+        return undefined;
+      }
+    };
+
+    lines.push("PackRat CS2 Competitive Dashboard Advanced Diagnostics");
+    lines.push(`Timestamp: ${new Date().toISOString()}`);
+    lines.push(`Platform: ${process.platform} ${process.arch}`);
+    lines.push(`Node: ${process.version}`);
+    lines.push(`Manual override: ${manualPath || "<automatic detection>"}`);
+    lines.push(`Saved CS2 path: ${this.globals.cs2InstallPath || "<none>"}`);
+    lines.push(`Saved GSI config: ${this.globals.gsiConfigPath || "<none>"}`);
+    lines.push(`Runtime listener: ${this.server.listening ? `LISTENING on ${this.server.port}` : "stopped"}`);
+    lines.push(`Runtime GSI connected: ${this.store.get().status.gsiConnected ? "yes" : "no"}`);
+    lines.push("");
+
+    const running = await timed("cs2.exe process check", () => this.detectCs2Running(), 2_500);
+    if (running !== undefined) lines.push(`INFO | cs2.exe running | ${running ? "yes" : "no"}`);
+
+    const settings = await timed("Stream Deck global settings read", async () => streamDeck.settings.getGlobalSettings() as Promise<unknown>, 2_500);
+    if (settings !== undefined) lines.push("INFO | Stream Deck settings channel | responsive");
+
+    const cs2 = await timed("CS2 install resolution", () => locateCs2Install(manualPath), 7_500);
+    if (cs2) {
+      lines.push(`INFO | installDir | ${cs2.installDir}`);
+      lines.push(`INFO | cfgDir | ${cs2.cfgDir}`);
+      lines.push(`INFO | steamRoot | ${cs2.steamRoot}`);
+      lines.push(`INFO | libraryRoot | ${cs2.libraryRoot}`);
+
+      const probePath = path.join(cs2.cfgDir, `.packrat-diagnostic-${process.pid}.tmp`);
+      const writable = await timed("CS2 cfg write/delete probe", async () => {
+        await writeFile(probePath, "PackRat diagnostic probe\n", "utf8");
+        await rm(probePath, { force: true });
+        return true;
+      }, 3_000);
+      if (writable) lines.push("INFO | cfg permissions | writable");
+
+      const expectedConfig = path.join(cs2.cfgDir, GSI_FILENAME);
+      const configExists = await timed("Existing PackRat GSI config check", async () => {
+        try {
+          await access(expectedConfig);
+          return true;
+        } catch {
+          return false;
+        }
+      }, 2_000);
+      if (configExists !== undefined) {
+        lines.push(`INFO | PackRat config | ${configExists ? `present at ${expectedConfig}` : "not installed"}`);
+        if (configExists) {
+          const configText = await timed("Existing GSI config read", () => readFile(expectedConfig, "utf8"), 2_000);
+          if (typeof configText === "string") {
+            lines.push(`INFO | GSI localhost URI | ${/127\.0\.0\.1:\d+\/gsi/.test(configText) ? "valid" : "missing or invalid"}`);
+            lines.push(`INFO | GSI auth token field | ${/"token"\s+"[^"]+"/.test(configText) ? "present" : "missing"}`);
+          }
+        }
+      }
+    }
+
+    if (this.server.listening) {
+      add("localhost listener probe", true, `Runtime listener already active on 127.0.0.1:${this.server.port}`);
+    } else {
+      const probeServer = new GsiServer();
+      const probePort = await timed("localhost listener bind", () => probeServer.start({
+        token: createGsiToken(),
+        preferredPort: this.globals.gsiPort,
+        onPayload: () => undefined
+      }), 3_000);
+      if (probePort !== undefined) {
+        lines.push(`INFO | localhost listener test port | 127.0.0.1:${probePort}`);
+        await timed("localhost listener close", () => probeServer.stop(), 2_500);
+      }
+    }
+
+    lines.push("");
+    lines.push("Setup trace from the most recent Enable attempt:");
+    if (this.setupTrace.length) lines.push(...this.setupTrace.map((entry) => `TRACE | ${entry}`));
+    else lines.push("TRACE | No setup trace recorded in this plugin process yet.");
+    lines.push("");
+    lines.push(`Diagnostics total: ${Date.now() - started}ms`);
+    lines.push("Secrets are intentionally omitted from this report.");
+
+    this.lastDiagnosticReport = lines.join("\n");
+    this.emitProgress(onProgress, "run-diagnostics", "diagnostics", "Diagnostics complete.");
+    return this.lastDiagnosticReport;
+  }
+
   private ingest(payload: Parameters<typeof normalizeGsiPayload>[0]): void {
     const before = this.store.get();
     const live = normalizeGsiPayload(payload);
     const session = this.sessionTracker.ingest(live);
+    this.setupStage = "ready";
     this.publish({
       live,
       session,
@@ -432,8 +581,35 @@ export class DashboardRuntime {
     }
   }
 
-  private setSetupStage(stage: SetupStage): void {
-    this.updateStatus({ setupStage: stage, error: undefined });
+  private setSetupStage(stage: SetupStage, onProgress?: PiProgress, command = "enable-gsi", message?: string): void {
+    this.setupStage = stage;
+    if (message) {
+      this.trace(`${stage}: ${message}`);
+      this.emitProgress(onProgress, command, stage, message);
+    }
+  }
+
+  private emitProgress(onProgress: PiProgress | undefined, command: string, stage: string, message: string, details?: Record<string, unknown>): void {
+    if (!onProgress) return;
+    const payload = {
+      ...this.publicState(),
+      type: "command-progress",
+      commandProgress: { command, stage, message, ...(details || {}) }
+    };
+    try {
+      const result = onProgress(payload);
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        void (result as Promise<void>).catch(() => undefined);
+      }
+    } catch {
+      // Progress reporting must never block the actual command.
+    }
+  }
+
+  private trace(message: string): void {
+    const stamp = new Date().toISOString().slice(11, 23);
+    this.setupTrace.push(`${stamp} ${message}`);
+    if (this.setupTrace.length > 60) this.setupTrace.splice(0, this.setupTrace.length - 60);
   }
 
   private updateStatus(patch: Partial<RuntimeStatus>): void {
@@ -453,7 +629,11 @@ export class DashboardRuntime {
     const snapshot = this.store.get();
     return {
       type: "status",
-      status: snapshot.status,
+      status: {
+        ...snapshot.status,
+        setupStage: this.setupStage,
+        detectedCs2Path: this.detectedCs2Path ?? snapshot.status.detectedCs2Path
+      },
       session: snapshot.session,
       online: snapshot.online,
       account: {
@@ -463,7 +643,11 @@ export class DashboardRuntime {
         leetifyKeyConfigured: Boolean(this.globals.leetifyApiKey)
       },
       setup: {
-        manualCs2Path: this.globals.manualCs2Path ?? ""
+        manualCs2Path: this.globals.manualCs2Path ?? "",
+        trace: this.setupTrace
+      },
+      diagnostics: {
+        report: this.lastDiagnosticReport
       }
     };
   }
@@ -478,6 +662,9 @@ export class DashboardRuntime {
     if (candidate.type === "refresh-online") return { type: "refresh-online" };
     if (candidate.type === "enable-gsi") {
       return { type: "enable-gsi", manualCs2Path: typeof candidate.manualCs2Path === "string" ? candidate.manualCs2Path : undefined };
+    }
+    if (candidate.type === "run-diagnostics") {
+      return { type: "run-diagnostics", manualCs2Path: typeof candidate.manualCs2Path === "string" ? candidate.manualCs2Path : undefined };
     }
     if (candidate.type === "set-steam-profile") {
       return { type: "set-steam-profile", steamProfile: typeof candidate.steamProfile === "string" ? candidate.steamProfile : undefined };
