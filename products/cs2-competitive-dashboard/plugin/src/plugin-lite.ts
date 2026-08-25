@@ -2,9 +2,11 @@ import streamDeck, { action } from "@elgato/streamdeck";
 import { LiveMetricActionBase } from "./actions/live-metric.js";
 import { StatusActionBase } from "./actions/status.js";
 import { LITE_LIVE_METRICS } from "./core/types.js";
+import { ensureAutomaticGsi } from "./gsi/auto-setup.js";
 import { DashboardRuntime } from "./runtime.js";
 
 const runtime = new DashboardRuntime();
+streamDeck.logger.setLevel("info");
 
 @action({ UUID: "com.packrat.cs2-competitive-dashboard-lite.live" })
 class LiteLiveMetricAction extends LiveMetricActionBase {
@@ -28,3 +30,4 @@ streamDeck.system.onApplicationDidTerminate((ev) => {
 
 await streamDeck.connect();
 await runtime.initialize();
+void ensureAutomaticGsi(runtime);
