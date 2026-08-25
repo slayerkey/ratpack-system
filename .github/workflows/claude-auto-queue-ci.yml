@@ -40,3 +40,27 @@ jobs:
       - name: Validate with official Stream Deck CLI
         working-directory: plugins/claude-auto-queue
         run: npx streamdeck validate com.packrat.claude-auto-queue.sdPlugin
+
+      - name: Reproduce Rat Dev build from Windows path with spaces
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'plugins\claude-auto-queue'
+          $root = Join-Path $env:RUNNER_TEMP 'Claude Projects\RatPack GitHub'
+          $target = Join-Path $root 'plugins\claude-auto-queue'
+          Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item (Join-Path $source 'package.json') $target
+          Copy-Item (Join-Path $source 'package-lock.json') $target
+          Copy-Item (Join-Path $source 'rollup.config.mjs') $target
+          Copy-Item (Join-Path $source 'tsconfig.json') $target
+          Copy-Item (Join-Path $source 'src') $target -Recurse
+          Push-Location $target
+          try {
+            npm ci --no-fund --no-audit
+            if ($LASTEXITCODE -ne 0) { throw 'npm ci failed in path-with-spaces regression' }
+            npm run build
+            if ($LASTEXITCODE -ne 0) { throw 'build failed in path-with-spaces regression' }
+          }
+          finally {
+            Pop-Location
+          }
