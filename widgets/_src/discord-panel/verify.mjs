@@ -43,4 +43,21 @@ for (const stale of ["bridgeSettings(", "validDiscordId(", "configureBridge(", "
   assert.equal(runtime.includes(stale), false, `stale fixed-channel runtime reference remains: ${stale}`);
 }
 
-console.log("DISCORD PANEL DEV QA PASS: source syntax, automatic loopback bridge transport, mute/deafen command mapping, no fixed channel configuration, and no stale fixed-channel runtime timer");
+const ui = fs.readFileSync(path.join(source, "discord-panel-ui.js"), "utf8");
+const translations = fs.readFileSync(path.join(repo, "widgets", "discord-panel", "translation.json"), "utf8");
+const obsoletePrototypeSignatures = [
+  "1540927508302536724",
+  "discord.com/api/oauth2/token",
+  "rpc.voice.read",
+  "rpc.voice.write",
+  "DISCORD_PORT_FIRST",
+  "DISCORD_PORT_LAST",
+  "Public Client PKCE",
+  "Client ID before release",
+];
+for (const stale of obsoletePrototypeSignatures) {
+  assert.equal(ui.includes(stale), false, `obsolete Discord prototype code remains in UI source: ${stale}`);
+  assert.equal(translations.includes(stale), false, `obsolete Discord prototype copy remains in translations: ${stale}`);
+}
+
+console.log("DISCORD PANEL DEV QA PASS: syntax, automatic loopback transport, mute/deafen mapping, no fixed-channel code, no delayed stale runtime calls, and no obsolete direct Discord OAuth/RPC prototype code");
