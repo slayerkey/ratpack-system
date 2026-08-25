@@ -63,7 +63,7 @@ jobs:
           retention-days: 30
 
   browser-and-streamspell:
-    name: Eight size, loopback, packaged, StreamSpell
+    name: Eight size, stress, loopback, packaged, StreamSpell
     needs: official-package
     runs-on: ubuntu-latest
     steps:
@@ -101,6 +101,9 @@ jobs:
 
       - name: Run eight size source browser gate
         run: node widgets/_src/discord-panel/visual-smoke.mjs widgets/_src/discord-panel/index.html artifacts/source-visual
+
+      - name: Run crowded roster and accessibility source stress
+        run: node widgets/_src/discord-panel/stress-smoke.mjs widgets/_src/discord-panel/index.html artifacts/source-stress
 
       - name: Unpack and audit official package
         shell: bash
@@ -159,6 +162,9 @@ jobs:
       - name: Run eight size packaged browser gate
         run: node widgets/_src/discord-panel/visual-smoke.mjs artifacts/unpacked/index.html artifacts/packaged-visual
 
+      - name: Run crowded roster and accessibility packaged stress
+        run: node widgets/_src/discord-panel/stress-smoke.mjs artifacts/unpacked/index.html artifacts/packaged-stress
+
       - name: Run packaged file-origin loopback transport gate
         run: node widgets/_src/discord-panel/network-smoke.mjs artifacts/unpacked/index.html artifacts/network-smoke
 
@@ -191,7 +197,9 @@ jobs:
           name: discord-panel-deep-qa
           path: |
             artifacts/source-visual/
+            artifacts/source-stress/
             artifacts/packaged-visual/
+            artifacts/packaged-stress/
             artifacts/network-smoke/
             artifacts/streamspell/
             artifacts/unpacked/package-audit.json
