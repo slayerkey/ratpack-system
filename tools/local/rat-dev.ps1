@@ -8,6 +8,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $DevRoot = Join-Path $RepoRoot "out\dev"
 $WorktreeRoot = Join-Path $DevRoot "worktrees"
 $Worktree = Join-Path $WorktreeRoot $Slug
+. (Join-Path $PSScriptRoot "rat-dev-dependencies.ps1")
 
 function Require-Command {
     param([string]$Name, [string]$Hint)
@@ -309,11 +310,21 @@ function Build-And-TestPlugin {
     if (Test-Path $packagePath) {
         $package = Get-Content $packagePath -Raw | ConvertFrom-Json
         $nodeModules = Join-Path $PluginRoot "node_modules"
+        $lockPath = Join-Path $PluginRoot "package-lock.json"
         Push-Location $PluginRoot
         try {
-            if (-not (Test-Path $nodeModules) -and (Test-Path (Join-Path $PluginRoot "package-lock.json"))) {
-                Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
-                Invoke-Checked -Command "npm" -Arguments @("ci", "--no-fund", "--no-audit") -Failure "npm ci failed"
+            if (Test-Path $lockPath -PathType Leaf) {
+                $dependencyState = Get-RatDevDependencyState -PluginRoot $PluginRoot
+                if (-not $dependencyState.Current) {
+                    if (Test-Path $nodeModules -PathType Container) {
+                        Write-Host "Plugin dependencies changed. Refreshing locked install..." -ForegroundColor Cyan
+                    }
+                    else {
+                        Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
+                    }
+                    Invoke-Checked -Command "npm" -Arguments @("ci", "--no-fund", "--no-audit") -Failure "npm ci failed"
+                    Set-RatDevDependencyState -PluginRoot $PluginRoot
+                }
             }
             elseif (-not (Test-Path $nodeModules) -and $package.dependencies) {
                 Write-Host "Installing plugin dependencies..." -ForegroundColor Cyan
