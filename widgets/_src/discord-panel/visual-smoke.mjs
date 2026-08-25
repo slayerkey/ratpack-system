@@ -23,7 +23,7 @@ function member(index, overrides = {}) {
   const id = String(1000 + index);
   const state = overrides.voice_state || {};
   return {
-    nick: overrides.nick || (index === 11 ? "A Very Long Discord Display Name For Layout Stress" : `Member ${index}`),
+    nick: overrides.nick || (index === 12 ? "A Very Long Discord Display Name For Layout Stress" : `Member ${index}`),
     mute: false,
     volume: 100,
     pan: { left: 1, right: 1 },
