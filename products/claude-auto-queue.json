@@ -2,7 +2,7 @@
   "id": "claude-auto-queue",
   "name": "Claude Auto Queue",
   "type": "plugin",
-  "status": "researching",
+  "status": "building",
   "workflow_state": "TESTING",
   "price_usd": null,
   "version": "0.1.0.0",
@@ -11,16 +11,19 @@
   "plugin_uuid": "com.packrat.claude-auto-queue",
   "minimum_claude_code_version": "2.1.163",
   "automated_feasibility": "PASS",
-  "automated_tests": 23,
+  "automated_tests": 25,
+  "core_host_feasibility": "GO",
   "release_gate": [
-    "23-test supported Claude hook, security, command discovery, VS Code bundled CLI discovery, session targeting, context-envelope and persistence suite: PASS",
+    "25-test supported Claude hook, security, command discovery, VS Code bundled CLI discovery, human session labels, safe Auto targeting, context-envelope and persistence suite: PASS",
     "locked npm ci dependency install on Windows: PASS",
     "Windows Rat Dev build from a path containing spaces: PASS",
     "official Stream Deck CLI validation: PASS",
     "RatPack context CI: PASS",
-    "authenticated Windows Claude Code same-session host spike: REQUIRED",
-    "premium profile and deterministic key-art QA after technical GO: DEFERRED"
+    "real VS Code Claude 2.1.243 hook connection and active-session identification: PASS",
+    "real same-session Auto Queue continuation with queue 1 -> 0 and chain 1/6: PASS",
+    "permission, restart persistence, explicit two-session routing, and disconnect host QA: REQUIRED",
+    "premium profile and deterministic key-art QA: NEXT"
   ],
-  "final_boundary": "authenticated local Claude Code session plus physical Stream Deck host smoke test",
-  "notes": "PackRat owns the pending queue. The product does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling below Claude's additionalContext spill threshold, a committed npm lockfile, and direct discovery of native Windows Claude Code plus the CLI bundled with the official VS Code extension and common VS Code forks."
+  "final_boundary": "remaining physical Stream Deck host smoke tests plus premium product QA",
+  "notes": "Core architecture is GO. A real Windows VS Code Claude Code 2.1.243 session received a PackRat-owned queued request through the documented Stop-hook continuation path and continued in the same conversation. PackRat stores only a short local preview of the latest real user prompt to make sessions human-identifiable without transcript scraping. The product does not claim external control of Claude Code's private native queued-message UI. Hook integration uses a per-install authenticated localhost endpoint, fail-safe session targeting, a six-continuation safety cap, a 9,000-character queue prompt ceiling, locked dependencies, and direct discovery of native Windows Claude Code plus the CLI bundled with VS Code and common VS Code forks."
 }
