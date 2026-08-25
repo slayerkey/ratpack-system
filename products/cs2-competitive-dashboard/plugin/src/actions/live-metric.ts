@@ -15,7 +15,9 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
     private readonly defaultMetric: LiveMetric = "score"
   ) {
     super();
-    this.runtime.subscribe(() => void this.refreshAll());
+    this.runtime.subscribe(() => {
+      setTimeout(() => void this.refreshAll(), 0);
+    });
   }
 
   override async onWillAppear(ev: any): Promise<void> {
@@ -36,7 +38,7 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
   }
 
   override async onSendToPlugin(ev: any): Promise<void> {
-    const response = await this.runtime.handlePiCommand(ev.payload);
+    const response = await this.runtime.handlePiCommand(ev.payload, (progress) => ev.action.sendToPropertyInspector(progress));
     await ev.action.sendToPropertyInspector(response);
   }
 
