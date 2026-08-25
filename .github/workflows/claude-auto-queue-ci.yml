@@ -70,6 +70,29 @@ jobs:
         run: |
           python -c "from PIL import Image; from pathlib import Path; p=Path('dist/marketplace'); expected={'01_search_icon.png':(512,512),'02_cover.png':(1920,960),'03_gallery_01.png':(1920,960),'04_gallery_02.png':(1920,960),'05_gallery_03.png':(1920,960),'06_gallery_04.png':(1920,960)}; bad=[(n,Image.open(p/n).size,s) for n,s in expected.items() if Image.open(p/n).size!=s]; assert not bad,bad; print('MARKETPLACE MEDIA PASS')"
 
+      - name: Exercise canonical Stream Deck Rat Ship kit builder
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'claude-auto-queue-ship-kit'
+          ./tools/local/rat-ship-plugin.ps1 -PluginSlug claude-auto-queue -Destination $dest
+          $required = @(
+            'claude-auto-queue.streamDeckPlugin',
+            'submission.json',
+            'PASTE_description.txt',
+            'PASTE_release_notes.txt',
+            '01_search_icon.png',
+            '02_cover.png',
+            '03_gallery_01.png',
+            '04_gallery_02.png',
+            '05_gallery_03.png',
+            '06_gallery_04.png'
+          )
+          $missing = @($required | Where-Object { -not (Test-Path (Join-Path $dest $_)) })
+          if ($missing.Count) { throw "Canonical plugin ship kit is incomplete: $($missing -join ', ')" }
+          $submission = Get-Content (Join-Path $dest 'submission.json') -Raw | ConvertFrom-Json
+          if ($null -ne $submission.price_usd) { throw 'Release test expects price to remain intentionally unset before approval.' }
+          Write-Host 'RAT SHIP PLUGIN KIT PASS: package, copy, media, and null-price kit boundary'
+
       - name: Reproduce Rat Dev build from Windows path with spaces
         shell: pwsh
         run: |
