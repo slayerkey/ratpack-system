@@ -203,6 +203,17 @@ try {
 
       await page.evaluate((value) => globalThis.__PACKRAT_DISCORD_TEST__.snapshot(value), liveSnapshot({ bridge: { port: 17483, listening: false, clients: 0 }, channel: null }));
       assert.equal((await page.evaluate(() => globalThis.__PACKRAT_DISCORD_TEST__.getState())).state, "disconnected", "bridge-disconnected state failed");
+
+      // Prove recovery from the tested failure states, then capture the normal live composition.
+      await page.evaluate((value) => globalThis.__PACKRAT_DISCORD_TEST__.snapshot(value), liveSnapshot());
+      next = await page.evaluate(() => globalThis.__PACKRAT_DISCORD_TEST__.getState());
+      assert.equal(next.state, "voice", "recovery to live voice state failed");
+      assert.equal(next.channel?.name, "Consults", "recovery channel failed");
+      assert.equal(next.members.length, 12, "recovery roster failed");
+      assert.equal(next.voice.mute, false, "recovery mute state failed");
+      assert.equal(next.voice.deaf, false, "recovery deafen state failed");
+      assert.equal(await page.locator("#muteButton").isDisabled(), false, "mute did not recover after reconnect");
+      assert.equal(await page.locator("#deafenButton").isDisabled(), false, "deafen did not recover after reconnect");
     }
 
     await page.screenshot({ path: path.join(artifactDir, `${slot.id}.png`), fullPage: false });
@@ -217,4 +228,4 @@ try {
 }
 
 await fs.writeFile(path.join(artifactDir, "results.json"), JSON.stringify({ entry, results }, null, 2));
-console.log(`DISCORD PANEL VISUAL QA PASS: ${slots.length} XENEON compositions, runtime stability, overflow, touch targets, roster, speaking, details, joins/leaves, channel switching, voice state, and failure states`);
+console.log(`DISCORD PANEL VISUAL QA PASS: ${slots.length} XENEON compositions, runtime stability, overflow, touch targets, roster, speaking, details, joins/leaves, channel switching, voice state, failure states, and recovery`);
