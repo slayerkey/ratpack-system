@@ -36,4 +36,11 @@ assert.equal(transport.includes("rpc.voice.read"), false);
 assert.equal(transport.includes("rpc.voice.write"), false);
 assert.equal(transport.includes("6463"), false);
 
-console.log("DISCORD PANEL DEV QA PASS: source syntax, automatic loopback bridge transport, mute/deafen command mapping, no fixed channel configuration, and no direct Discord OAuth/RPC dependency");
+const runtime = fs.readFileSync(path.join(source, "discord-panel.js"), "utf8");
+assert.match(runtime, /snapshot: function \(snapshot\) \{ applyBridgeSnapshot\(snapshot \|\| null\); \}/);
+assert.match(runtime, /!fixtureMode && \(!rpcSocket \|\| rpcSocket\.readyState !== WebSocket\.OPEN\)/);
+for (const stale of ["bridgeSettings(", "validDiscordId(", "configureBridge(", "discordServerId", "discordVoiceChannelId"]) {
+  assert.equal(runtime.includes(stale), false, `stale fixed-channel runtime reference remains: ${stale}`);
+}
+
+console.log("DISCORD PANEL DEV QA PASS: source syntax, automatic loopback bridge transport, mute/deafen command mapping, no fixed channel configuration, and no stale fixed-channel runtime timer");
