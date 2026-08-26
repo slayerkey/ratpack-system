@@ -12,7 +12,7 @@ PASS: the companion connected to `\\?\\pipe\\discord-ipc-0` and Discord returned
 
 PASS: native StreamKit `AUTHORIZE` succeeded for `rpc`, `rpc.voice.read`, and `rpc.voice.write`.
 
-PASS: the one-time code exchange succeeded and the access token was cached locally.
+PASS: the one-time code exchange succeeded.
 
 PASS: RPC `AUTHENTICATE` succeeded.
 
@@ -38,7 +38,7 @@ PASS: supported Stream Deck manifest minimum is `7.3`.
 
 PASS: Bridge Status is implemented as an official `SingletonAction`.
 
-PASS: global token persistence uses official `streamDeck.settings` APIs.
+PASS: Discord access tokens are session memory only and are not stored through Stream Deck global settings.
 
 PASS: wake recovery uses official `streamDeck.system.onSystemDidWakeUp`.
 
@@ -50,13 +50,13 @@ PASS: release dependencies are committed in `package-lock.json` and CI installs 
 
 ## Clean Windows release CI
 
-Authoritative migration gate passed on public GitHub Windows runners.
+Authoritative migration gate runs on public GitHub Windows runners.
 
 PASS: locked dependency installation.
 
 PASS: `npm audit --audit-level=high` with zero reported vulnerabilities at validation time.
 
-PASS: 11 automated tests.
+PASS: automated tests.
 
 PASS: bundled release build.
 
@@ -66,7 +66,7 @@ PASS: official Elgato `streamdeck validate`.
 
 PASS: official Elgato `streamdeck pack` producing a `.streamDeckPlugin` artifact.
 
-The automated tests cover Discord IPC framing, loopback WebSocket framing/origin policy, command delivery, exact StreamKit RPC identity/scopes/token exchange, official SDK migration requirements, and removal of obsolete fallbacks.
+The automated tests cover Discord IPC framing, loopback WebSocket framing/origin policy, command delivery, exact StreamKit RPC identity/scopes/token exchange, official SDK migration requirements, memory-only credential handling, and removal of obsolete fallbacks.
 
 ## XENEON integration proof
 
@@ -96,15 +96,21 @@ PASS: XENEON receives no Discord access token.
 
 PASS: no Discord Client Secret is embedded.
 
+PASS: Discord access token is held only in process memory for the current plugin session.
+
+PASS: the companion source contains no Stream Deck global-settings token persistence.
+
 PASS: the release bundle is checked for `client_secret`.
 
 PASS: the XENEON package contains no Discord application identity or direct Discord authorization logic.
 
 ## Remaining manual smoke test
 
-Run the final `1.0.0.0` companion on the user's Windows Stream Deck installation and confirm the already-authorized Discord path still reaches `streamkit.stage: ready`, current channel discovery, speaking, mute, and deafen after the SDK migration.
+Run the final `1.0.0.0` companion on the user's Windows Stream Deck installation and confirm a normal Discord authorization reaches `streamkit.stage: ready`, current channel discovery, speaking, mute, and deafen after the SDK and credential-storage changes.
 
-This is a regression smoke test of the new Stream Deck host layer, not a new architecture feasibility test.
+Because the token is intentionally memory only, restarting the plugin process may require authorization again. That is expected behavior for this release candidate.
+
+This is a regression smoke test of the final Stream Deck host layer, not a new architecture feasibility test.
 
 ## Commercial release boundary
 
