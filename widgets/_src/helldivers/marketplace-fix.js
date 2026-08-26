@@ -8,8 +8,8 @@
  * 2. The required X-Super-Client and X-Super-Contact values are sent through the
  *    API's supported lowercase query parameters. This keeps the request a simple GET
  *    and avoids a browser CORS preflight from the installed file:// widget origin.
- * 3. Transport failures retain their actual reason instead of collapsing every
- *    non-success response into a blank/offline panel.
+ * 3. Transport failures retain their actual reason, and partial snapshots retry the
+ *    missing endpoints after the upstream limit clears instead of waiting a full poll.
  */
 (function () {
     var recoveryRetryTimer = null;
@@ -138,7 +138,6 @@
             return;
         }
 
-        clearTimeout(recoveryRetryTimer);
         var cold = document.getElementById("coldOffline");
         if (cold) cold.classList.add("hidden");
         if (success > 0) {
@@ -148,6 +147,8 @@
             document.body.setAttribute("data-connection", success === ENDPOINTS.length ? "live" : "stale");
             setText("connectionBadge", success === ENDPOINTS.length ? L("LIVE") : L("STALE"));
             renderAll();
+            if (success < ENDPOINTS.length) scheduleRecoveryRetry(classifyFailure(results));
+            else clearTimeout(recoveryRetryTimer);
         } else {
             currentData = cache.data;
             document.body.setAttribute("data-connection", "stale");
@@ -165,7 +166,7 @@
         };
     }
 
-    globalThis.__packratHelldiversRecovery = { version: 2, transport: "query" };
+    globalThis.__packratHelldiversRecovery = { version: 3, transport: "query", partialRetry: true };
 
     try {
         if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) {
