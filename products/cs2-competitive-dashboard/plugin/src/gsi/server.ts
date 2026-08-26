@@ -175,9 +175,14 @@ export class GsiServer {
         this.respond(res, 405, "Method Not Allowed");
         return;
       }
-      hostDiagnostics.openLogFolder();
-      res.statusCode = 204;
-      res.end();
+      try {
+        await hostDiagnostics.openLogFolder();
+        res.statusCode = 204;
+        res.end();
+      } catch (error) {
+        hostDiagnostics.error("open log folder failed", error);
+        this.respond(res, 500, "Could not open log folder");
+      }
       return;
     }
 
