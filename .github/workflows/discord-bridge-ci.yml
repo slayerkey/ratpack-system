@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-release:
@@ -27,7 +27,27 @@ jobs:
 
       - name: Install dependencies
         shell: pwsh
-        run: npm install
+        run: |
+          if (Test-Path package-lock.json) {
+            npm ci
+          } else {
+            npm install
+          }
+
+      - name: Commit generated lockfile once
+        shell: pwsh
+        run: |
+          if (-not (Test-Path package-lock.json)) { throw 'npm did not generate package-lock.json' }
+          $status = git status --porcelain -- package-lock.json
+          if ($status) {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Lock Discord Bridge release dependencies"
+            git push origin HEAD:product/discord-bridge
+          } else {
+            Write-Host 'package-lock.json is already committed'
+          }
 
       - name: Audit dependencies
         shell: pwsh
@@ -49,9 +69,6 @@ jobs:
             throw "Expected exactly bin/plugin.js in the release bundle"
           }
           $bundle = Get-Content com.packrat.discord-bridge.sdPlugin/bin/plugin.js -Raw
-          if ($bundle -notmatch '@elgato') {
-            Write-Host 'Bundled SDK identifiers are minified; continuing with source/package assertions.'
-          }
           if ($bundle -match 'client_secret') {
             throw 'Release bundle must not contain a Discord client secret'
           }
