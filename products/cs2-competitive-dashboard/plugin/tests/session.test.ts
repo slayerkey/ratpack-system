@@ -93,7 +93,7 @@ test("detects a respawn reset even when the next packet already contains a kill"
   }));
 
   assert.equal(metrics.headshotKills, 2);
-  assert.equal(metrics.hsPercent, 200 / 3);
+  assert.ok(Math.abs(metrics.hsPercent - (2 / 3) * 100) < 1e-9);
   assert.equal(metrics.damage, 240);
   assert.equal(metrics.rounds, 1);
 });
