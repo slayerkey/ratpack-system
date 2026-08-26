@@ -124,7 +124,7 @@ jobs:
         run: |
           verify="widgets/_src/${{ matrix.slug }}/verify.mjs"
           if [[ -f "$verify" ]]; then
-            node "$verify"
+            RATPACK_PACKAGED_ENTRY="$PWD/artifacts/package/index.html" node "$verify"
           else
             echo "No optional verify.mjs for ${{ matrix.slug }}"
           fi
