@@ -34,10 +34,14 @@ test("Discord Bridge uses the official Stream Deck v2 SDK and SDKVersion 3", asy
   assert.match(source, /from "@elgato\/streamdeck"/);
   assert.match(source, /extends SingletonAction/);
   assert.match(source, /streamDeck\.actions\.registerAction/);
-  assert.match(source, /streamDeck\.settings\.getGlobalSettings/);
-  assert.match(source, /streamDeck\.settings\.setGlobalSettings/);
   assert.match(source, /streamDeck\.system\.onSystemDidWakeUp/);
   assert.match(source, /await streamDeck\.connect\(\)/);
+
+  assert.doesNotMatch(source, /streamDeck\.settings\.getGlobalSettings/);
+  assert.doesNotMatch(source, /streamDeck\.settings\.setGlobalSettings/);
+  assert.doesNotMatch(source, /streamkitAccessToken/);
+  assert.match(source, /tokenPersistence: "memory_only"/);
+  assert.match(source, /let sessionAccessToken = ""/);
 
   assert.doesNotMatch(source, /EventEmitter/);
   assert.doesNotMatch(source, /-pluginUUID/);
