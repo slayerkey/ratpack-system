@@ -19,7 +19,7 @@ export interface GsiServerOptions {
   onPayload: (payload: RawGsiPayload) => void | Promise<void>;
 }
 
-function candidatePorts(preferredPort?: number): number[] {
+export function candidateGsiPorts(preferredPort?: number): number[] {
   const first = DEFAULT_GSI_PORT;
   const last = first + MAX_PORT_ATTEMPTS - 1;
   const preferred = Number.isInteger(preferredPort) && preferredPort! >= first && preferredPort! <= last
@@ -48,12 +48,13 @@ export class GsiServer {
   async start(options: GsiServerOptions): Promise<number> {
     if (this.server?.listening && this.activePort) return this.activePort;
 
-    const ports = candidatePorts(options.preferredPort);
+    const ports = candidateGsiPorts(options.preferredPort);
+    const lastAllowedPort = DEFAULT_GSI_PORT + MAX_PORT_ATTEMPTS - 1;
     hostDiagnostics.event("listener bind started", {
       flavor: hostDiagnostics.flavor,
       host: HOST,
       preferredPort: options.preferredPort,
-      allowedRange: `${ports[0] === options.preferredPort ? DEFAULT_GSI_PORT : ports[0]}-${DEFAULT_GSI_PORT + MAX_PORT_ATTEMPTS - 1}`
+      allowedRange: `${DEFAULT_GSI_PORT}-${lastAllowedPort}`
     }, { setupStage: "listener-bind" });
 
     for (const port of ports) {
@@ -84,8 +85,7 @@ export class GsiServer {
       }
     }
 
-    const lastPort = DEFAULT_GSI_PORT + MAX_PORT_ATTEMPTS - 1;
-    const error = new Error(`Unable to bind a local CS2 GSI listener in the ${hostDiagnostics.flavor} port range ${DEFAULT_GSI_PORT}-${lastPort}`);
+    const error = new Error(`Unable to bind a local CS2 GSI listener in the ${hostDiagnostics.flavor} port range ${DEFAULT_GSI_PORT}-${lastAllowedPort}`);
     hostDiagnostics.error("listener bind failed", error, { listenerRunning: false });
     throw error;
   }
