@@ -36,7 +36,9 @@ test("exact production GSI server drives the dashboard runtime and live key disp
   const server = new GsiServer();
   const port = await server.start({
     token,
-    preferredPort: 39123,
+    // Stay inside the dedicated Pro block while using a high port so this test does
+    // not share an HTTP connection pool entry with the invalid traffic test below.
+    preferredPort: 32145,
     onPayload: (incoming) => ingestGsi(runtime, incoming)
   });
   const origin = `http://127.0.0.1:${port}`;
@@ -68,7 +70,7 @@ test("exact production GSI server drives the dashboard runtime and live key disp
 
 test("production GSI server accepts legacy /gsi but rejects invalid traffic", async () => {
   const server = new GsiServer();
-  const port = await server.start({ token, preferredPort: 39223, onPayload: () => undefined });
+  const port = await server.start({ token, preferredPort: 32146, onPayload: () => undefined });
   const origin = `http://127.0.0.1:${port}`;
 
   try {
