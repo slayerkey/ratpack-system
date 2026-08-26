@@ -22,7 +22,7 @@ export function fitValue(value: string): number {
   if (length <= 4) return 40;
   if (length <= 7) return 33;
   if (length <= 10) return 27;
-  if (length <= 13) return 23;
+  if (length <= 12) return 23;
   if (length <= 16) return 20;
   if (length <= 20) return 18;
   return 16;
