@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs && rollup -c",
+    "build": "node scripts/build.mjs && rollup -c && node scripts/cleanup-build.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "npm run test && npm run build",
     "validate": "streamdeck validate com.packrat.discord-bridge.sdPlugin --no-update-check",
