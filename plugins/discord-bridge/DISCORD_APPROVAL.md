@@ -62,7 +62,7 @@ The use case is intentionally narrow:
 4. Read the user's local mute/deafen state.
 5. Let the user toggle their own local mute/deafen state from the XENEON Edge.
 
-The app does not automate messages, scrape Discord, use a user token, impersonate a user, or access Discord remotely. Discord access remains local to the user's PC. The XENEON widget receives only normalized local voice state from the companion over 127.0.0.1. Discord access tokens are not sent to the XENEON widget.
+The app does not automate messages, scrape Discord, use a user token, impersonate a user, or access Discord remotely. Discord access remains local to the user's PC. The XENEON widget receives only normalized local voice state from the companion over 127.0.0.1. Discord access tokens are not sent to the XENEON widget and the current release candidate keeps the session access token in process memory only.
 
 We have implemented and tested the transport using Discord's documented RPC commands/events and would like approval for a PackRat-owned application before commercial distribution.
 
@@ -94,9 +94,11 @@ When a PackRat application is approved:
 1. Replace the StreamKit client identity with the approved PackRat application ID.
 2. Use only Discord's approved production token exchange mechanism for that application.
 3. Never embed the application Client Secret in the Stream Deck plugin or XENEON widget.
-4. If a Client Secret is required for token exchange, use a PackRat-controlled HTTPS backend.
-5. Rerun the real Windows authorization/channel/roster/speaking/mute/deafen test.
-6. Rerun Discord Bridge Release QA.
-7. Rerun Discord Panel Deep QA.
-8. Update the release docs to record the approved identity and scope grant.
-9. Only then submit the paid XENEON product publicly.
+4. Do not persist Discord access tokens in Stream Deck global settings.
+5. If Discord requires a Client Secret or another confidential credential for token exchange, keep that credential in PackRat-controlled server infrastructure and expose only the minimum exchange endpoint needed by the companion.
+6. Keep the XENEON widget credential-free and continue passing only normalized local voice state over `127.0.0.1`.
+7. Rerun the real Windows authorization/channel/roster/speaking/mute/deafen test.
+8. Rerun Discord Bridge Release QA.
+9. Rerun Discord Panel Deep QA.
+10. Update the release docs to record the approved identity and scope grant.
+11. Only then submit the paid XENEON product publicly.
