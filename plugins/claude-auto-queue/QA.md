@@ -4,6 +4,8 @@ Current state: **RELEASE CANDIDATE**
 
 Core architecture: **GO**
 
+Final Windows host smoke: **PASS — 2026-08-25**
+
 ## Automated release gate
 
 - `npm ci` from committed lockfile: PASS.
@@ -19,7 +21,7 @@ Core architecture: **GO**
 - Windows build regression from a RatPack-style path containing spaces: PASS.
 - RatPack lightweight context and PowerShell validation: PASS.
 - Shared canonical Rat Ship Stream Deck plugin routing: PASS and merged to `main`.
-- Canonical plugin ship-kit builder integration: release CI gate.
+- Canonical plugin ship-kit builder integration: PASS.
 
 ## Proven real Windows host behavior
 
@@ -30,26 +32,20 @@ Core architecture: **GO**
 - A PackRat-owned queued request was consumed at a supported `Stop` boundary.
 - Claude continued in the same VS Code conversation and returned the expected queued work result.
 - Queue moved 1 to 0 and continuation count moved to 1/6, then the session finished.
+- Final physical smoke reported PASS with no release-blocking issues.
+- Permission attention behavior, restart persistence, explicit two-chat routing, Disconnect cleanup/reconnect, and physical profile/action behavior were smoke tested on the real host.
+- Repeated queued round trips returned the exact queued test text.
 
-## Final physical host smoke
+## Required user-facing mental model
 
-Run:
+The release UI and listing must explain that Auto Queue is not an immediate send action:
 
-```text
-rat dev claude-auto-queue
-```
+1. Connect Claude Code once.
+2. Send one normal message in the Claude chat to let PackRat learn that active chat.
+3. Queue a follow-up while Claude is working. The queued prompt stays local and does not interrupt or type into VS Code.
+4. When Claude finishes the current turn, the queued prompt becomes the next request in the same chat.
 
-Then complete `HOST_SMOKE.md`.
-
-The remaining host checks cover:
-
-1. Permission prompt -> **NEED YOU** without automatic approval.
-2. Queue persistence across a Stream Deck/plugin restart.
-3. Explicit routing between two real Claude chats.
-4. Disconnect cleanup and reconnect.
-5. Physical bundled-profile rendering plus one ready-made Queue Prompt action.
-
-These are final host/UI confidence checks. The underlying state transitions, persistence, session binding, permission/error states, and disconnect ownership rules already have automated coverage.
+If Auto is waiting for a chat, the correct instruction is to send one normal Claude message first.
 
 ## Marketplace QA
 
@@ -69,7 +65,7 @@ These are final host/UI confidence checks. The underlying state transitions, per
 
 ## Final release boundary
 
-After `HOST_SMOKE.md` passes:
+Host QA is complete. Remaining steps are:
 
 1. Set the explicitly approved `submission.price_usd` and matching product registry price.
 2. Merge PR #70 to `main` after final CI.
