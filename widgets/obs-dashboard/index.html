@@ -613,6 +613,24 @@ body[data-slot="xl-v"] .scene-button { min-height: 68px; font-size: 17px; }
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 </style>
+<script>
+(function () {
+  var names = ["obsPort","obsPassword","textColor","accentColor","backgroundColor"];
+  names.forEach(function (name) {
+    try {
+      if (Object.prototype.hasOwnProperty.call(globalThis, name)) return;
+      var resolve = Function("return typeof " + name + " !== 'undefined' ? " + name + " : undefined;");
+      if (resolve() === undefined) return;
+      Object.defineProperty(globalThis, name, {
+        configurable: true,
+        enumerable: true,
+        get: function () { try { return resolve(); } catch (error) { return undefined; } }
+      });
+    } catch (error) {}
+  });
+  globalThis.__ratpackIcueBindingBridge = { version: 1, names: names.slice() };
+})();
+</script>
 </head>
 <body data-slot="s-h" data-connection="connecting" data-has-cache="false">
 <main id="stage" aria-label="Stream Dashboard">
