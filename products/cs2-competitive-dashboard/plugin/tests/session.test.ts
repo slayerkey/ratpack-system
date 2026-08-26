@@ -98,6 +98,30 @@ test("detects a respawn reset even when the next packet already contains a kill"
   assert.equal(metrics.rounds, 1);
 });
 
+test("uses a Deathmatch damage reset when kill and headshot counters repeat exactly", () => {
+  const session = new SessionTracker();
+  session.ingest(live({
+    roundKills: 1,
+    roundHeadshotKills: 1,
+    roundTotalDamage: 110,
+    kills: 1,
+    deaths: 0
+  }));
+
+  const metrics = session.ingest(live({
+    roundKills: 1,
+    roundHeadshotKills: 1,
+    roundTotalDamage: 70,
+    kills: 2,
+    deaths: 1
+  }));
+
+  assert.equal(metrics.headshotKills, 2);
+  assert.equal(metrics.hsPercent, 100);
+  assert.equal(metrics.damage, 180);
+  assert.equal(metrics.rounds, 1);
+});
+
 test("finalizes a match once and starts a new match afterward", () => {
   const session = new SessionTracker();
   session.ingest(live({ roundNumber: 0, roundTotalDamage: 90, kills: 2, deaths: 1 }));
