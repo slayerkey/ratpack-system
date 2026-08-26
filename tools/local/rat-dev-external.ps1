@@ -196,6 +196,10 @@ try {
                 Invoke-Native -Command "npm" -Arguments @("install", "--no-fund", "--no-audit") -Failure "npm install failed"
             }
 
+            if ($package.scripts.typecheck) {
+                Write-Stage "Type check $Slug"
+                Invoke-Native -Command "npm" -Arguments @("run", "typecheck") -Failure "Plugin type check failed"
+            }
             if ($package.scripts.build) {
                 Write-Stage "Build $Slug"
                 Invoke-Native -Command "npm" -Arguments @("run", "build") -Failure "Plugin build failed"
