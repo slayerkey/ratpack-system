@@ -10,6 +10,7 @@ const diagnostics = readFileSync("static/ui/diagnostics.js", "utf8");
 const installer = readFileSync("src/gsi/installer.ts", "utf8");
 const hostService = readFileSync("src/gsi/host-service.ts", "utf8");
 const hostLog = readFileSync("src/diagnostics/host.ts", "utf8");
+const hostFlavor = readFileSync("src/host-flavor.ts", "utf8");
 const pluginPro = readFileSync("src/plugin-pro.ts", "utf8");
 const pluginLite = readFileSync("src/plugin-lite.ts", "utf8");
 
@@ -128,15 +129,25 @@ test("local GSI startup no longer depends on Stream Deck global settings", () =>
 });
 
 test("dashboard GSI config matches the proven root URI while preserving security", () => {
-  assert.match(installer, /gamestate_integration_packrat_cs2_dashboard\.cfg/);
+  assert.match(installer, /gsiFilenameForFlavor/);
+  assert.match(installer, /LEGACY_SHARED_GSI_FILENAME/);
   assert.match(installer, /http:\/\/127\.0\.0\.1:\$\{port\}\//);
   assert.doesNotMatch(installer, /\$\{port\}\/gsi/);
   assert.match(installer, /"auth"/);
   assert.match(installer, /"token"/);
 });
 
+test("Pro and Lite cannot overwrite each other's local GSI host identity", () => {
+  assert.match(hostFlavor, /32123/);
+  assert.match(hostFlavor, /32147/);
+  assert.match(hostFlavor, /gamestate_integration_packrat_cs2_dashboard_\$\{flavor\}\.cfg/);
+  assert.match(hostLog, /cs2-competitive-dashboard-\$\{this\.flavor\}\.log/);
+  assert.match(hostLog, /gsi-\$\{this\.flavor\}\.json/);
+  assert.match(diagnostics, /FIRST_PORT = flavor === "lite" \? 32147 : 32123/);
+  assert.match(diagnostics, /state\?\.flavor !== flavor/);
+});
+
 test("persistent diagnostics are independent of Property Inspector RPC", () => {
-  assert.match(hostLog, /cs2-competitive-dashboard\.log/);
   assert.match(hostLog, /plugin process started/);
   assert.match(hostLog, /uncaught exception/);
   assert.match(hostLog, /unhandled rejection/);
