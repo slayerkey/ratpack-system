@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { currentProductFlavor, type ProductFlavor } from "../host-flavor.js";
 
 const PRODUCT_DIR = "CS2CompetitiveDashboard";
@@ -160,12 +160,24 @@ export class HostDiagnostics {
     }
   }
 
-  openLogFolder(): void {
-    try {
-      if (process.platform === "win32") execFile("explorer.exe", [this.logDir], { windowsHide: true });
-    } catch (error) {
-      this.error("open log folder failed", error);
-    }
+  async openLogFolder(): Promise<void> {
+    this.ensureDirs();
+    if (process.platform !== "win32") throw new Error("Open Log Folder is only supported on Windows");
+
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn("explorer.exe", [this.logDir], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false
+      });
+      child.once("error", reject);
+      child.once("spawn", () => {
+        child.unref();
+        resolve();
+      });
+    });
+
+    this.event("open log folder launched", { logDir: this.logDir });
   }
 
   summaryText(): string {
