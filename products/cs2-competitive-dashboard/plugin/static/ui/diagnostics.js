@@ -106,7 +106,8 @@
       return;
     }
     try {
-      await fetch(`${currentOrigin}${OPEN_LOG_PATH}`, { method: "POST" });
+      const response = await fetch(`${currentOrigin}${OPEN_LOG_PATH}`, { method: "POST" });
+      if (!response.ok) throw new Error(`Open Log Folder returned HTTP ${response.status}`);
       text("host-diag-feedback", "Opened the PackRat CS2 diagnostic log folder.");
     } catch {
       text("host-diag-feedback", "Could not open the folder automatically. Use the persistent log path shown above.");
