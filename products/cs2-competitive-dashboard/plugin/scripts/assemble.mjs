@@ -6,7 +6,7 @@ import { generateBundledProfiles } from "./profiles.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
 const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
-const HOST_LOG = "%APPDATA%\\PackRat\\CS2CompetitiveDashboard\\logs\\cs2-competitive-dashboard.log";
+const HOST_LOG_DIR = "%APPDATA%\\PackRat\\CS2CompetitiveDashboard\\logs";
 
 for (const build of builds) {
   await mkdir(path.join(build.output, "bin"), { recursive: true });
@@ -41,7 +41,8 @@ for (const build of builds) {
   await generateImages(build);
 }
 
-console.log(`Host diagnostics after install: ${HOST_LOG}`);
+console.log(`Pro host diagnostics after install: ${HOST_LOG_DIR}\\cs2-competitive-dashboard-pro.log`);
+console.log(`Lite host diagnostics after install: ${HOST_LOG_DIR}\\cs2-competitive-dashboard-lite.log`);
 
 function createManifest(build, profiles) {
   return {
