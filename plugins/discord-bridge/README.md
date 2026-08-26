@@ -1,36 +1,56 @@
 # PackRat Discord Bridge
 
-Development companion for the PackRat Discord Voice Panel on XENEON Edge.
+Free Stream Deck companion for the PackRat Discord Voice Panel on XENEON Edge.
 
-## Current feasibility architecture
+Current release candidate: `1.0.0.0`.
 
-Discord Desktop stays the user's normal voice client.
+## What it does
 
-The active `0.3.0.0` feasibility path uses Discord StreamKit's public RPC identity over Discord's native desktop IPC:
+Discord Desktop remains the user's normal voice client. The bridge runs locally and exposes only normalized voice state to the XENEON widget.
+
+Live path:
 
 1. Connect to Discord Desktop through the native `discord-ipc-*` named pipe.
-2. Handshake using Discord StreamKit client ID `207646673902501888`.
-3. Request `rpc`, `rpc.voice.read`, and `rpc.voice.write` through native RPC `AUTHORIZE`.
-4. Exchange the one time authorization code at `https://streamkit.discord.com/overlay/token` by sending only `{ code }`. No Discord Client Secret is embedded.
-5. Authenticate the native RPC session with the returned access token.
-6. Follow the currently selected Discord voice channel automatically, subscribe to roster and speaking events, and read/write the user's mute and deafen settings.
-7. Forward only the normalized local snapshot to XENEON over the loopback PackRat bridge at `127.0.0.1:17483`.
+2. Authorize the required Discord RPC voice scopes.
+3. Follow the currently selected voice channel automatically.
+4. Receive roster, speaking, mute, and deafen updates.
+5. Apply mute and deafen changes through Discord RPC.
+6. Serve the normalized local snapshot to XENEON at `ws://127.0.0.1:17483`.
 
-The XENEON widget never receives the StreamKit access token or a Discord Client Secret.
+The XENEON widget never receives a Discord access token or Client Secret.
 
-This is a feasibility implementation. Using Discord StreamKit's public application identity for a separate commercial Marketplace product still needs a release policy/terms review before shipping, even if the local technical test succeeds.
+## Stream Deck implementation
 
-## Why this transport exists
+The release candidate uses the current official Node SDK:
 
-The PackRat owned Discord application successfully reached the native Discord IPC `READY` handshake, but Discord rejected its `rpc.voice.read` and `rpc.voice.write` authorization request with `invalid_scope` before issuing a code.
+- `@elgato/streamdeck` `2.1.2`
+- manifest `SDKVersion: 3`
+- Node.js `24`
+- Stream Deck minimum `7.3`
+- deterministic `package-lock.json`
+- bundled single-file runtime at `bin/plugin.js`
 
-A current open source Discord voice integration demonstrates that Discord StreamKit's public client ID and token exchange endpoint can perform the same native RPC voice flow without embedding a client secret. Build `0.3.0.0` tests that path directly.
+The old custom Stream Deck host protocol, hidden Edge browser fallback, keyboard-shortcut fallback, and browser OAuth implementation have been removed from the release source tree.
 
-The previous hidden Microsoft Edge/fixed-channel StreamKit overlay implementation remains only as experimental source fallback and is not part of the production build.
+Clean Windows CI runs locked dependency installation, dependency audit, automated tests, bundled build, official `streamdeck validate`, official `streamdeck pack`, and release artifact verification.
+
+## Current Discord transport
+
+The technically proven build uses Discord StreamKit's public RPC identity:
+
+- client ID `207646673902501888`
+- scopes `rpc`, `rpc.voice.read`, and `rpc.voice.write`
+- one-time code exchange through `https://streamkit.discord.com/overlay/token`
+
+No Discord Client Secret is embedded.
+
+Real Windows testing proved native Discord IPC, authorization, token exchange, RPC authentication, current channel discovery, real `voice_states`, speaking state, mute/deafen state, and the required voice scopes.
+
+This proves the product architecture. It does **not** by itself grant PackRat permission to commercially distribute a separate application using Discord StreamKit's application identity. See `DISCORD_APPROVAL.md` before public commercial release.
 
 ## Stream Deck key states
 
-The Bridge Status action communicates normal state through its own title and does not use Stream Deck's warning triangle for expected states.
+The Bridge Status action uses its title for expected states rather than warning overlays.
 
 Typical titles:
 
@@ -44,38 +64,31 @@ Typical titles:
 
 ## Local development
 
-Do not download ZIPs for normal iteration.
-
 ```text
 rat dev discord-bridge
 ```
 
-Rat Dev fetches `origin/product/discord-bridge`, builds it, runs tests, validates it with the official Stream Deck CLI, replaces the linked development copy, restarts it, and opens:
+Rat Dev fetches `origin/product/discord-bridge`, builds and tests it, validates it with the official Stream Deck CLI, replaces the linked development copy, restarts it, and opens:
 
 ```text
 http://127.0.0.1:17483/state
 ```
 
-The XENEON side can be built, officially validated, packaged, and opened for iCUE import with:
+The XENEON product is developed separately with:
 
 ```text
 rat dev discord-panel
 ```
 
-Generated development files stay under the ignored RatPack `out` directory.
+## Release pairing and price
 
-## Current physical gate
+- PackRat Discord Bridge: **Free**
+- PackRat Discord Voice Panel for XENEON Edge: **$7.99 one time**
 
-Run `rat dev discord-bridge`, press the Bridge Status key once if it says `Press to Authorize`, and approve the Discord prompt.
+The bridge is a companion dependency and discovery surface, not a separately paid product.
 
-A successful bridge state should show:
+## Remaining release boundary
 
-- `buildVersion: 0.3.0.0`
-- `streamkit.mode: public_rpc`
-- `streamkit.stage: ready`
-- `discord.ready: true`
-- `discord.authenticated: true`
+Engineering is release-candidate quality. Before public commercial submission, use a Discord-approved PackRat application identity for the restricted RPC scopes or obtain explicit written confirmation from Discord that this third-party StreamKit identity usage is permitted.
 
-Then join any Discord voice channel. The bridge should automatically populate `channel`, `channel.voice_states`, `speaking`, and the current mute/deafen settings.
-
-After that, run `rat dev discord-panel` and verify on the physical XENEON Edge that the same current channel, roster, speaking highlights, mute, and deafen controls stay in sync.
+A real Windows smoke test of `1.0.0.0` after the SDK migration is also recommended before Marketplace submission. Physical XENEON hardware remains an optional final smoke test because the widget has passed the full automated CORSAIR, browser, packaged, actual companion bridge, stress, and StreamSpell gates.
