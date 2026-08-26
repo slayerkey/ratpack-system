@@ -26,9 +26,11 @@ The widget never connects directly to Discord and never stores Discord credentia
 
 The companion owns Discord IPC/RPC, authorization, current channel discovery, speaking events, and mute/deafen control. The widget consumes only normalized local state and sends local commands.
 
+The final companion keeps its current Discord access token in process memory only. It does not persist the token through Stream Deck global settings. This does not change the XENEON bridge protocol or widget state model.
+
 ## Authoritative deep QA
 
-The final no-hardware validation campaign passed the complete PackRat XENEON stack.
+The final no-hardware validation campaign passes the complete PackRat XENEON stack and is rerun whenever the companion transport changes.
 
 PASS: source transport regression.
 
@@ -145,7 +147,7 @@ PASS: live speaking state.
 
 PASS: real mute/deafen state.
 
-The final companion has since migrated to the official Elgato SDK without changing `LocalBridgeServer` or the Discord IPC/RPC model. A final real-Windows `1.0.0.0` regression smoke remains recommended.
+The final companion has since migrated to the official Elgato SDK and memory-only credential handling without changing `LocalBridgeServer` or the Discord IPC/RPC model. A final real-Windows `1.0.0.0` regression smoke remains recommended.
 
 ## Physical XENEON boundary
 
