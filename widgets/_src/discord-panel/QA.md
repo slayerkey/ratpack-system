@@ -10,31 +10,113 @@ Branch: `product/discord-panel`
 
 Manifest author: `PackRat 🐀`
 
-Version: `0.2.0`
+Version: `1.0.0`
 
-Current state: automatic current-channel loopback transport implemented. Awaiting the real StreamKit public RPC companion feasibility result and physical XENEON Edge smoke test.
+Price target: `$7.99` one time.
 
-## Previous layout proof retained
+Required companion: PackRat Discord Bridge `1.0.0.0`, free.
 
-The visual product and responsive CSS were intentionally preserved from the original Discord RPC build.
+Current state: XENEON release candidate. The widget and local companion transport are strongly validated without physical XENEON hardware. Public commercial release still depends on a compliant Discord RPC application identity/approval path.
 
-Fixture: 12 voice members, including speaking, self-muted, self-deafened, long names, and descender-heavy text.
+## Canonical architecture
 
-PASS: all eight official XENEON viewport compositions reached the voice state with all 12 members represented.
+Discord Desktop -> PackRat Discord Bridge on Stream Deck -> `ws://127.0.0.1:17483` -> Discord Voice Panel on XENEON Edge.
 
-PASS: zero document or body overflow across all eight compositions.
+The widget never connects directly to Discord and never stores Discord credentials.
 
-PASS: zero browser runtime exceptions across all eight compositions.
+The companion owns Discord IPC/RPC, authorization, current channel discovery, speaking events, and mute/deafen control. The widget consumes only normalized local state and sends local commands.
 
-PASS: zero browser console errors across all eight compositions.
+## Authoritative deep QA
 
-PASS: speaker promotion and the 900 ms anti-jitter hold across all eight compositions.
+The final no-hardware validation campaign passed the complete PackRat XENEON stack.
 
-PASS: mute and deafen touch interaction through deterministic fixture hooks across all eight compositions.
+PASS: source transport regression.
 
-PASS: member detail open and close interaction across all eight compositions.
+PASS: canonical flattened shipping build.
 
-Touch target measurements from that gate:
+PASS: official CORSAIR CLI validation.
+
+PASS: official CORSAIR `.icuewidget` packaging.
+
+PASS: all eight official XENEON viewport sizes against authored source.
+
+PASS: all eight official XENEON viewport sizes against the unpacked official package.
+
+PASS: zero document/body overflow across all eight sizes.
+
+PASS: zero browser runtime exceptions and zero console errors.
+
+PASS: required touch target sizing across every composition.
+
+PASS: speaking animation/promotion and the 900 ms anti-jitter hold.
+
+PASS: member details, joins, leaves, and automatic channel switching.
+
+PASS: mute and deafen state/command mapping.
+
+PASS: idle, authorization, authorization failure, disconnected, and recovery states.
+
+PASS: delayed runtime regression detection caught and eliminated the stale fixed-channel timer.
+
+## Crowded roster and input safety
+
+PASS: 50-member roster stress on all eight source layouts.
+
+PASS: 50-member roster stress on all eight packaged layouts.
+
+PASS: every member remains reachable; short layouts scroll internally while XL Vertical can fit the complete roster.
+
+PASS: long names, Unicode, emoji, multiple writing systems, and HTML/script-looking display names remain safe text.
+
+PASS: reduced-motion mode disables speaking motion as intended.
+
+PASS: iCUE text/accent/background settings and Recent Activity setting remain functional.
+
+## Real companion bridge integration
+
+The packaged XENEON widget is tested against the actual `LocalBridgeServer` implementation checked out from `product/discord-bridge`, not just a generic WebSocket mock.
+
+PASS: official packaged `file://` widget connects to `127.0.0.1:17483` with the expected local origin behavior.
+
+PASS: bridge snapshot renders the current channel and roster.
+
+PASS: mute command crosses the actual companion bridge.
+
+PASS: deafen command crosses the actual companion bridge.
+
+PASS: speaking updates cross the bridge.
+
+PASS: automatic channel switching crosses the bridge.
+
+PASS: forced socket loss produces the disconnected state.
+
+PASS: automatic reconnect occurs and a fresh `refresh` command restores live state.
+
+## StreamSpell
+
+PASS: StreamSpell loads the official CORSAIR package.
+
+PASS: all eight official XENEON presets render successfully.
+
+StreamSpell intentionally sandboxes network connections, so it is used for package/layout verification. The separate packaged file-origin test covers the localhost WebSocket transport.
+
+## Package/privacy audit
+
+PASS: shipping widget is flattened and self-contained.
+
+PASS: no Discord Client Secret.
+
+PASS: no Discord access token.
+
+PASS: no Discord application Client ID in the XENEON package.
+
+PASS: no obsolete direct Discord OAuth/RPC implementation.
+
+PASS: no fixed Server ID or Channel ID configuration.
+
+PASS: manifest remains interactive and uses exact author `PackRat 🐀`.
+
+## Responsive measurements
 
 | Slot | Viewport | Minimum mute/deafen target |
 | --- | --- | --- |
@@ -47,65 +129,32 @@ Touch target measurements from that gate:
 | XL horizontal | 2536x696 | 104 px |
 | XL vertical | 696x2536 | 106 px |
 
-Recent activity remains intentionally hidden on S, M, and L and visible on both XL compositions. XL roster rendering uses two columns.
+## Real Discord proof
 
-## Current live transport implementation
+Before the Stream Deck SDK migration, the same companion Discord transport was proven on the user's real Windows/Discord environment:
 
-PASS by implementation review: the widget no longer attempts Discord OAuth or direct Discord localhost WebSocket RPC.
+PASS: native Discord IPC `READY`.
 
-PASS by implementation review: live transport is only `ws://127.0.0.1:17483` to the PackRat Discord Bridge.
+PASS: RPC authorization and authentication.
 
-PASS by implementation review: the fixed Server ID and Voice Channel ID settings from the abandoned overlay fallback have been removed.
+PASS: granted `rpc`, `rpc.voice.read`, and `rpc.voice.write` scopes through the technical StreamKit feasibility path.
 
-PASS by implementation review: an unauthenticated bridge snapshot puts the panel in a deliberate Connect Discord state.
+PASS: current real voice channel and roster.
 
-PASS by implementation review: after companion authentication, the widget consumes the companion's current selected voice channel automatically.
+PASS: live speaking state.
 
-PASS by implementation review: current roster snapshots are normalized into the existing member model rather than redesigning the UI.
+PASS: real mute/deafen state.
 
-PASS by implementation review: speaking changes retain speaker promotion and the 900 ms hold behavior.
+The final companion has since migrated to the official Elgato SDK without changing `LocalBridgeServer` or the Discord IPC/RPC model. A final real-Windows `1.0.0.0` regression smoke remains recommended.
 
-PASS by implementation review: mute and deafen touch actions send only loopback commands to the companion; the XENEON widget never holds Discord credentials.
+## Physical XENEON boundary
 
-PASS by implementation review: leaving voice produces a calm not-in-voice state instead of an error.
+PackRat does not currently own a physical XENEON Edge. Canonical PackRat policy allows a release candidate without hardware after source, browser, official CORSAIR package, and StreamSpell tiers pass unless an untested transport remains.
 
-PASS by implementation review: the local `verify.mjs` rejects regressions back to fixed-channel configuration or direct Discord OAuth/RPC.
+The localhost transport is separately tested with the official package through the actual PackRat companion bridge. A real iCUE/XENEON smoke test remains additional confidence if hardware becomes available, not the place ordinary code/layout/package bugs should first be discovered.
 
-## Canonical local test path
+## Commercial release boundary
 
-First prove the companion:
+The remaining blocker is external to XENEON QA: Discord documents the RPC voice scopes as approval-only. The technically proven StreamKit public identity should not be assumed commercially reusable by PackRat without explicit permission.
 
-```text
-rat dev discord-bridge
-```
-
-A successful companion must reach `discord.authenticated: true` and `streamkit.stage: ready`, then automatically populate its current channel after joining Discord voice.
-
-Then run:
-
-```text
-rat dev discord-panel
-```
-
-Rat Dev runs `verify.mjs`, rebuilds the flattened widget with `tools/xeneon/inline.py`, runs the official CORSAIR validator, packages with the official CORSAIR CLI, stores the package under `out/dev/packages/discord-panel`, and opens it for iCUE import.
-
-## Physical XENEON gate
-
-Prove on real iCUE/XENEON:
-
-1. widget connects to the loopback companion
-2. current Discord channel name appears automatically
-3. real member names and avatars populate the roster
-4. member joins/leaves update without reloading the widget
-5. real speaking changes animate and reorder correctly
-6. Mute touch changes the actual Discord mute state
-7. Deafen touch changes the actual Discord deafen state
-8. changing Discord voice channels changes the panel automatically
-9. leaving voice returns to the idle state
-10. bridge and widget reconnect after host restarts
-
-## Release gates after live feasibility
-
-After the physical spike passes, rerun the complete eight-size browser suite against final loopback fixtures, regenerate the flattened shipping HTML, run official CORSAIR validation/package, StreamSpell packaged verification, Rat Art, and Rat Ship.
-
-The companion itself also needs its final official Stream Deck SDK migration, release packaging, and a policy/terms review for the chosen Discord authorization identity before this can be called a release candidate.
+Public paid release should use either an approved PackRat-owned Discord application or written Discord confirmation allowing the StreamKit identity path.
