@@ -17,7 +17,7 @@ const html = fs.readFileSync(entry, "utf8");
 const required = ["textColor", "accentColor", "backgroundColor"];
 const declared = required.filter((name) => new RegExp(`name=[\"']x-icue-property[\"'][^>]*content=[\"']${name}[\"']|content=[\"']${name}[\"'][^>]*name=[\"']x-icue-property[\"']`, "i").test(html));
 const report = {
-  schema_version: 1,
+  schema_version: 2,
   entry: path.basename(entry),
   declared,
   initial: null,
@@ -36,7 +36,14 @@ if (declared.length !== required.length) {
 
 const before = { text: "#E9EEF2", accent: "#19A8FF", background: "#071018" };
 const after = { text: "#FFF3D6", accent: "#FF274D", background: "#18100B" };
-const init = `
+
+// iCUE property controls are JavaScript bindings in the widget document. Playwright's
+// addInitScript runs in a different initialization context and does not reproduce that
+// global lexical environment faithfully. Instrument a copy of the exact packaged HTML
+// with one classic script before RatPack's bridge, so the test exercises the same
+// document-level binding semantics that iCUE uses while leaving the official package
+// artifact itself untouched.
+const harness = `<script id="ratpack-native-style-harness">
 let textColor = ${JSON.stringify(before.text)};
 let accentColor = ${JSON.stringify(before.accent)};
 let backgroundColor = ${JSON.stringify(before.background)};
@@ -44,14 +51,30 @@ let gradientMotion = 0;
 let iCUE_initialized = false;
 let uniqueId = "ratpack-native-style-smoke";
 globalThis.tr = async function (value) { return value; };
-`;
+globalThis.__setRatpackIcueStyleSmoke = function (next) {
+  textColor = String(next.text);
+  accentColor = String(next.accent);
+  backgroundColor = String(next.background);
+};
+</script>`;
+
+if (!/<head(?:\s[^>]*)?>/i.test(html)) {
+  console.error("packaged widget is missing <head>");
+  process.exit(2);
+}
+const instrumentedHtml = html.replace(/<head(\s[^>]*)?>/i, (match) => match + "\n" + harness);
+const instrumentedEntry = path.join(path.dirname(path.resolve(entry)), "__ratpack-native-style-instrumented.html");
+fs.writeFileSync(instrumentedEntry, instrumentedHtml, "utf8");
+report.instrumentedEntry = path.basename(instrumentedEntry);
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1688, height: 696 } });
-await context.addInitScript({ content: init });
 const page = await context.newPage();
 const runtimeErrors = [];
 page.on("pageerror", (error) => runtimeErrors.push(String(error)));
+page.on("console", (message) => {
+  if (message.type() === "error") runtimeErrors.push(message.text());
+});
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
@@ -75,8 +98,8 @@ async function snapshot() {
 
 let exitCode = 0;
 try {
-  await page.goto(pathToFileURL(path.resolve(entry)).href, { waitUntil: "load", timeout: 30_000 });
-  await page.waitForTimeout(350);
+  await page.goto(pathToFileURL(instrumentedEntry).href, { waitUntil: "load", timeout: 30_000 });
+  await page.waitForTimeout(400);
   report.bridge = await page.evaluate(() => globalThis.__ratpackIcueBindingBridge || null);
   if (!report.bridge || report.bridge.version !== 1) throw new Error("packaged widget is missing RatPack iCUE binding bridge");
 
@@ -85,17 +108,19 @@ try {
     ["textBinding", before.text],
     ["accentBinding", before.accent],
     ["backgroundBinding", before.background],
+    ["textVar", before.text],
+    ["accentVar", before.accent],
+    ["backgroundVar", before.background],
   ]) {
     if (normalize(report.initial[key]) !== normalize(expected)) throw new Error(`initial ${key} mismatch: ${report.initial[key]} != ${expected}`);
   }
 
-  await page.evaluate(`
-    textColor = ${JSON.stringify(after.text)};
-    accentColor = ${JSON.stringify(after.accent)};
-    backgroundColor = ${JSON.stringify(after.background)};
+  await page.evaluate((next) => {
+    if (typeof globalThis.__setRatpackIcueStyleSmoke !== "function") throw new Error("native style harness setter missing");
+    globalThis.__setRatpackIcueStyleSmoke(next);
     if (globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function") globalThis.icueEvents.onDataUpdated();
-  `);
-  await page.waitForTimeout(450);
+  }, after);
+  await page.waitForTimeout(500);
   report.updated = await snapshot();
 
   for (const [key, expected] of [
@@ -109,6 +134,7 @@ try {
     if (normalize(report.updated[key]) !== normalize(expected)) throw new Error(`updated ${key} mismatch: ${report.updated[key]} != ${expected}`);
   }
 
+  if (runtimeErrors.length) throw new Error(`runtime errors: ${JSON.stringify(runtimeErrors)}`);
   await page.screenshot({ path: path.join(outDir, "native-style-updated.png") });
   report.passed = true;
 } catch (error) {
@@ -117,6 +143,7 @@ try {
 } finally {
   report.runtimeErrors = runtimeErrors;
   fs.writeFileSync(path.join(outDir, "native-style-result.json"), JSON.stringify(report, null, 2) + "\n");
+  try { fs.unlinkSync(instrumentedEntry); } catch {}
   await browser.close();
 }
 
