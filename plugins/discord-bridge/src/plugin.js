@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import streamDeck, { SingletonAction } from "@elgato/streamdeck";
 import { DiscordIpcClient } from "./discord-ipc.js";
 import { LocalBridgeServer } from "./local-bridge.js";
 import {
@@ -9,95 +9,8 @@ import {
 
 const STATUS_ACTION = "com.packrat.discord-bridge.status";
 const BRIDGE_PORT = 17483;
-const BUILD_VERSION = "0.3.0.0";
+const BUILD_VERSION = "1.0.0.0";
 const SAVED_TOKEN_KEY = "streamkitAccessToken";
-
-function argValue(...names) {
-  for (let index = 0; index < process.argv.length; index += 1) {
-    if (!names.includes(process.argv[index])) continue;
-    return process.argv[index + 1] || "";
-  }
-  return "";
-}
-
-class StreamDeckHost extends EventEmitter {
-  constructor() {
-    super();
-    this.port = argValue("-port", "--port");
-    this.pluginUUID = argValue("-pluginUUID", "--pluginUUID");
-    this.registerEvent = argValue("-registerEvent", "--registerEvent");
-    this.socket = null;
-    this.contexts = new Set();
-    this.globalWaiters = [];
-  }
-
-  async connect() {
-    if (!this.port || !this.pluginUUID || !this.registerEvent) throw new Error("Stream Deck launch arguments are missing");
-    this.socket = new WebSocket(`ws://127.0.0.1:${this.port}`);
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Stream Deck WebSocket connection timed out")), 5000);
-      this.socket.addEventListener("open", () => {
-        clearTimeout(timer);
-        this.send({ event: this.registerEvent, uuid: this.pluginUUID });
-        resolve();
-      }, { once: true });
-      this.socket.addEventListener("error", () => {
-        clearTimeout(timer);
-        reject(new Error("Stream Deck WebSocket connection failed"));
-      }, { once: true });
-    });
-    this.socket.addEventListener("message", (event) => {
-      let message;
-      try { message = JSON.parse(String(event.data)); } catch { return; }
-      if (message.event === "willAppear" && message.action === STATUS_ACTION) {
-        this.contexts.add(message.context);
-        this.emit("statusAppear", message.context);
-      } else if (message.event === "willDisappear" && message.action === STATUS_ACTION) {
-        this.contexts.delete(message.context);
-      } else if (message.event === "keyDown" && message.action === STATUS_ACTION) {
-        this.emit("statusPress", message.context);
-      } else if (message.event === "systemDidWakeUp") {
-        this.emit("wake");
-      } else if (message.event === "didReceiveGlobalSettings") {
-        const settings = message.payload?.settings || {};
-        const waiter = this.globalWaiters.shift();
-        if (waiter) {
-          clearTimeout(waiter.timer);
-          waiter.resolve(settings);
-        }
-        this.emit("globalSettings", settings);
-      }
-    });
-  }
-
-  send(value) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
-    this.socket.send(JSON.stringify(value));
-    return true;
-  }
-
-  setTitle(context, title) { this.send({ event: "setTitle", context, payload: { title, target: 0 } }); }
-  updateAllTitles(title) { for (const context of this.contexts) this.setTitle(context, title); }
-  showOk(context) { this.send({ event: "showOk", context }); }
-  openUrl(url) { this.send({ event: "openUrl", payload: { url } }); }
-  log(message) { this.send({ event: "logMessage", payload: { message: String(message) } }); }
-
-  getGlobalSettings(timeoutMs = 2500) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const index = this.globalWaiters.findIndex((entry) => entry.resolve === resolve);
-        if (index >= 0) this.globalWaiters.splice(index, 1);
-        reject(new Error("Stream Deck global settings request timed out"));
-      }, timeoutMs);
-      this.globalWaiters.push({ resolve, reject, timer });
-      this.send({ event: "getGlobalSettings", context: this.pluginUUID });
-    });
-  }
-
-  setGlobalSettings(settings) {
-    this.send({ event: "setGlobalSettings", context: this.pluginUUID, payload: settings || {} });
-  }
-}
 
 const model = {
   ok: true,
@@ -129,16 +42,30 @@ const model = {
   error: null,
 };
 
-function snapshot() { return JSON.parse(JSON.stringify(model)); }
-function touch() { model.updatedAt = new Date().toISOString(); }
+function snapshot() {
+  return JSON.parse(JSON.stringify(model));
+}
 
-const streamDeck = new StreamDeckHost();
+function touch() {
+  model.updatedAt = new Date().toISOString();
+}
+
 const discord = new DiscordIpcClient(STREAMKIT_CLIENT_ID);
 const bridge = new LocalBridgeServer({ port: BRIDGE_PORT, snapshot });
+const statusActions = new Map();
+
 let reconnectTimer = null;
 let globalSettings = {};
 let channelSubscriptionId = null;
 let authorizing = false;
+
+function logError(error) {
+  try {
+    streamDeck.logger.error(String(error?.stack || error?.message || error));
+  } catch {
+    // Stream Deck may already be shutting down.
+  }
+}
 
 function statusTitle() {
   if (!model.bridge.listening) return "Bridge\nStarting";
@@ -151,22 +78,34 @@ function statusTitle() {
   return "Discord\nReady";
 }
 
+async function updateAllTitles(title) {
+  const writes = [];
+  for (const action of statusActions.values()) {
+    writes.push(action.setTitle(title).catch(logError));
+  }
+  await Promise.all(writes);
+}
+
 function publish() {
   touch();
   model.bridge.clients = bridge.clients?.size || 0;
-  streamDeck.updateAllTitles(statusTitle());
+  void updateAllTitles(statusTitle());
   bridge.broadcastSnapshot();
 }
 
 function setError(error) {
   model.error = error ? String(error?.message || error) : null;
+  if (error) logError(error);
   publish();
 }
 
 function setStage(stage, error = null) {
   model.streamkit.stage = stage;
   model.streamkit.lastError = error ? String(error?.message || error) : null;
-  if (error) model.error = model.streamkit.lastError;
+  if (error) {
+    model.error = model.streamkit.lastError;
+    logError(error);
+  }
   publish();
 }
 
@@ -174,14 +113,14 @@ function savedToken() {
   return String(globalSettings?.[SAVED_TOKEN_KEY] || "").trim();
 }
 
-function persistToken(token) {
+async function persistToken(token) {
   globalSettings = { ...globalSettings, [SAVED_TOKEN_KEY]: String(token || "") };
   model.streamkit.tokenCached = Boolean(token);
-  streamDeck.setGlobalSettings(globalSettings);
+  await streamDeck.settings.setGlobalSettings(globalSettings);
 }
 
-function clearToken() {
-  persistToken("");
+async function clearToken() {
+  await persistToken("");
 }
 
 function currentVoiceStates() {
@@ -192,13 +131,27 @@ function memberId(entry) {
   return String(entry?.user?.id || entry?.user_id || "");
 }
 
+function mergeVoiceState(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming || typeof incoming !== "object") return existing;
+
+  const next = { ...existing, ...incoming };
+  if (existing.user || incoming.user) {
+    next.user = { ...(existing.user || {}), ...(incoming.user || {}) };
+  }
+  if (existing.voice_state || incoming.voice_state) {
+    next.voice_state = { ...(existing.voice_state || {}), ...(incoming.voice_state || {}) };
+  }
+  return next;
+}
+
 function upsertVoiceState(raw) {
   if (!model.channel) return;
   if (!Array.isArray(model.channel.voice_states)) model.channel.voice_states = [];
   const id = memberId(raw);
   if (!id) return;
   const index = model.channel.voice_states.findIndex((entry) => memberId(entry) === id);
-  if (index >= 0) model.channel.voice_states[index] = raw;
+  if (index >= 0) model.channel.voice_states[index] = mergeVoiceState(model.channel.voice_states[index], raw);
   else model.channel.voice_states.push(raw);
 }
 
@@ -212,9 +165,10 @@ function removeVoiceState(raw) {
 
 async function setChannelSubscriptions(channelId) {
   if (channelSubscriptionId === channelId) return;
+
   if (channelSubscriptionId) {
     const args = { channel_id: channelSubscriptionId };
-    await Promise.all([
+    await Promise.allSettled([
       discord.unsubscribe("VOICE_STATE_CREATE", args),
       discord.unsubscribe("VOICE_STATE_UPDATE", args),
       discord.unsubscribe("VOICE_STATE_DELETE", args),
@@ -222,8 +176,10 @@ async function setChannelSubscriptions(channelId) {
       discord.unsubscribe("SPEAKING_STOP", args),
     ]);
   }
+
   channelSubscriptionId = channelId || null;
   if (!channelSubscriptionId) return;
+
   const args = { channel_id: channelSubscriptionId };
   await Promise.all([
     discord.subscribe("VOICE_STATE_CREATE", args),
@@ -236,14 +192,17 @@ async function setChannelSubscriptions(channelId) {
 
 async function refreshSelectedChannel() {
   if (!model.discord.authenticated) return;
+
   try {
     const channel = await discord.request("GET_SELECTED_VOICE_CHANNEL", {});
     model.channel = channel?.id ? channel : null;
     model.speaking = {};
+
     for (const entry of currentVoiceStates()) {
       const id = memberId(entry);
       if (id) model.speaking[id] = false;
     }
+
     await setChannelSubscriptions(model.channel?.id ? String(model.channel.id) : null);
   } catch (error) {
     const text = String(error?.message || error);
@@ -255,6 +214,7 @@ async function refreshSelectedChannel() {
       throw error;
     }
   }
+
   publish();
 }
 
@@ -279,11 +239,13 @@ async function authenticateToken(token, { clearOnFailure = false } = {}) {
     setStage("authenticating");
     const auth = await discord.request("AUTHENTICATE", { access_token: token });
     const scopes = Array.isArray(auth?.scopes) ? auth.scopes : [];
-    if (scopes.length) {
-      for (const required of ["rpc.voice.read", "rpc.voice.write"]) {
-        if (!scopes.includes(required)) throw new Error(`StreamKit token did not grant ${required}`);
+
+    for (const required of ["rpc.voice.read", "rpc.voice.write"]) {
+      if (!scopes.includes(required)) {
+        throw new Error(`StreamKit token did not grant ${required}`);
       }
     }
+
     model.discord.authenticated = true;
     model.account = auth?.user || null;
     model.scopes = scopes;
@@ -297,7 +259,13 @@ async function authenticateToken(token, { clearOnFailure = false } = {}) {
     model.discord.authenticated = false;
     model.account = null;
     model.scopes = [];
-    if (clearOnFailure) clearToken();
+    if (clearOnFailure) {
+      try {
+        await clearToken();
+      } catch (settingsError) {
+        logError(settingsError);
+      }
+    }
     setStage("authorization_required", error);
     return false;
   }
@@ -305,13 +273,16 @@ async function authenticateToken(token, { clearOnFailure = false } = {}) {
 
 async function beginAuthorization() {
   if (authorizing) return;
+
   if (!model.discord.ready) {
     await connectDiscord();
     if (!model.discord.ready) return;
   }
+
   authorizing = true;
   model.error = null;
   model.streamkit.lastError = null;
+
   try {
     setStage("authorizing");
     const authorization = await discord.request(
@@ -324,12 +295,20 @@ async function beginAuthorization() {
       null,
       120000,
     );
-    if (!authorization?.code) throw new Error("Discord StreamKit authorization returned no code");
+
+    if (!authorization?.code) {
+      throw new Error("Discord StreamKit authorization returned no code");
+    }
+
     setStage("exchanging");
     const token = await exchangeStreamKitCode(authorization.code);
-    persistToken(token.accessToken);
+    await persistToken(token.accessToken);
+
     const ok = await authenticateToken(token.accessToken, { clearOnFailure: true });
-    if (!ok) throw new Error(model.streamkit.lastError || "Discord StreamKit authentication failed");
+    if (!ok) {
+      throw new Error(model.streamkit.lastError || "Discord StreamKit authentication failed");
+    }
+
     setStage("ready");
   } catch (error) {
     model.discord.authenticated = false;
@@ -342,6 +321,7 @@ async function beginAuthorization() {
 async function connectDiscord() {
   clearTimeout(reconnectTimer);
   reconnectTimer = null;
+
   model.discord.connected = false;
   model.discord.ready = false;
   model.discord.authenticated = false;
@@ -353,34 +333,45 @@ async function connectDiscord() {
   model.speaking = {};
   model.scopes = [];
   publish();
+
   try {
     const pipe = await discord.connect();
     if (!pipe) throw new Error("Discord desktop IPC was not found");
+
     model.discord.connected = true;
     model.discord.ready = true;
     model.discord.pipe = pipe;
     model.discord.handshake = "ready";
     model.error = null;
     publish();
+
     const token = savedToken();
     model.streamkit.tokenCached = Boolean(token);
+
     if (token) await authenticateToken(token, { clearOnFailure: true });
     else setStage("authorization_required");
+
     return true;
   } catch (error) {
     model.discord.handshake = "retrying";
     model.discord.lastHandshakeError = String(error?.message || error);
     setError(error);
-    reconnectTimer = setTimeout(connectDiscord, 5000);
+    reconnectTimer = setTimeout(() => {
+      void connectDiscord();
+    }, 5000);
     return false;
   }
 }
 
 async function setSelfVoice(field, value) {
-  if (!model.discord.authenticated) throw new Error("Discord voice bridge is not authenticated");
+  if (!model.discord.authenticated) {
+    throw new Error("Discord voice bridge is not authenticated");
+  }
+
   const args = {};
   args[field] = Boolean(value);
   const voice = await discord.request("SET_VOICE_SETTINGS", args);
+
   if (voice && typeof voice.mute === "boolean") model.voice.mute = voice.mute;
   if (voice && typeof voice.deaf === "boolean") model.voice.deaf = voice.deaf;
   publish();
@@ -388,12 +379,15 @@ async function setSelfVoice(field, value) {
 
 async function handleBridgeCommand(message) {
   const command = String(message?.command || "");
+
   try {
     if (command === "authorize") {
       await beginAuthorization();
     } else if (command === "refresh") {
       if (!model.discord.ready) await connectDiscord();
-      if (model.discord.authenticated) await Promise.all([refreshVoiceSettings(), refreshSelectedChannel()]);
+      if (model.discord.authenticated) {
+        await Promise.all([refreshVoiceSettings(), refreshSelectedChannel()]);
+      }
     } else if (command === "toggle-mute") {
       await setSelfVoice("mute", !model.voice.mute);
     } else if (command === "toggle-deafen") {
@@ -405,6 +399,35 @@ async function handleBridgeCommand(message) {
     }
   } catch (error) {
     setError(error);
+  }
+}
+
+class BridgeStatusAction extends SingletonAction {
+  manifestId = STATUS_ACTION;
+
+  async onWillAppear(ev) {
+    if (!ev.action?.isKey?.()) return;
+    statusActions.set(ev.action.id, ev.action);
+    await ev.action.setTitle(statusTitle());
+  }
+
+  onWillDisappear(ev) {
+    statusActions.delete(ev.action?.id);
+  }
+
+  async onKeyDown(ev) {
+    if (!model.discord.ready) {
+      await connectDiscord();
+      return;
+    }
+
+    if (!model.discord.authenticated) {
+      await beginAuthorization();
+      return;
+    }
+
+    await Promise.all([refreshVoiceSettings(), refreshSelectedChannel()]);
+    if (ev.action?.isKey?.()) await ev.action.showOk();
   }
 }
 
@@ -458,41 +481,43 @@ discord.on("offline", () => {
   model.channel = null;
   model.speaking = {};
   publish();
-  if (!reconnectTimer) reconnectTimer = setTimeout(connectDiscord, 5000);
+
+  if (!reconnectTimer) {
+    reconnectTimer = setTimeout(() => {
+      void connectDiscord();
+    }, 5000);
+  }
 });
 
 discord.on("error", (error) => setError(error));
-bridge.on("command", handleBridgeCommand);
-streamDeck.on("statusAppear", (context) => streamDeck.setTitle(context, statusTitle()));
-streamDeck.on("statusPress", async (context) => {
-  if (!model.discord.ready) await connectDiscord();
-  else if (!model.discord.authenticated) await beginAuthorization();
-  else {
-    await Promise.all([refreshVoiceSettings(), refreshSelectedChannel()]);
-    streamDeck.showOk(context);
-  }
-});
-streamDeck.on("wake", connectDiscord);
-streamDeck.on("globalSettings", (settings) => {
-  globalSettings = settings || {};
-  model.streamkit.tokenCached = Boolean(savedToken());
-  publish();
+bridge.on("command", (message) => {
+  void handleBridgeCommand(message);
 });
 
-process.on("uncaughtException", setError);
-process.on("unhandledRejection", setError);
+process.on("uncaughtException", (error) => setError(error));
+process.on("unhandledRejection", (error) => setError(error));
 
 async function main() {
+  streamDeck.actions.registerAction(new BridgeStatusAction());
+  streamDeck.system.onSystemDidWakeUp(() => {
+    void connectDiscord();
+  });
+
   await streamDeck.connect();
+
   try {
-    globalSettings = await streamDeck.getGlobalSettings();
+    globalSettings = await streamDeck.settings.getGlobalSettings();
   } catch (error) {
-    streamDeck.log(`Global settings unavailable: ${String(error?.message || error)}`);
+    streamDeck.logger.warn(`Global settings unavailable: ${String(error?.message || error)}`);
+    globalSettings = {};
   }
+
   model.streamkit.tokenCached = Boolean(savedToken());
+
   await bridge.start();
   model.bridge.listening = true;
   publish();
+
   await connectDiscord();
 }
 
