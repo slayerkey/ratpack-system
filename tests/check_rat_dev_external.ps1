@@ -33,11 +33,18 @@ Require-Text $external 'Stream Deck manifest not found' "A candidate with a miss
 # Build/test/validator failures all happen before activation because Invoke-Native throws and the
 # activation marker is later in the script.
 Require-Text $external 'npm ci failed' "Dependency failure must be explicit."
+Require-Text $external 'Plugin type check failed' "Typecheck failure must be explicit."
 Require-Text $external 'Plugin build failed' "Build failure must be explicit."
 Require-Text $external 'Plugin tests failed' "Test failure must be explicit."
 Require-Text $external 'Stream Deck validation failed' "Validator failure must be explicit."
 Require-Text $external 'Validate with official Stream Deck CLI' "External Rat Dev must validate before activation."
 Require-Text $external 'Switch Stream Deck to validated build' "External Rat Dev must have an explicit activation stage."
+
+$typecheckIndex = $external.IndexOf('Type check $Slug')
+$buildIndex = $external.IndexOf('Build $Slug')
+if ($typecheckIndex -lt 0 -or $buildIndex -lt 0 -or $typecheckIndex -ge $buildIndex) {
+    throw "External Rat Dev must run a declared product typecheck before building."
+}
 
 # Activation and rollback.
 Require-Text $external 'Stream Deck link failed' "Link failure must be explicit."
