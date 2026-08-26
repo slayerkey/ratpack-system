@@ -42,19 +42,45 @@ Stream Deck connect
 
 Provider/global settings are handled afterward in Pro. A provider/settings problem cannot tear down an already working CS2 listener/config.
 
+## Pro and Lite coexistence regression
+
+Pro and Lite must be able to remain installed at the same time. This matters directly to the Lite to Pro upgrade path.
+
+The products therefore use separate local host identities:
+
+### Pro
+
+* Valve cfg: `gamestate_integration_packrat_cs2_dashboard_pro.cfg`
+* default port range starts at `32123`
+* local state: `%APPDATA%\PackRat\CS2CompetitiveDashboard\state\gsi-pro.json`
+* persistent log: `%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log`
+
+### Lite
+
+* Valve cfg: `gamestate_integration_packrat_cs2_dashboard_lite.cfg`
+* default port range starts at `32147`
+* local state: `%APPDATA%\PackRat\CS2CompetitiveDashboard\state\gsi-lite.json`
+* persistent log: `%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-lite.log`
+
+The obsolete shared cfg `gamestate_integration_packrat_cs2_dashboard.cfg` is removed after a current flavor cfg is installed. The obsolete shared local state is migrated into Pro only. Never remove the other current flavor's cfg because CS2 supports multiple GSI integrations and may publish to both products.
+
 ## Persistent host diagnostics
 
-Every Pro/Lite process now writes a persistent log independent of Property Inspector RPC:
+Every Pro/Lite process writes a persistent log independent of Property Inspector RPC.
+
+Rat Dev links Pro, so the primary real-host troubleshooting artifact is:
 
 ```text
-%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log
 ```
 
-The normal build prints this path, so `rat dev cs2-competitive-dashboard` surfaces it during development.
+Lite uses the corresponding `cs2-competitive-dashboard-lite.log` file.
+
+The normal build prints both paths during development.
 
 The log must record enough evidence to locate a failure without guessing, including:
 
-* process start, PID, version and plugin directory
+* process start, flavor, PID, version and plugin directory
 * Stream Deck connection start/success/failure
 * settings channel state without secrets
 * Steam candidates and selected CS2/cfg paths
@@ -79,6 +105,8 @@ Expected diagnostic endpoint:
 ```text
 GET http://127.0.0.1:<selected-port>/packrat/diagnostics
 ```
+
+The Pro PI only probes the Pro port range and only accepts a diagnostic state whose flavor is `pro`. Lite does the same for `lite`. This prevents a Pro Property Inspector from accidentally attaching to the Lite service when both products are installed.
 
 Expected controls:
 
@@ -107,6 +135,11 @@ Automated checks cover:
 * manual install root and exact `game\csgo\cfg` normalization
 * cfg generation and atomic write behavior
 * local GSI startup has no Stream Deck settings dependency
+* Pro/Lite cfg filenames are distinct
+* Pro/Lite local state files are distinct
+* Pro/Lite persistent log files are distinct
+* Pro/Lite default port ranges are distinct
+* diagnostics discovery is scoped to the current flavor
 * persistent diagnostics do not depend on Property Inspector RPC
 * session K/D, derived ADR, HS%, match finalization and W/L fixtures
 * direct Leetify provider normalization using a customer key fixture
@@ -191,7 +224,8 @@ Rat Dev fetches the product branch, builds/tests Pro, runs the official Stream D
 The build also prints:
 
 ```text
-Host diagnostics after install: %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+Pro host diagnostics after install: %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log
+Lite host diagnostics after install: %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-lite.log
 ```
 
 Bundled profiles remain a separate development install behavior. Manual `.streamDeckProfile` installation already worked. Do not let profile auto installation distract from the GSI host gate.
@@ -202,14 +236,14 @@ Bundled profiles remain a separate development install behavior. Manual `.stream
 2. Run `rat dev cs2-competitive-dashboard`.
 3. Do **not** click an Enable button. Local GSI starts automatically.
 4. Open any dashboard Property Inspector.
-5. Advanced Diagnostics should find the local diagnostic service within a few seconds.
+5. Advanced Diagnostics should find the Pro local diagnostic service within a few seconds.
 6. Before CS2 starts, verify:
    * plugin process = running
    * Stream Deck = connected
    * CS2 install = detected
    * cfg folder = found/writable
-   * GSI config = installed
-   * listener = running on `127.0.0.1`
+   * GSI config = `gamestate_integration_packrat_cs2_dashboard_pro.cfg`
+   * listener = running on `127.0.0.1`, normally starting at port `32123`
    * last GSI packet = none
 7. If CS2 was open during first install, close it fully and relaunch once.
 8. Enter Deathmatch or another normal game mode.
@@ -236,10 +270,10 @@ First use **Copy Diagnostic Summary** and paste the full result.
 Also send the full contents of:
 
 ```text
-%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard.log
+%APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log
 ```
 
-If Advanced Diagnostics cannot find the local service at all, the persistent AppData log is the primary artifact because it is created at process startup before listener/config setup.
+If Advanced Diagnostics cannot find the local service at all, the persistent Pro AppData log is the primary artifact because it is created at process startup before listener/config setup.
 
 The manifest also enables Node debugging, so Stream Deck managed plugin logs can be inspected if the persistent log indicates a crash at SDK connection.
 
