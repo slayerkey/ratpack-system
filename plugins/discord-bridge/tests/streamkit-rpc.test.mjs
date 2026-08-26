@@ -34,13 +34,18 @@ test("StreamKit token exchange sends only the one time code", async () => {
   assert.equal(request.options.body.includes("client_secret"), false);
 });
 
-test("production plugin uses StreamKit RPC instead of the fixed channel browser fallback", async () => {
+test("production plugin uses StreamKit RPC and keeps the access token memory only", async () => {
   const source = await readFile(resolve(process.cwd(), "src/plugin.js"), "utf8");
   assert.match(source, /new DiscordIpcClient\(STREAMKIT_CLIENT_ID\)/);
   assert.match(source, /"AUTHORIZE"/);
   assert.match(source, /exchangeStreamKitCode/);
   assert.match(source, /"SET_VOICE_SETTINGS"/);
   assert.match(source, /"GET_SELECTED_VOICE_CHANNEL"/);
+  assert.match(source, /let sessionAccessToken = ""/);
+  assert.match(source, /tokenPersistence: "memory_only"/);
+  assert.doesNotMatch(source, /setGlobalSettings/);
+  assert.doesNotMatch(source, /getGlobalSettings/);
+  assert.doesNotMatch(source, /streamkitAccessToken/);
   assert.equal(source.includes("1540927508302536724"), false);
   assert.equal(source.includes("new StreamKitEdge"), false);
   assert.equal(source.includes("sendDiscordShortcut"), false);
