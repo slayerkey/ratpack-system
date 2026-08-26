@@ -6,11 +6,18 @@ Sources live in widgets/_src/<slug>/ and shipping files live in widgets/<slug>/.
 Local stylesheets and classic scripts referenced by the source HTML are inlined into
 widgets/<slug>/index.html before official iCUE validation and packaging.
 
+The generated document also installs a tiny compatibility bridge for iCUE property
+controls. Current iCUE injects controls as JavaScript bindings before widget scripts;
+some older RatPack widgets read settings through globalThis. The bridge exposes live
+getters for those injected bindings without copying or caching the values, so changes
+received through onDataUpdated are visible immediately in both access patterns.
+
 Usage:
     python tools/xeneon/inline.py <slug>
     python tools/xeneon/inline.py <slug> --check
 """
 import argparse
+import json
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -27,6 +34,10 @@ LINK_RE = re.compile(r"""<link\b[^>]*\brel\s*=\s*["']stylesheet["'][^>]*>""", re
 SCRIPT_RE = re.compile(r"""<script\b([^>]*)\bsrc\s*=\s*["']([^"']+)["']([^>]*)>\s*</script>""", re.I)
 HREF_RE = re.compile(r"""\bhref\s*=\s*["']([^"']+)["']""", re.I)
 BLOCK_RE = re.compile(r"<script\b.*?</script>|<style\b.*?</style>", re.S | re.I)
+META_RE = re.compile(r"<meta\b[^>]*>", re.I)
+NAME_RE = re.compile(r"""\bname\s*=\s*["']([^"']+)["']""", re.I)
+CONTENT_RE = re.compile(r"""\bcontent\s*=\s*["']([^"']+)["']""", re.I)
+JS_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
 
 
 def die(msg):
@@ -50,6 +61,47 @@ def self_close_void(html: str) -> str:
         tag = match.group(0)
         return tag if tag.rstrip().endswith("/>") else tag[:-1].rstrip() + " />"
     return re.sub(rf"<(?:{'|'.join(VOID)})\b[^>]*>", fix, html)
+
+
+def icue_property_names(html: str) -> list[str]:
+    names = []
+    for match in META_RE.finditer(html):
+        tag = match.group(0)
+        name_match = NAME_RE.search(tag)
+        if not name_match or name_match.group(1).lower() != "x-icue-property":
+            continue
+        content_match = CONTENT_RE.search(tag)
+        if not content_match:
+            continue
+        name = content_match.group(1).strip()
+        if JS_IDENTIFIER_RE.match(name) and name not in names:
+            names.append(name)
+    return names
+
+
+def binding_bridge(html: str) -> str:
+    names = icue_property_names(html)
+    if not names:
+        return ""
+    encoded = json.dumps(names, ensure_ascii=True, separators=(",", ":"))
+    return f"""<script>
+(function () {{
+  var names = {encoded};
+  names.forEach(function (name) {{
+    try {{
+      if (Object.prototype.hasOwnProperty.call(globalThis, name)) return;
+      var resolve = Function("return typeof " + name + " !== 'undefined' ? " + name + " : undefined;");
+      if (resolve() === undefined) return;
+      Object.defineProperty(globalThis, name, {{
+        configurable: true,
+        enumerable: true,
+        get: function () {{ try {{ return resolve(); }} catch (error) {{ return undefined; }} }}
+      }});
+    }} catch (error) {{}}
+  }});
+  globalThis.__ratpackIcueBindingBridge = {{ version: 1, names: names.slice() }};
+}})();
+</script>"""
 
 
 def build(slug: str, check_only: bool) -> None:
@@ -84,6 +136,12 @@ def build(slug: str, check_only: bool) -> None:
 
     html = LINK_RE.sub(inline_link, html)
     html = SCRIPT_RE.sub(inline_script, html)
+
+    bridge = binding_bridge(html)
+    if bridge:
+        if "</head>" not in html:
+            die("no </head> in built document")
+        html = html.replace("</head>", bridge + "\n</head>", 1)
 
     parts, last = [], 0
     for match in BLOCK_RE.finditer(html):

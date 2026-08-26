@@ -4,7 +4,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const repo = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(".");
-const entry = path.join(repo, "widgets", "helldivers", "index.html");
+const packagedEntry = process.env.RATPACK_PACKAGED_ENTRY ? path.resolve(process.env.RATPACK_PACKAGED_ENTRY) : null;
+const entry = packagedEntry || path.join(repo, "widgets", "helldivers", "index.html");
 if (!fs.existsSync(entry)) throw new Error(`shipping widget not found: ${entry}`);
 
 const future = (hours) => new Date(Date.now() + hours * 3600_000).toISOString();
