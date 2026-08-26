@@ -140,14 +140,17 @@ export class SessionTracker {
       }
 
       // Deathmatch and some respawn modes can reset player.state round counters
-      // without advancing map.round. Preserve the completed life segment without
-      // counting it as another competitive round.
-      const respawnReset = live.roundKills < match.lastRoundKills;
-      if (respawnReset || live.roundTotalDamage < match.lastRoundDamage) {
+      // without advancing map.round. A damage reset is also a reliable life-reset
+      // signal when the first packet from the new life already has the same kill
+      // and headshot counts as the previous life.
+      const damageReset = live.roundTotalDamage < match.lastRoundDamage;
+      const respawnReset = live.roundKills < match.lastRoundKills || damageReset;
+      if (respawnReset) {
         match.committedDamage += match.maxRoundDamage;
         match.maxRoundDamage = 0;
-      }
-      if (respawnReset || live.roundHeadshotKills < match.lastRoundHeadshots) {
+        match.committedHeadshots += match.maxRoundHeadshots;
+        match.maxRoundHeadshots = 0;
+      } else if (live.roundHeadshotKills < match.lastRoundHeadshots) {
         match.committedHeadshots += match.maxRoundHeadshots;
         match.maxRoundHeadshots = 0;
       }
