@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows-release:
@@ -25,29 +25,9 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install dependencies
+      - name: Install locked dependencies
         shell: pwsh
-        run: |
-          if (Test-Path package-lock.json) {
-            npm ci
-          } else {
-            npm install
-          }
-
-      - name: Commit generated lockfile once
-        shell: pwsh
-        run: |
-          if (-not (Test-Path package-lock.json)) { throw 'npm did not generate package-lock.json' }
-          $status = git status --porcelain -- package-lock.json
-          if ($status) {
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Lock Discord Bridge release dependencies"
-            git push origin HEAD:product/discord-bridge
-          } else {
-            Write-Host 'package-lock.json is already committed'
-          }
+        run: npm ci
 
       - name: Audit dependencies
         shell: pwsh
