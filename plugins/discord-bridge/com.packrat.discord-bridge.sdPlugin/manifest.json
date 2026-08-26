@@ -40,7 +40,7 @@
   ],
   "SDKVersion": 3,
   "Software": {
-    "MinimumVersion": "7.5"
+    "MinimumVersion": "7.3"
   },
   "UUID": "com.packrat.discord-bridge",
   "Version": "1.0.0.0"
