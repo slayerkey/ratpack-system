@@ -20,6 +20,9 @@ interface MatchAccumulator {
   committedDamage: number;
   committedRounds: number;
   committedHeadshots: number;
+  lastRoundDamage: number;
+  lastRoundHeadshots: number;
+  lastRoundKills: number;
   lastKills: number;
   lastDeaths: number;
   lastAssists: number;
@@ -77,7 +80,8 @@ export class SessionTracker {
     const assists = this.completed.assists + (current?.lastAssists ?? 0);
     const damage = this.completed.damage + currentDamage;
     const rounds = this.completed.rounds + currentRounds;
-    const headshotKills = this.completed.headshotKills + currentHeadshots;
+    const rawHeadshotKills = this.completed.headshotKills + currentHeadshots;
+    const headshotKills = Math.min(kills, rawHeadshotKills);
 
     return {
       matches: this.completed.matches,
@@ -105,6 +109,9 @@ export class SessionTracker {
       committedDamage: 0,
       committedRounds: 0,
       committedHeadshots: 0,
+      lastRoundDamage: live.roundTotalDamage,
+      lastRoundHeadshots: live.roundHeadshotKills,
+      lastRoundKills: live.roundKills,
       lastKills: live.kills,
       lastDeaths: live.deaths,
       lastAssists: live.assists,
@@ -117,17 +124,41 @@ export class SessionTracker {
       match.team = live.playerTeam;
     }
 
-    if (live.roundNumber !== undefined && match.roundNumber !== undefined && live.roundNumber !== match.roundNumber) {
+    const roundChanged =
+      live.roundNumber !== undefined &&
+      match.roundNumber !== undefined &&
+      live.roundNumber !== match.roundNumber;
+
+    if (roundChanged) {
       this.commitRound(match);
       match.roundNumber = live.roundNumber;
-      match.maxRoundDamage = 0;
-      match.maxRoundHeadshots = 0;
-    } else if (match.roundNumber === undefined && live.roundNumber !== undefined) {
-      match.roundNumber = live.roundNumber;
+      match.maxRoundDamage = live.roundTotalDamage;
+      match.maxRoundHeadshots = live.roundHeadshotKills;
+    } else {
+      if (match.roundNumber === undefined && live.roundNumber !== undefined) {
+        match.roundNumber = live.roundNumber;
+      }
+
+      // Deathmatch and some respawn modes can reset player.state round counters
+      // without advancing map.round. Preserve the completed life segment without
+      // counting it as another competitive round.
+      const respawnReset = live.roundKills < match.lastRoundKills;
+      if (respawnReset || live.roundTotalDamage < match.lastRoundDamage) {
+        match.committedDamage += match.maxRoundDamage;
+        match.maxRoundDamage = 0;
+      }
+      if (respawnReset || live.roundHeadshotKills < match.lastRoundHeadshots) {
+        match.committedHeadshots += match.maxRoundHeadshots;
+        match.maxRoundHeadshots = 0;
+      }
+
+      match.maxRoundDamage = Math.max(match.maxRoundDamage, live.roundTotalDamage);
+      match.maxRoundHeadshots = Math.max(match.maxRoundHeadshots, live.roundHeadshotKills);
     }
 
-    match.maxRoundDamage = Math.max(match.maxRoundDamage, live.roundTotalDamage);
-    match.maxRoundHeadshots = Math.max(match.maxRoundHeadshots, live.roundHeadshotKills);
+    match.lastRoundDamage = live.roundTotalDamage;
+    match.lastRoundHeadshots = live.roundHeadshotKills;
+    match.lastRoundKills = live.roundKills;
     match.lastKills = Math.max(match.lastKills, live.kills);
     match.lastDeaths = Math.max(match.lastDeaths, live.deaths);
     match.lastAssists = Math.max(match.lastAssists, live.assists);
@@ -149,7 +180,7 @@ export class SessionTracker {
     this.completed.assists += match.lastAssists;
     this.completed.damage += match.committedDamage;
     this.completed.rounds += match.committedRounds;
-    this.completed.headshotKills += match.committedHeadshots;
+    this.completed.headshotKills += Math.min(match.lastKills, match.committedHeadshots);
 
     const winner = this.winnerFromScore(live);
     if (winner !== "UNKNOWN" && match.team !== "UNKNOWN") {
