@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import { generateGsiConfig } from "../src/gsi/installer.js";
+import { defaultGsiPortForFlavor, gsiFilenameForFlavor, LEGACY_SHARED_GSI_FILENAME } from "../src/host-flavor.js";
 import { normalizeManualCs2Path, parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
 
 test("GSI config binds to localhost root and requests only approved normal-player components", () => {
@@ -14,6 +15,16 @@ test("GSI config binds to localhost root and requests only approved normal-playe
   assert.doesNotMatch(config, /"phase_countdowns"/);
   assert.doesNotMatch(config, /"allplayers_/);
   assert.doesNotMatch(config, /"allgrenades"/);
+});
+
+test("Pro and Lite use distinct GSI config files and port ranges", () => {
+  assert.equal(gsiFilenameForFlavor("pro"), "gamestate_integration_packrat_cs2_dashboard_pro.cfg");
+  assert.equal(gsiFilenameForFlavor("lite"), "gamestate_integration_packrat_cs2_dashboard_lite.cfg");
+  assert.notEqual(gsiFilenameForFlavor("pro"), gsiFilenameForFlavor("lite"));
+  assert.equal(defaultGsiPortForFlavor("pro"), 32123);
+  assert.equal(defaultGsiPortForFlavor("lite"), 32147);
+  assert.notEqual(defaultGsiPortForFlavor("pro"), defaultGsiPortForFlavor("lite"));
+  assert.equal(LEGACY_SHARED_GSI_FILENAME, "gamestate_integration_packrat_cs2_dashboard.cfg");
 });
 
 test("parses custom Steam library paths and CS2 install folder", () => {
