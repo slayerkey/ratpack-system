@@ -18,6 +18,8 @@ Completed:
 - deterministic locked dependencies
 - obsolete raw Stream Deck host implementation removed
 - obsolete browser OAuth, hidden Edge, and hotkey fallbacks removed
+- Discord access token changed to session memory only
+- regression tests forbid Stream Deck global-settings token persistence
 - clean Windows dependency audit and automated tests
 - official Elgato CLI validation
 - official Elgato `.streamDeckPlugin` packaging
@@ -25,16 +27,19 @@ Completed:
 
 ## Remaining manual regression smoke
 
-Run the final `1.0.0.0` plugin on the user's Windows Stream Deck installation once after the SDK migration and confirm:
+Run the final `1.0.0.0` plugin on the user's Windows Stream Deck installation once and confirm:
 
 1. `/state` reports `buildVersion: 1.0.0.0`.
 2. Discord native IPC reaches `ready`.
-3. cached authorization either reconnects automatically or one normal Discord authorization prompt succeeds.
+3. one normal Discord authorization prompt succeeds when required.
 4. `streamkit.stage` reaches `ready`.
 5. joining/switching a voice channel updates `channel` automatically.
 6. speaking state updates.
 7. mute and deafen state/control still work.
-8. a Stream Deck/Discord restart reconnects normally.
+8. a Discord reconnect works while the plugin process remains alive.
+9. a plugin process restart returns to authorization-required rather than restoring a stored access token.
+
+The last behavior is intentional: the current Discord access token is memory only and is never persisted through Stream Deck settings.
 
 This is the only meaningful local engineering regression test remaining for the companion.
 
