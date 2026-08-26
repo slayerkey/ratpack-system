@@ -192,7 +192,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
+          git add -f \
             widgets/now-playing/index.html \
             widgets/helldivers/index.html \
             widgets/rig-battery/index.html \
