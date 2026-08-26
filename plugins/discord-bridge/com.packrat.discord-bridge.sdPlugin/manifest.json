@@ -24,8 +24,9 @@
   ],
   "Author": "PackRat 🐀",
   "Category": "PackRat Discord Bridge",
+  "CategoryIcon": "imgs/category/icon",
   "CodePath": "bin/plugin.js",
-  "Description": "Local Discord voice companion for PackRat Discord Panel on XENEON Edge.",
+  "Description": "Free local Discord voice companion for the PackRat Discord Voice Panel on XENEON Edge.",
   "Icon": "imgs/plugin/icon",
   "Name": "PackRat Discord Bridge",
   "Nodejs": {
@@ -37,11 +38,10 @@
       "MinimumVersion": "10"
     }
   ],
-  "SDKVersion": 2,
+  "SDKVersion": 3,
   "Software": {
     "MinimumVersion": "7.5"
   },
   "UUID": "com.packrat.discord-bridge",
-  "Version": "0.3.0.0",
-  "CategoryIcon": "imgs/category/icon"
+  "Version": "1.0.0.0"
 }
