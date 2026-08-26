@@ -28,7 +28,7 @@ test("Discord Bridge uses the official Stream Deck v2 SDK and SDKVersion 3", asy
   assert.equal(pkg.dependencies?.["@elgato/streamdeck"], "2.1.2");
   assert.equal(manifest.SDKVersion, 3);
   assert.equal(manifest.Nodejs?.Version, "24");
-  assert.equal(manifest.Software?.MinimumVersion, "7.5");
+  assert.equal(manifest.Software?.MinimumVersion, "7.3");
   assert.equal(manifest.Version, "1.0.0.0");
 
   assert.match(source, /from "@elgato\/streamdeck"/);
