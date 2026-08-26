@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import { generateGsiConfig } from "../src/gsi/installer.js";
+import { candidateGsiPorts } from "../src/gsi/server.js";
 import { defaultGsiPortForFlavor, gsiFilenameForFlavor, LEGACY_SHARED_GSI_FILENAME } from "../src/host-flavor.js";
 import { normalizeManualCs2Path, parseInstallDir, parseSteamLibraries, parseSteamLibraryPaths } from "../src/gsi/steam-locator.js";
 
@@ -25,6 +26,18 @@ test("Pro and Lite use distinct GSI config files and port ranges", () => {
   assert.equal(defaultGsiPortForFlavor("lite"), 32147);
   assert.notEqual(defaultGsiPortForFlavor("pro"), defaultGsiPortForFlavor("lite"));
   assert.equal(LEGACY_SHARED_GSI_FILENAME, "gamestate_integration_packrat_cs2_dashboard.cfg");
+});
+
+test("Pro listener retries never spill beyond its dedicated 24 port range", () => {
+  const ports = candidateGsiPorts(32146);
+  assert.equal(ports.length, 24);
+  assert.equal(ports[0], 32146);
+  assert.equal(new Set(ports).size, 24);
+  assert.ok(ports.every((port) => port >= 32123 && port <= 32146));
+
+  const invalidPreferred = candidateGsiPorts(40000);
+  assert.equal(invalidPreferred[0], 32123);
+  assert.ok(invalidPreferred.every((port) => port >= 32123 && port <= 32146));
 });
 
 test("parses custom Steam library paths and CS2 install folder", () => {
