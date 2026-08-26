@@ -2,11 +2,13 @@ import { randomBytes } from "node:crypto";
 import { access, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { hostDiagnostics, tokenFingerprint } from "../diagnostics/host.js";
+import { currentProductFlavor, gsiFilenameForFlavor, LEGACY_SHARED_GSI_FILENAME } from "../host-flavor.js";
 import { locateCs2Install, type Cs2Install } from "./steam-locator.js";
 
-// Keep this distinct from the older PackRat CS2 Live Stats plugin so both products
-// can be installed at the same time without overwriting each other's Valve GSI config.
-export const GSI_FILENAME = "gamestate_integration_packrat_cs2_dashboard.cfg";
+// Keep the dashboard configs distinct from both the older CS2 Live Stats plugin and
+// each other. Lite and Pro may legitimately be installed at the same time during an
+// upgrade, so CS2 should publish to both localhost listeners instead of last-writer-wins.
+export const GSI_FILENAME = gsiFilenameForFlavor();
 
 export interface GsiInstallResult {
   cs2: Cs2Install;
@@ -20,7 +22,8 @@ export function createGsiToken(): string {
 }
 
 export function generateGsiConfig(port: number, token: string): string {
-  return `"PackRat CS2 Competitive Dashboard"
+  const flavor = currentProductFlavor().toUpperCase();
+  return `"PackRat CS2 Competitive Dashboard ${flavor}"
 {
     "uri" "http://127.0.0.1:${port}/"
     "timeout" "5.0"
@@ -58,6 +61,7 @@ export async function installGsiConfig(options: {
   const temporaryPath = `${configPath}.tmp`;
 
   hostDiagnostics.event("GSI config write started", {
+    flavor: hostDiagnostics.flavor,
     installDir: cs2.installDir,
     cfgDir: cs2.cfgDir,
     configPath,
@@ -77,7 +81,19 @@ export async function installGsiConfig(options: {
   await rename(temporaryPath, configPath);
   await access(configPath);
 
+  // Remove only the obsolete shared dashboard config from pre flavor-separated builds.
+  // Never remove the other current flavor's cfg because CS2 supports multiple GSI files.
+  const legacyPath = path.join(cs2.cfgDir, LEGACY_SHARED_GSI_FILENAME);
+  if (legacyPath !== configPath) {
+    try {
+      await rm(legacyPath, { force: true });
+    } catch (error) {
+      hostDiagnostics.error("legacy shared GSI config cleanup failed", error);
+    }
+  }
+
   hostDiagnostics.event("GSI config write succeeded", {
+    flavor: hostDiagnostics.flavor,
     configPath,
     uri: `http://127.0.0.1:${options.port}/`
   }, { configInstalled: true, configPath });
