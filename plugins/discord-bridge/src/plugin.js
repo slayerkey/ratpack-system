@@ -10,7 +10,6 @@ import {
 const STATUS_ACTION = "com.packrat.discord-bridge.status";
 const BRIDGE_PORT = 17483;
 const BUILD_VERSION = "1.0.0.0";
-const SAVED_TOKEN_KEY = "streamkitAccessToken";
 
 const model = {
   ok: true,
@@ -32,6 +31,7 @@ const model = {
     stage: "idle",
     clientId: STREAMKIT_CLIENT_ID,
     tokenCached: false,
+    tokenPersistence: "memory_only",
     lastError: null,
   },
   account: null,
@@ -55,9 +55,9 @@ const bridge = new LocalBridgeServer({ port: BRIDGE_PORT, snapshot });
 const statusActions = new Map();
 
 let reconnectTimer = null;
-let globalSettings = {};
 let channelSubscriptionId = null;
 let authorizing = false;
+let sessionAccessToken = "";
 
 function logError(error) {
   try {
@@ -109,18 +109,9 @@ function setStage(stage, error = null) {
   publish();
 }
 
-function savedToken() {
-  return String(globalSettings?.[SAVED_TOKEN_KEY] || "").trim();
-}
-
-async function persistToken(token) {
-  globalSettings = { ...globalSettings, [SAVED_TOKEN_KEY]: String(token || "") };
-  model.streamkit.tokenCached = Boolean(token);
-  await streamDeck.settings.setGlobalSettings(globalSettings);
-}
-
-async function clearToken() {
-  await persistToken("");
+function clearSessionToken() {
+  sessionAccessToken = "";
+  model.streamkit.tokenCached = false;
 }
 
 function currentVoiceStates() {
@@ -259,13 +250,7 @@ async function authenticateToken(token, { clearOnFailure = false } = {}) {
     model.discord.authenticated = false;
     model.account = null;
     model.scopes = [];
-    if (clearOnFailure) {
-      try {
-        await clearToken();
-      } catch (settingsError) {
-        logError(settingsError);
-      }
-    }
+    if (clearOnFailure) clearSessionToken();
     setStage("authorization_required", error);
     return false;
   }
@@ -302,9 +287,10 @@ async function beginAuthorization() {
 
     setStage("exchanging");
     const token = await exchangeStreamKitCode(authorization.code);
-    await persistToken(token.accessToken);
+    sessionAccessToken = String(token.accessToken || "");
+    if (!sessionAccessToken) throw new Error("Discord StreamKit token exchange returned no access token");
 
-    const ok = await authenticateToken(token.accessToken, { clearOnFailure: true });
+    const ok = await authenticateToken(sessionAccessToken, { clearOnFailure: true });
     if (!ok) {
       throw new Error(model.streamkit.lastError || "Discord StreamKit authentication failed");
     }
@@ -312,6 +298,7 @@ async function beginAuthorization() {
     setStage("ready");
   } catch (error) {
     model.discord.authenticated = false;
+    clearSessionToken();
     setStage("failed", error);
   } finally {
     authorizing = false;
@@ -345,11 +332,11 @@ async function connectDiscord() {
     model.error = null;
     publish();
 
-    const token = savedToken();
-    model.streamkit.tokenCached = Boolean(token);
-
-    if (token) await authenticateToken(token, { clearOnFailure: true });
-    else setStage("authorization_required");
+    if (sessionAccessToken) {
+      await authenticateToken(sessionAccessToken, { clearOnFailure: true });
+    } else {
+      setStage("authorization_required");
+    }
 
     return true;
   } catch (error) {
@@ -504,20 +491,9 @@ async function main() {
   });
 
   await streamDeck.connect();
-
-  try {
-    globalSettings = await streamDeck.settings.getGlobalSettings();
-  } catch (error) {
-    streamDeck.logger.warn(`Global settings unavailable: ${String(error?.message || error)}`);
-    globalSettings = {};
-  }
-
-  model.streamkit.tokenCached = Boolean(savedToken());
-
   await bridge.start();
   model.bridge.listening = true;
   publish();
-
   await connectDiscord();
 }
 
