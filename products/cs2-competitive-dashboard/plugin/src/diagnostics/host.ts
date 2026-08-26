@@ -3,13 +3,14 @@ import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } f
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { currentProductFlavor, type ProductFlavor } from "../host-flavor.js";
 
 const PRODUCT_DIR = "CS2CompetitiveDashboard";
-const LOG_NAME = "cs2-competitive-dashboard.log";
 const MAX_LOG_BYTES = 2 * 1024 * 1024;
 
 export interface HostDiagnosticSnapshot {
   product: "CS2 Competitive Dashboard";
+  flavor: ProductFlavor;
   version: string;
   pid: number;
   pluginDir: string;
@@ -41,7 +42,7 @@ export interface HostDiagnosticSnapshot {
   lastEvent?: string;
 }
 
-type DiagnosticPatch = Partial<Omit<HostDiagnosticSnapshot, "product" | "version" | "pid" | "pluginDir" | "logPath" | "processStartedAt">>;
+type DiagnosticPatch = Partial<Omit<HostDiagnosticSnapshot, "product" | "flavor" | "version" | "pid" | "pluginDir" | "logPath" | "processStartedAt">>;
 
 function baseDir(): string {
   if (process.env.PACKRAT_CS2_DATA_DIR) return path.resolve(process.env.PACKRAT_CS2_DATA_DIR);
@@ -74,14 +75,16 @@ export function tokenFingerprint(token: string | undefined): string | undefined 
 }
 
 export class HostDiagnostics {
+  readonly flavor = currentProductFlavor();
   readonly rootDir = baseDir();
   readonly logDir = path.join(this.rootDir, "logs");
   readonly stateDir = path.join(this.rootDir, "state");
-  readonly logPath = path.join(this.logDir, LOG_NAME);
-  readonly statePath = path.join(this.stateDir, "gsi.json");
+  readonly logPath = path.join(this.logDir, `cs2-competitive-dashboard-${this.flavor}.log`);
+  readonly statePath = path.join(this.stateDir, `gsi-${this.flavor}.json`);
 
   private state: HostDiagnosticSnapshot = {
     product: "CS2 Competitive Dashboard",
+    flavor: this.flavor,
     version: "0.1.0.0",
     pid: process.pid,
     pluginDir: process.cwd(),
@@ -102,6 +105,7 @@ export class HostDiagnostics {
     this.ensureDirs();
     this.rotateIfNeeded();
     this.event("plugin process started", {
+      flavor: this.flavor,
       version: this.state.version,
       pid: process.pid,
       pluginDir: process.cwd(),
@@ -167,7 +171,7 @@ export class HostDiagnostics {
   summaryText(): string {
     const s = this.snapshot();
     return [
-      `PackRat CS2 Competitive Dashboard diagnostics`,
+      `PackRat CS2 Competitive Dashboard ${s.flavor.toUpperCase()} diagnostics`,
       `Process: running (PID ${s.pid})`,
       `Stream Deck connected: ${s.streamDeckConnected ? "yes" : "no"}`,
       `Settings channel: ${s.settingsChannel}`,
