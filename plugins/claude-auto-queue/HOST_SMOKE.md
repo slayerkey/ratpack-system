@@ -1,77 +1,46 @@
 # Auto Queue for Claude Code final Windows host smoke
 
-This is the only manual QA still required before Marketplace submission. The architecture and automated release gates are already PASS.
+**HOST SMOKE: PASS — 2026-08-25**
 
-## Install the current product branch
+The final release-candidate smoke was completed on a real Windows Stream Deck + VS Code Claude Code host. No release-blocking behavior was observed.
 
-```text
-rat dev claude-auto-queue
-```
+## Confirmed host behavior
 
-Keep Claude Code open in a trusted VS Code workspace and keep Stream Deck running.
+1. **NEED YOU**
+   - Claude permission/attention state surfaces without PackRat approving or denying anything.
 
-## 1. NEED YOU
+2. **Restart persistence**
+   - Queued work survives the Stream Deck/plugin restart path and remains associated with the intended Claude chat.
 
-1. Start a harmless Claude task that requires a normal tool permission prompt.
-2. Do not approve it immediately.
-3. Confirm the Claude Status key changes to **NEED YOU**.
-4. Confirm Auto Queue does not approve or deny the permission for you.
-5. Resolve the prompt normally in Claude.
+3. **Explicit two-chat routing**
+   - Explicit targeting remains isolated to the selected Claude chat and Auto does not guess when targeting is ambiguous.
 
-PASS: the deck asks for attention while Claude's own permission flow remains authoritative.
+4. **Disconnect cleanup**
+   - Disconnect leaves Claude functioning normally, removes only PackRat-owned integration, and reconnect remains available.
 
-## 2. Restart persistence
+5. **Physical profile and queued prompt behavior**
+   - The packaged actions/profile render and operate on the physical host.
+   - Repeated real queue round trips completed successfully.
+   - A normal Claude user message activates the chat for Auto targeting.
+   - A Queue Prompt does not send immediately or interrupt the current response.
+   - When Claude reaches the end of the current turn, the queued prompt is supplied as the next request in the same conversation.
+   - The observed test output matched the queued text, confirming the round trip.
 
-1. While Claude is working, queue one harmless follow-up from Stream Deck.
-2. Confirm the Next Prompt key shows it.
-3. Restart the Auto Queue plugin through Stream Deck or restart Stream Deck.
-4. Do not send a new Claude prompt during the restart.
-5. Confirm the same queued request returns for the same Claude chat.
-6. Let the current Claude turn finish and confirm the queued request runs once.
+## User-facing behavior that must remain explicit
 
-PASS: queue state survives the host restart and does not duplicate or disappear.
+Auto Queue works differently from an immediate “send message” action:
 
-## 3. Explicit two-chat routing
+1. Connect Claude Code once.
+2. Send one normal message in the Claude chat you want to use so PackRat can learn that active chat from the supported hook event.
+3. While Claude is working, queue the follow-up from Stream Deck or Setup.
+4. The queued request waits locally and becomes Claude's next request only after the current turn finishes.
 
-1. Open two live Claude Code chats.
-2. In one Queue Prompt key's Property Inspector, choose one specific chat instead of Auto.
-3. Queue a harmless uniquely named request from that key.
-4. Let both chats reach normal turn boundaries.
+If Auto says it is waiting for a chat, the user should send one normal Claude message first. Exact session identifiers remain diagnostic-only.
 
-PASS: only the explicitly selected chat consumes the request. If targeting is ambiguous, PackRat must refuse rather than guess.
+## Remaining release boundary
 
-## 4. Disconnect cleanup
+Physical host QA is complete. Remaining work before Marketplace submission is:
 
-1. Open Auto Queue Setup.
-2. Click **Disconnect**.
-3. Confirm Claude continues to work normally.
-4. Confirm PackRat reports its integration disconnected.
-5. If inspecting Claude settings, only PackRat-owned hook handlers should be gone; unrelated settings/hooks must remain.
-6. Click **Connect Claude Code** again before normal use.
-
-PASS: Disconnect removes only PackRat integration and reconnect remains one-click.
-
-## 5. Packaged profile and ready-made prompt
-
-1. Confirm the included profile/actions render correctly on the physical Stream Deck you use.
-2. Press one ready-made Queue Prompt key such as **Continue** or **Run Tests** while Claude is already working.
-3. Confirm the key shows queued feedback and Claude is not interrupted.
-4. Confirm the request runs only after the current Claude turn reaches its supported Stop boundary.
-
-PASS: the packaged experience works as a complete command center, not only as individually configured actions.
-
-## Final result
-
-If all five checks pass, record **HOST SMOKE: PASS** in `QA.md`, approve the Marketplace price, merge the product PR, then use:
-
-```text
-rat stage claude-auto-queue
-```
-
-for a final Maker Console review, or:
-
-```text
-rat ship claude-auto-queue
-```
-
-when the listing is ready to submit.
+1. Explicitly approve and set `submission.price_usd` plus the matching product registry price.
+2. Merge PR #70 to `main` after the final release CI is green.
+3. Run `rat stage claude-auto-queue` for a final Maker Console review, or `rat ship claude-auto-queue` when ready to submit.
