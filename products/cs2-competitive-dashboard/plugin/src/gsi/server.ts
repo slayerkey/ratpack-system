@@ -19,6 +19,20 @@ export interface GsiServerOptions {
   onPayload: (payload: RawGsiPayload) => void | Promise<void>;
 }
 
+function candidatePorts(preferredPort?: number): number[] {
+  const first = DEFAULT_GSI_PORT;
+  const last = first + MAX_PORT_ATTEMPTS - 1;
+  const preferred = Number.isInteger(preferredPort) && preferredPort! >= first && preferredPort! <= last
+    ? preferredPort
+    : undefined;
+  const ports: number[] = [];
+  if (preferred !== undefined) ports.push(preferred);
+  for (let port = first; port <= last; port += 1) {
+    if (port !== preferred) ports.push(port);
+  }
+  return ports;
+}
+
 export class GsiServer {
   private server?: Server;
   private activePort?: number;
@@ -34,11 +48,15 @@ export class GsiServer {
   async start(options: GsiServerOptions): Promise<number> {
     if (this.server?.listening && this.activePort) return this.activePort;
 
-    const firstPort = options.preferredPort ?? DEFAULT_GSI_PORT;
-    hostDiagnostics.event("listener bind started", { flavor: hostDiagnostics.flavor, host: HOST, preferredPort: firstPort }, { setupStage: "listener-bind" });
+    const ports = candidatePorts(options.preferredPort);
+    hostDiagnostics.event("listener bind started", {
+      flavor: hostDiagnostics.flavor,
+      host: HOST,
+      preferredPort: options.preferredPort,
+      allowedRange: `${ports[0] === options.preferredPort ? DEFAULT_GSI_PORT : ports[0]}-${DEFAULT_GSI_PORT + MAX_PORT_ATTEMPTS - 1}`
+    }, { setupStage: "listener-bind" });
 
-    for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
-      const port = firstPort + offset;
+    for (const port of ports) {
       const server = http.createServer((req, res) => {
         void this.handleRequest(req, res, options);
       });
@@ -66,7 +84,8 @@ export class GsiServer {
       }
     }
 
-    const error = new Error(`Unable to bind a local CS2 GSI listener starting at port ${firstPort}`);
+    const lastPort = DEFAULT_GSI_PORT + MAX_PORT_ATTEMPTS - 1;
+    const error = new Error(`Unable to bind a local CS2 GSI listener in the ${hostDiagnostics.flavor} port range ${DEFAULT_GSI_PORT}-${lastPort}`);
     hostDiagnostics.error("listener bind failed", error, { listenerRunning: false });
     throw error;
   }
