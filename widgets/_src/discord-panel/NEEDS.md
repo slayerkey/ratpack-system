@@ -1,53 +1,70 @@
 # Discord Voice Panel needs
 
-## Current transport
+## Release candidate state
 
-The XENEON widget does not connect directly to Discord and does not perform Discord OAuth.
+Discord Voice Panel `1.0.0` is strongly validated and priced at `$7.99` one time.
+
+Required PackRat Discord Bridge companion `1.0.0.0` is free.
 
 Live path:
 
-Discord Desktop -> PackRat Discord Bridge on Stream Deck -> loopback WebSocket `ws://127.0.0.1:17483` -> Discord Voice Panel on XENEON Edge.
+Discord Desktop -> PackRat Discord Bridge -> `ws://127.0.0.1:17483` -> Discord Voice Panel.
 
-The active companion feasibility build uses Discord StreamKit's public RPC identity over Discord native IPC. The companion owns authorization, token storage, current voice channel discovery, roster/speaking subscriptions, and mute/deafen RPC commands.
+The XENEON widget performs no Discord OAuth and contains no Discord token, Client Secret, or application identity.
 
-The XENEON package receives only normalized local state and sends local commands such as authorize, refresh, mute, and deafen. No Discord access token or Client Secret enters the widget.
+## Completed XENEON gates
 
-## User setup for the feasibility build
+- source transport regression
+- flattened shipping build
+- official CORSAIR validation and package
+- all eight official XENEON sizes against source
+- all eight official XENEON sizes against the official package
+- 50-member stress at all eight sizes on source and package
+- Unicode/emoji/pathological name safety
+- reduced-motion and iCUE appearance settings
+- speaking promotion/hold, member detail, joins/leaves, channel switching
+- mute/deafen state and command mapping
+- idle/auth/failure/disconnected/recovery states
+- packaged `file://` localhost WebSocket test
+- actual PackRat companion `LocalBridgeServer` integration
+- forced disconnect and reconnect
+- strict package/privacy audit
+- StreamSpell package verification at all eight presets
 
-1. Update the companion with `rat dev discord-bridge`.
-2. Authorize once from the Stream Deck Bridge Status key if prompted.
-3. Join any Discord voice channel.
-4. Build/import the widget with `rat dev discord-panel`.
+## Companion state
 
-There is no Server ID or Voice Channel ID configuration in the active build. The panel should automatically follow the current Discord voice channel.
+The free companion has been migrated to official `@elgato/streamdeck` `2.1.2`, `SDKVersion: 3`, Node.js 24, a deterministic lockfile, bundled output, and official Elgato validate/pack release CI.
 
-## Current physical gate
+The same Discord transport was previously proven on the user's real Windows machine with native Discord IPC, authorization, current channel/roster, speaking state, and mute/deafen state.
 
-On the real XENEON Edge prove:
+Remaining engineering smoke: run the final companion `1.0.0.0` on the user's Windows Stream Deck installation once after the SDK migration and confirm the existing Discord path still reaches ready state and recovers after restart.
 
-- loopback WebSocket connects from the iCUE widget runtime
-- authenticated companion snapshot reaches the widget
-- joining a Discord voice channel automatically changes the displayed channel
-- member roster renders and updates as members join/leave
-- speaking events animate/promote correctly
-- mute touch changes Discord and the returned mute state
-- deafen touch changes Discord and the returned deafen state
-- leaving voice returns to the calm idle state
-- switching voice channels updates without reconfiguring iCUE
-- widget reconnects after Stream Deck, Discord, or iCUE restart
-- no viewport overflow on the physical smoke-test slot
+## Physical XENEON boundary
 
-The eight-size visual layout was already exercised with deterministic fixtures before the transport pivot. The roster UI and CSS were intentionally retained. After live transport feasibility passes, rerun the complete eight-size release gate against the final transport before shipping.
+PackRat does not currently own a physical XENEON Edge. The canonical automated release tiers are complete. A physical import/touch/local-bridge smoke test is additional confidence if hardware becomes available, but is not a reason to keep iterating ordinary widget code.
 
-## Release gates after feasibility
+## Commercial Discord blocker
 
-A technical StreamKit public RPC pass does not by itself make this release-ready. Before commercial release:
+Discord documents `rpc`, `rpc.voice.read`, and `rpc.voice.write` as approval-only scopes.
 
-- confirm the final companion implementation is acceptable under current Discord/StreamKit terms
-- migrate the companion to the current official Stream Deck SDK and release packaging requirements
-- rerun all eight XENEON sizes and interaction fixtures
-- run official CORSAIR validation/package and StreamSpell verification
-- generate Rat Art from the final real widget render
-- complete Rat Ship and Marketplace review
+The current technical feasibility path uses Discord StreamKit's public application identity. Do not assume that identity can be used by a separate paid PackRat product in production.
 
-If using StreamKit's public application identity is not acceptable for third-party commercial distribution, keep the proven local architecture and obtain Discord voice-scope approval for a PackRat-owned application instead.
+Before public commercial release, satisfy one of these:
+
+1. obtain approval for the required scopes on a PackRat-owned Discord application and switch the free companion to that approved identity; or
+2. obtain explicit written confirmation from Discord that this third-party commercial use of the StreamKit public identity/token endpoint is permitted.
+
+Anything less should be treated as not approved.
+
+The companion repository includes `plugins/discord-bridge/DISCORD_APPROVAL.md` with the official support path and a prepared request template.
+
+## Marketplace finishing work after Discord clearance
+
+Once the Discord production identity is compliant:
+
+1. rerun the real Windows companion smoke using the approved identity
+2. rerun Discord Bridge Release QA
+3. rerun Discord Panel Deep QA
+4. review the current private Elgato Maker/Marketplace agreement for companion disclosure requirements
+5. generate Rat Art from the final deterministic widget captures
+6. run Rat Ship and submit the free companion plus `$7.99` XENEON product
