@@ -1,13 +1,13 @@
 export type ProductFlavor = "pro" | "lite";
 
 /**
- * Both Marketplace products are bundled from the same source tree, but Stream Deck
- * launches each plugin from its UUID named .sdPlugin directory. Using the process
- * location keeps low level host modules flavor aware without depending on Property
- * Inspector settings or another asynchronous SDK round trip.
+ * Both Marketplace products are bundled from one source tree, but each bundle lives
+ * under its immutable plugin UUID directory. import.meta.url therefore gives us a
+ * stable flavor signal even if Stream Deck changes the process working directory.
+ * cwd and argv remain useful fallbacks for source tests and unusual launchers.
  */
 export function currentProductFlavor(): ProductFlavor {
-  const marker = `${process.cwd()}\n${process.argv.join("\n")}`.toLowerCase();
+  const marker = `${import.meta.url}\n${process.cwd()}\n${process.argv.join("\n")}`.toLowerCase();
   return marker.includes("cs2-competitive-dashboard-lite") ? "lite" : "pro";
 }
 
