@@ -1,6 +1,7 @@
 import { SingletonAction } from "@elgato/streamdeck";
 import type { LiveMetric } from "../core/types.js";
-import { beginKeyRefresh, failKeyRefresh, finishKeyRefresh } from "../diagnostics/render-trace.js";
+import { beginKeyRefresh, finishKeyRefresh } from "../diagnostics/render-trace.js";
+import { keyImageUpdateQueue } from "../render/key-update-queue.js";
 import { renderKeySvg } from "../render/key-svg.js";
 import type { DashboardRuntime } from "../runtime.js";
 import { liveDisplay } from "./format.js";
@@ -8,7 +9,7 @@ import { liveDisplay } from "./format.js";
 export type MetricSettings = { metric?: string };
 
 export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
-  private readonly visible = new Set<any>();
+  private readonly visible = new Map<any, LiveMetric>();
 
   constructor(
     private readonly runtime: DashboardRuntime,
@@ -16,26 +17,27 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
     private readonly defaultMetric: LiveMetric = "score"
   ) {
     super();
-    this.runtime.subscribe(() => {
-      setTimeout(() => void this.refreshAll(), 0);
-    });
+    this.runtime.subscribe(() => this.refreshAll());
   }
 
   override async onWillAppear(ev: any): Promise<void> {
     if (!ev.action.isKey()) return;
-    this.visible.add(ev.action);
     const metric = this.metricFrom(ev.payload.settings);
+    this.visible.set(ev.action, metric);
     if (ev.payload.settings?.metric !== metric) await ev.action.setSettings({ ...ev.payload.settings, metric });
-    await this.render(ev.action, metric);
+    this.render(ev.action, metric);
   }
 
   override onWillDisappear(ev: any): void {
     this.visible.delete(ev.action);
+    keyImageUpdateQueue.forget(ev.action);
   }
 
   override async onDidReceiveSettings(ev: any): Promise<void> {
     if (!ev.action.isKey()) return;
-    await this.render(ev.action, this.metricFrom(ev.payload.settings));
+    const metric = this.metricFrom(ev.payload.settings);
+    this.visible.set(ev.action, metric);
+    this.render(ev.action, metric);
   }
 
   override async onSendToPlugin(ev: any): Promise<void> {
@@ -48,23 +50,19 @@ export class LiveMetricActionBase extends SingletonAction<MetricSettings> {
     return candidate && this.allowedMetrics.includes(candidate) ? candidate : this.defaultMetric;
   }
 
-  private async refreshAll(): Promise<void> {
+  private refreshAll(): void {
     const traced = beginKeyRefresh("live", this.visible.size);
-    try {
-      await Promise.all([...this.visible].map(async (action) => {
-        const settings = await action.getSettings() as MetricSettings;
-        await this.render(action, this.metricFrom(settings));
-      }));
-      finishKeyRefresh("live", this.visible.size, traced);
-    } catch (error) {
-      failKeyRefresh("live", error, traced);
-      throw error;
-    }
+    for (const [action, metric] of this.visible) this.render(action, metric);
+    finishKeyRefresh("live", this.visible.size, traced);
   }
 
-  private async render(action: any, metric: LiveMetric): Promise<void> {
+  private render(action: any, metric: LiveMetric): void {
     const snapshot = this.runtime.snapshot();
     const display = liveDisplay(metric, snapshot.live, snapshot.session, snapshot.status);
-    await action.setImage(renderKeySvg(display.label, display.value, display.tone, display.subtitle));
+    keyImageUpdateQueue.request(
+      action,
+      renderKeySvg(display.label, display.value, display.tone, display.subtitle),
+      "live"
+    );
   }
 }
