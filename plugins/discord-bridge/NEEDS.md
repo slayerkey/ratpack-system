@@ -1,63 +1,71 @@
 # Discord Bridge needs
 
-## Proven locally on Windows
+## Engineering status
 
-- Stream Deck plugin launches and survives normal restart/link cycles.
-- The local PackRat bridge listens on `127.0.0.1:17483`.
-- The companion connects to Discord through `\\?\\pipe\\discord-ipc-0`.
-- Discord accepts the native IPC handshake and returns RPC v1 `READY`.
-- The old browser/WebSocket `Origin` problem is bypassed by the companion architecture.
-- Discord rejects the PackRat-owned application's `rpc.voice.read` and `rpc.voice.write` request with `invalid_scope` before issuing an authorization code.
+The companion is now a `1.0.0.0` release candidate.
 
-## StreamKit public RPC path is technically proven
+Completed:
 
-Build `0.3.0.0` uses Discord StreamKit's public RPC identity instead of the PackRat application.
+- native Discord IPC transport proven on real Windows
+- StreamKit RPC authorization/token/authentication proven on real Windows
+- current voice channel discovery proven
+- roster, speaking, mute, and deafen state proven
+- real RPC mute/deafen control path implemented
+- loopback bridge bound to `127.0.0.1:17483`
+- official `@elgato/streamdeck` `2.1.2` migration
+- manifest `SDKVersion: 3`
+- Node.js 24 runtime
+- deterministic locked dependencies
+- obsolete raw Stream Deck host implementation removed
+- obsolete browser OAuth, hidden Edge, and hotkey fallbacks removed
+- clean Windows dependency audit and automated tests
+- official Elgato CLI validation
+- official Elgato `.streamDeckPlugin` packaging
+- XENEON deep QA through the real companion `LocalBridgeServer`
 
-The companion uses StreamKit client ID `207646673902501888`, requests `rpc`, `rpc.voice.read`, and `rpc.voice.write` through native Discord IPC, exchanges the resulting one time code through `https://streamkit.discord.com/overlay/token`, then authenticates the IPC session.
+## Remaining manual regression smoke
 
-Real Windows host proof now confirms:
+Run the final `1.0.0.0` plugin on the user's Windows Stream Deck installation once after the SDK migration and confirm:
 
-- native StreamKit `AUTHORIZE` succeeds
-- StreamKit token exchange succeeds
-- RPC `AUTHENTICATE` succeeds
-- the granted scope set contains `rpc`, `rpc.voice.read`, and `rpc.voice.write`
-- the access token is cached locally in Stream Deck settings
-- the current Discord voice channel is discovered automatically
-- real `voice_states` populate without Server ID or Channel ID configuration
-- real mute/deafen state populates
-- speaking state arrives live
+1. `/state` reports `buildVersion: 1.0.0.0`.
+2. Discord native IPC reaches `ready`.
+3. cached authorization either reconnects automatically or one normal Discord authorization prompt succeeds.
+4. `streamkit.stage` reaches `ready`.
+5. joining/switching a voice channel updates `channel` automatically.
+6. speaking state updates.
+7. mute and deafen state/control still work.
+8. a Stream Deck/Discord restart reconnects normally.
 
-No Discord Client Secret is embedded. The token is not sent to the XENEON widget or exposed through the local bridge state.
+This is the only meaningful local engineering regression test remaining for the companion.
 
-The original product experience is therefore technically viable:
+## Physical XENEON status
 
-- automatically follows whichever Discord voice channel the user joins
-- receives the real roster and speaking events
-- reads actual mute/deafen state
-- changes mute/deafen through Discord RPC
+PackRat does not currently own a physical XENEON Edge. The widget has passed the canonical no-hardware release tiers: source/structure checks, all-eight-size browser fixtures, official CORSAIR validate/package, packaged file-origin loopback testing through the actual companion bridge, crowded roster stress, and StreamSpell.
 
-## What still needs physical proof
+A physical XENEON/iCUE smoke test is welcome if compatible hardware becomes available, but ordinary software/layout/package work should not wait on hardware.
 
-1. Run `rat dev discord-panel` and import the fresh widget package into iCUE.
-2. Confirm the real XENEON runtime can connect to the loopback bridge.
-3. Confirm current channel and roster render on the physical Edge.
-4. Confirm speaking highlights update quickly and reorder correctly.
-5. Confirm Mute touch changes Discord and returned state updates.
-6. Confirm Deafen touch changes Discord and returned state updates.
-7. Switch between Discord voice channels and confirm the panel follows automatically.
-8. Restart the linked Stream Deck plugin and confirm cached StreamKit authentication reconnects without another consent prompt.
-9. Restart Discord and iCUE and confirm normal recovery.
+## Commercial Discord gate
 
-## After physical feasibility passes
+This is the remaining public-release blocker.
 
-- migrate the raw Stream Deck host layer to the current `@elgato/streamdeck` SDK and SDKVersion 3 before Marketplace release
-- remove obsolete hidden Edge/fixed-channel fallback source if no longer needed
-- package and validate the companion through the official Elgato release path
-- rerun the complete XENEON eight-size gate against the final loopback transport
-- run official CORSAIR package, StreamSpell, Rat Art, and Rat Ship
-- review current Discord/StreamKit terms before relying on StreamKit's public application identity in a commercial third-party product
-- review current Elgato Marketplace/Maker terms for the required free local companion
+Discord documents `rpc`, `rpc.voice.read`, and `rpc.voice.write` as scopes available only to approved partners. The working technical path currently authenticates using Discord StreamKit's public application identity.
 
-## Production alternative if StreamKit identity is not acceptable
+Do **not** treat that technical success as permission for a separate paid PackRat product.
 
-The native IPC transport itself is already proven. If StreamKit's public identity is unsuitable for commercial release, the clean production path is to obtain the required Discord voice scope approval for a PackRat-owned application and reuse the same bridge/widget architecture.
+Before public commercial release, satisfy one of these:
+
+1. obtain Discord approval for the required RPC voice scopes on a PackRat-owned Discord application, then change the companion to that identity and approved token exchange path; or
+2. obtain explicit written Discord confirmation that PackRat may use the StreamKit public application identity and `streamkit.discord.com/overlay/token` for this third-party commercial companion.
+
+The second path should be considered unapproved unless Discord says so explicitly.
+
+See `DISCORD_APPROVAL.md` for the support path and request template.
+
+## Marketplace paperwork
+
+Before final Marketplace submission, review the current private Elgato Maker/Marketplace agreement for any companion-app or dependency disclosure requirements. Technical Elgato SDK validation and packaging are already complete.
+
+## Release pairing
+
+- PackRat Discord Bridge: free
+- PackRat Discord Voice Panel: $7.99 one time
