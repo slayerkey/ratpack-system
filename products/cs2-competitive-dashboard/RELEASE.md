@@ -76,18 +76,19 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 
 1. Install the plugin and accept the included Stream Deck profiles for your device if prompted.
 2. Start with the included **Competitive** or **Live Match** profile, or add individual CS2 Competitive Dashboard Pro actions anywhere you want.
-3. Open the Property Inspector and select **Enable Live CS2 Tracking**.
-4. Launch or restart CS2.
-5. Add your Steam profile URL or SteamID once.
-6. For Premier and Competitive account data, create a free Leetify developer API key using the direct link inside the Property Inspector and paste it into setup.
-7. For FACEIT account data, create a free FACEIT App/API key using the direct Developer Portal link inside the Property Inspector and paste it into setup.
-8. Select **Save Keys and Test Connection**.
+3. Live CS2 tracking configures itself automatically when the plugin starts. There is no Enable button and no API key required for live tracking.
+4. If CS2 was already open during the first install, close and relaunch it once so CS2 loads the new Valve GSI config.
+5. Enter a normal CS2 game mode. The Property Inspector changes to **Connected to CS2** after the first game state update arrives.
+6. Add your Steam profile URL or SteamID once for optional online competitive data.
+7. For Premier and Competitive account data, create a free Leetify developer API key using the direct link inside the Property Inspector and paste it into setup.
+8. For FACEIT account data, create a free FACEIT App/API key using the direct Developer Portal link inside the Property Inspector and paste it into setup.
+9. Select **Save Keys and Test Connection**.
 
 The local live and session features do not require either provider key. The Leetify key is required for Leetify-backed Competitive features and the FACEIT key is required for FACEIT features.
 
 The Property Inspector includes the exact provider links and short step by step instructions so users do not need to find developer pages themselves.
 
-Steam and CS2 are auto-detected for normal installations. A manual path override is available only for unusual library layouts.
+Steam and CS2 are auto-detected for normal installations. The plugin automatically installs its localhost Valve GSI configuration. Advanced Diagnostics shows the detected CS2 path, cfg writeability, local listener, config path, CS2 process state, last GSI packet, and persistent log location.
 
 ### Provider key disclosure
 
@@ -131,13 +132,14 @@ Initial release of CS2 Competitive Dashboard Pro.
 
 * ready-to-use Competitive and Live Match profiles for supported Stream Deck models
 * live CS2 Game State Integration
-* automatic Steam/CS2 setup
+* automatic Steam/CS2 and local GSI setup
 * session K/D, ADR, HS%, W/L and match tracking
 * Premier and Competitive rank views
 * FACEIT Elo, level, performance and recent form views
 * guided setup for free customer-owned Leetify and FACEIT API keys
 * direct provider links inside the Property Inspector
 * configurable dynamic key displays
+* persistent local host diagnostics for CS2 setup and GSI connectivity
 * explicit setup, invalid-key, offline, private-profile and rate-limit states
 * localhost-only authenticated GSI listener
 * no shared PackRat provider API keys or provider quota
@@ -163,7 +165,8 @@ Includes:
 * Money
 * Current Map
 * CS2 / GSI Status
-* one-click live tracking setup
+* automatic live tracking setup
+* built in local diagnostics for CS2 and GSI connectivity
 * one basic ready-to-use starter profile for supported Stream Deck models
 
 For session performance, Premier and Competitive ranks, FACEIT stats, weapons/ammo, the complete live metric set, and separate **Competitive + Live Match profiles**, use CS2 Competitive Dashboard Pro.
@@ -187,7 +190,7 @@ Recommended sequence:
 1. Hero: clean Stream Deck key grid showing the strongest live/session/competitive mix, with minimal copy.
 2. Feature breakdown: Live CS2 / Session / Competitive / FACEIT as the four value areas.
 3. Profiles: show the Competitive and Live Match layouts as an ease-of-setup and Pro-value feature.
-4. Setup: Property Inspector showing one-click GSI setup, Steam profile, and the guided provider key cards.
+4. Setup: Property Inspector showing automatic GSI status and diagnostics, Steam profile, and the guided provider key cards.
 5. Live states: examples of Score, Health, Premier, FACEIT Elo, Session K/D.
 6. Lite vs Pro / ecosystem frame after Pro is published.
 
