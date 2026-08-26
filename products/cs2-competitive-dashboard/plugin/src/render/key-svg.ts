@@ -17,11 +17,15 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function fitValue(value: string): number {
-  if (value.length <= 4) return 40;
-  if (value.length <= 7) return 33;
-  if (value.length <= 10) return 27;
-  return 22;
+export function fitValue(value: string): number {
+  const length = [...value].length;
+  if (length <= 4) return 40;
+  if (length <= 7) return 33;
+  if (length <= 10) return 27;
+  if (length <= 13) return 23;
+  if (length <= 16) return 20;
+  if (length <= 20) return 18;
+  return 16;
 }
 
 export function renderKeySvg(label: string, value: string, tone: KeyTone = "default", subtitle?: string): string {
