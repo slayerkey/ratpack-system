@@ -1,10 +1,11 @@
 import http, { type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { hostDiagnostics } from "../diagnostics/host.js";
+import { defaultGsiPortForFlavor } from "../host-flavor.js";
 import type { RawGsiPayload } from "../core/types.js";
 import { isCs2Payload } from "./normalize.js";
 
 const HOST = "127.0.0.1";
-export const DEFAULT_GSI_PORT = 32123;
+export const DEFAULT_GSI_PORT = defaultGsiPortForFlavor();
 const MAX_PORT_ATTEMPTS = 24;
 const MAX_BODY_BYTES = 512 * 1024;
 const SHUTDOWN_GRACE_MS = 750;
@@ -34,7 +35,7 @@ export class GsiServer {
     if (this.server?.listening && this.activePort) return this.activePort;
 
     const firstPort = options.preferredPort ?? DEFAULT_GSI_PORT;
-    hostDiagnostics.event("listener bind started", { host: HOST, preferredPort: firstPort }, { setupStage: "listener-bind" });
+    hostDiagnostics.event("listener bind started", { flavor: hostDiagnostics.flavor, host: HOST, preferredPort: firstPort }, { setupStage: "listener-bind" });
 
     for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
       const port = firstPort + offset;
@@ -47,7 +48,7 @@ export class GsiServer {
         this.server = server;
         this.activePort = port;
         const url = `http://${HOST}:${port}/`;
-        hostDiagnostics.event("listener bind succeeded", { host: HOST, port, url }, {
+        hostDiagnostics.event("listener bind succeeded", { flavor: hostDiagnostics.flavor, host: HOST, port, url }, {
           listenerRunning: true,
           listenerPort: port,
           listenerUrl: url,
@@ -91,7 +92,7 @@ export class GsiServer {
           server.closeIdleConnections?.();
           server.closeAllConnections?.();
         } catch {
-          // Best effort only.
+          // Best effort only. The close callback remains the source of truth.
         }
       }, SHUTDOWN_GRACE_MS);
 
