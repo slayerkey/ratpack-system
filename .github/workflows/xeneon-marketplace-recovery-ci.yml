@@ -165,3 +165,42 @@ jobs:
           name: recovery-systemic-audits
           path: artifacts/
           retention-days: 30
+
+  sync-generated:
+    name: Sync validated shipping HTML
+    needs: [package, smoke, audits]
+    if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, '[generated-sync]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: recovery/xeneon-marketplace-20260825
+          fetch-depth: 0
+
+      - name: Generate all recovered shipping HTML
+        run: |
+          for slug in now-playing helldivers rig-battery obs-dashboard agenda-panel; do
+            python tools/xeneon/inline.py "$slug"
+            python tools/xeneon/inline.py "$slug" --check
+          done
+
+      - name: Commit generated shipping outputs when changed
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            widgets/now-playing/index.html \
+            widgets/helldivers/index.html \
+            widgets/rig-battery/index.html \
+            widgets/obs-dashboard/index.html \
+            widgets/agenda-panel/index.html
+          if git diff --cached --quiet; then
+            echo "All five generated shipping outputs are already synchronized."
+            exit 0
+          fi
+          git commit -m "[generated-sync] Sync recovered XENEON shipping HTML"
+          git push origin HEAD:recovery/xeneon-marketplace-20260825

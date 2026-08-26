@@ -17,7 +17,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const PORT = 4460;
 const GOOD_PASSWORD = "ratpack-obs-test";
-const report = { schema_version: 1, port: PORT, phases: [], connections: 0, passed: false };
+const report = { schema_version: 2, port: PORT, phases: [], connections: 0, passed: false };
 let server = null;
 let serverClients = new Set();
 
@@ -84,9 +84,8 @@ async function stopServer() {
   await new Promise((resolve) => current.close(() => resolve()));
 }
 
-const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1688, height: 696 } });
-await context.addInitScript({ content: `
+const packagedHtml = fs.readFileSync(entry, "utf8");
+const harness = `<script id="ratpack-obs-marketplace-harness">
 let obsPort = "${PORT}";
 let obsPassword = "";
 let textColor = "#F2F5F7";
@@ -95,7 +94,19 @@ let backgroundColor = "#0B0E11";
 let iCUE_initialized = true;
 let uniqueId = "ratpack-obs-marketplace-smoke";
 globalThis.tr = async function (value) { return value; };
-` });
+globalThis.__setRatpackObsSettings = function (port, password) {
+  obsPort = String(port);
+  obsPassword = String(password);
+};
+</script>`;
+if (!/<head(?:\s[^>]*)?>/i.test(packagedHtml)) throw new Error("packaged OBS widget is missing <head>");
+const instrumentedHtml = packagedHtml.replace(/<head(\s[^>]*)?>/i, (match) => match + "\n" + harness);
+const instrumentedEntry = path.join(path.dirname(path.resolve(entry)), "__ratpack-obs-marketplace-instrumented.html");
+fs.writeFileSync(instrumentedEntry, instrumentedHtml, "utf8");
+report.instrumentedEntry = path.basename(instrumentedEntry);
+
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext({ viewport: { width: 1688, height: 696 } });
 const page = await context.newPage();
 const runtimeErrors = [];
 page.on("pageerror", (error) => runtimeErrors.push(String(error)));
@@ -116,8 +127,8 @@ async function waitConnection(expected, timeout = 10_000) {
 
 async function setSettings(port, password) {
   await page.evaluate(({ port, password }) => {
-    obsPort = String(port);
-    obsPassword = String(password);
+    if (typeof globalThis.__setRatpackObsSettings !== "function") throw new Error("OBS marketplace harness setter missing");
+    globalThis.__setRatpackObsSettings(port, password);
     if (globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function") globalThis.icueEvents.onDataUpdated();
   }, { port, password });
 }
@@ -125,9 +136,13 @@ async function setSettings(port, password) {
 let exitCode = 0;
 try {
   // OBS closed / starts after the widget.
-  await page.goto(pathToFileURL(path.resolve(entry)).href, { waitUntil: "load", timeout: 30_000 });
+  await page.goto(pathToFileURL(instrumentedEntry).href, { waitUntil: "load", timeout: 30_000 });
   await page.waitForTimeout(1200);
-  report.phases.push({ phase: "obs-closed", state: await state() });
+  const bridge = await page.evaluate(() => globalThis.__ratpackIcueBindingBridge || null);
+  if (!bridge || !bridge.names?.includes("obsPort") || !bridge.names?.includes("obsPassword")) throw new Error("packaged OBS widget is missing live port/password binding bridge");
+  const closed = await state();
+  if (String(closed.port) !== String(PORT)) throw new Error(`OBS port lexical binding mismatch: ${closed.port} != ${PORT}`);
+  report.phases.push({ phase: "obs-closed", state: closed });
 
   await startServer({ auth: false });
   await waitConnection("connected", 12_000);
@@ -163,6 +178,7 @@ try {
   for (const phase of required) if (!names.includes(phase)) throw new Error(`missing OBS marketplace test phase: ${phase}`);
   if (report.phases.find((item) => item.phase === "wrong-password")?.state.connection !== "auth") throw new Error("wrong password did not render auth failure");
   if (report.phases.find((item) => item.phase === "correct-port-after-failure")?.state.connection !== "connected") throw new Error("OBS did not reconnect after corrected settings");
+  if (report.connections < 4) throw new Error(`expected repeated real loopback connections, saw ${report.connections}`);
 
   await page.screenshot({ path: path.join(outDir, "obs-connected.png") });
   report.passed = true;
@@ -173,6 +189,7 @@ try {
   report.runtimeErrors = runtimeErrors;
   await stopServer();
   await browser.close();
+  try { fs.unlinkSync(instrumentedEntry); } catch {}
   fs.writeFileSync(path.join(outDir, "marketplace-network-result.json"), JSON.stringify(report, null, 2) + "\n");
 }
 

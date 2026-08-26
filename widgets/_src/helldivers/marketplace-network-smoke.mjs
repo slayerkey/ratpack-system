@@ -15,9 +15,10 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const API_PREFIX = "https://api.helldivers2.dev/api/v1/";
 const report = {
-  schema_version: 1,
+  schema_version: 2,
   transport: API_PREFIX,
   getRequests: [],
+  failedRequests: [],
   statuses: [],
   connectionState: null,
   badge: null,
@@ -42,6 +43,11 @@ const runtimeErrors = [];
 page.on("pageerror", (error) => runtimeErrors.push(String(error)));
 page.on("request", (request) => {
   if (request.method() === "GET" && request.url().startsWith(API_PREFIX)) report.getRequests.push(request.url());
+});
+page.on("requestfailed", (request) => {
+  if (request.url().startsWith(API_PREFIX)) {
+    report.failedRequests.push({ url: request.url(), method: request.method(), error: request.failure()?.errorText || "unknown" });
+  }
 });
 page.on("response", (response) => {
   if (response.request().method() === "GET" && response.url().startsWith(API_PREFIX)) {
@@ -69,11 +75,16 @@ try {
   report.recoveryMarker = await page.evaluate(() => globalThis.__packratHelldiversRecovery || null);
   report.uniqueGetRequests = [...new Set(report.getRequests)];
 
-  if (!report.recoveryMarker || report.recoveryMarker.version !== 1) throw new Error("Helldivers recovery patch missing from packaged widget");
+  if (!report.recoveryMarker || report.recoveryMarker.version !== 2 || report.recoveryMarker.transport !== "query") throw new Error("Helldivers query-transport recovery patch missing from packaged widget");
   if (report.getRequests.length > 4) throw new Error(`duplicate startup fetch burst detected: ${report.getRequests.length} GETs`);
   if (report.uniqueGetRequests.length !== 4) throw new Error(`expected four production endpoints, saw ${report.uniqueGetRequests.length}`);
+  for (const url of report.uniqueGetRequests) {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("x-super-client") !== "packrat-xeneon") throw new Error(`missing x-super-client query credential: ${url}`);
+    if (!parsed.searchParams.get("x-super-contact")) throw new Error(`missing x-super-contact query credential: ${url}`);
+  }
   if (report.statuses.some((item) => item.status === 429)) throw new Error(`production API rate limited clean startup: ${JSON.stringify(report.statuses)}`);
-  if (!report.statuses.some((item) => item.status >= 200 && item.status < 300)) throw new Error(`no successful production API response: ${JSON.stringify(report.statuses)}`);
+  if (!report.statuses.some((item) => item.status >= 200 && item.status < 300)) throw new Error(`no successful production API response: statuses=${JSON.stringify(report.statuses)} failed=${JSON.stringify(report.failedRequests)}`);
   if (!new Set(["live", "stale"]).has(report.connectionState)) throw new Error(`packaged widget did not reach usable data state: ${report.connectionState} / ${report.badge}`);
 
   await page.screenshot({ path: path.join(outDir, "helldivers-live.png") });

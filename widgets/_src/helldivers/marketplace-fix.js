@@ -1,15 +1,20 @@
 /* Marketplace rejection recovery for the live Helldivers transport.
  *
- * Fixes two installed-runtime failures:
+ * Fixes three installed-runtime failures:
  * 1. onICUEInitialized no longer starts a second four-endpoint snapshot while the
  *    DOM startup snapshot is already in flight. The upstream API currently limits
  *    clients to five requests per ten seconds, so the old eight-request burst could
  *    rate-limit a clean install.
- * 2. Transport failures retain their actual reason instead of collapsing every
+ * 2. The required X-Super-Client and X-Super-Contact values are sent through the
+ *    API's supported lowercase query parameters. This keeps the request a simple GET
+ *    and avoids a browser CORS preflight from the installed file:// widget origin.
+ * 3. Transport failures retain their actual reason instead of collapsing every
  *    non-success response into a blank/offline panel.
  */
 (function () {
     var recoveryRetryTimer = null;
+    var RECOVERY_CLIENT = "packrat-xeneon";
+    var RECOVERY_CONTACT = "slayerkey+ondiscord@gmail.com";
 
     function setColdState(kind) {
         var badge = {
@@ -65,13 +70,18 @@
         return asArray(data.campaigns).length > 0 || asArray(data.assignments).length > 0 || asArray(data.planets).length > 0;
     }
 
+    function recoveryUrl(endpoint) {
+        var params = "x-super-client=" + encodeURIComponent(RECOVERY_CLIENT) +
+            "&x-super-contact=" + encodeURIComponent(RECOVERY_CONTACT);
+        return API_ROOT + "/" + endpoint + "?" + params;
+    }
+
     fetchJson = async function (endpoint) {
         var controller = new AbortController();
         var timer = setTimeout(function () { controller.abort(); }, 8000);
         try {
-            var response = await fetch(API_ROOT + "/" + endpoint, {
+            var response = await fetch(recoveryUrl(endpoint), {
                 method: "GET",
-                headers: API_HEADERS,
                 signal: controller.signal,
                 cache: "no-store"
             });
@@ -155,7 +165,7 @@
         };
     }
 
-    globalThis.__packratHelldiversRecovery = { version: 1 };
+    globalThis.__packratHelldiversRecovery = { version: 2, transport: "query" };
 
     try {
         if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) {
