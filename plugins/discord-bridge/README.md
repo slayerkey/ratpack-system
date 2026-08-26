@@ -34,6 +34,14 @@ The old custom Stream Deck host protocol, hidden Edge browser fallback, keyboard
 
 Clean Windows CI runs locked dependency installation, dependency audit, automated tests, bundled build, official `streamdeck validate`, official `streamdeck pack`, and release artifact verification.
 
+## Credential handling
+
+The current Discord access token is session memory only.
+
+The companion does not store the StreamKit access token in Stream Deck global settings, files, the XENEON widget, or the loopback snapshot. A plugin process restart can therefore require another normal Discord authorization step.
+
+Automated release tests fail if Stream Deck global settings token persistence or the old persisted token key returns.
+
 ## Current Discord transport
 
 The technically proven build uses Discord StreamKit's public RPC identity:
@@ -68,7 +76,7 @@ Typical titles:
 rat dev discord-bridge
 ```
 
-Rat Dev fetches `origin/product/discord-bridge`, builds and tests it, validates it with the official Stream Deck CLI, replaces the linked development copy, restarts it, and opens:
+Rat Dev fetches `origin/product/discord-bridge`, installs locked dependencies when needed, builds and tests it, validates it with the official Stream Deck CLI, replaces the linked development copy, restarts it, and opens:
 
 ```text
 http://127.0.0.1:17483/state
@@ -91,4 +99,4 @@ The bridge is a companion dependency and discovery surface, not a separately pai
 
 Engineering is release-candidate quality. Before public commercial submission, use a Discord-approved PackRat application identity for the restricted RPC scopes or obtain explicit written confirmation from Discord that this third-party StreamKit identity usage is permitted.
 
-A real Windows smoke test of `1.0.0.0` after the SDK migration is also recommended before Marketplace submission. Physical XENEON hardware remains an optional final smoke test because the widget has passed the full automated CORSAIR, browser, packaged, actual companion bridge, stress, and StreamSpell gates.
+A real Windows smoke test of `1.0.0.0` after the SDK and memory-only credential changes is also recommended before Marketplace submission. Physical XENEON hardware remains an optional final smoke test because the widget has passed the full automated CORSAIR, browser, packaged, actual companion bridge, stress, and StreamSpell gates.
