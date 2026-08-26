@@ -77,13 +77,21 @@ if ($dirty) {
 }
 
 Write-Host "Refreshing RatPack command layer..." -ForegroundColor DarkGray
-Invoke-Git -Arguments @("fetch", "--prune", "origin")
+# Fetch main explicitly instead of relying on whatever remote refspec happens to be configured on
+# this machine. This prevents a successful fetch from leaving origin/main stale.
+Invoke-Git -Arguments @("fetch", "--prune", "origin", "+refs/heads/main:refs/remotes/origin/main")
 
 $branch = Get-GitText -Arguments @("branch", "--show-current")
 if ($branch -ne "main") {
     Invoke-Git -Arguments @("switch", "main")
 }
-Invoke-Git -Arguments @("pull", "--ff-only", "origin", "main")
+Invoke-Git -Arguments @("merge", "--ff-only", "refs/remotes/origin/main")
+
+$localCommit = Get-GitText -Arguments @("rev-parse", "HEAD")
+$remoteCommit = Get-GitText -Arguments @("rev-parse", "refs/remotes/origin/main")
+if ($localCommit -ne $remoteCommit) {
+    throw "RatPack bootstrap did not land on canonical origin/main. Local: $localCommit Remote: $remoteCommit"
+}
 
 $commit = Get-GitText -Arguments @("log", "-1", "--pretty=format:%h")
 Write-Host "RatPack command layer is current at $commit." -ForegroundColor DarkGray
