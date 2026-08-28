@@ -104,7 +104,7 @@ jobs:
           git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git $runnerDir
           git -C $runnerDir rev-parse HEAD | Set-Content "artifacts/corsair-runner-commit.txt"
 
-      - name: Load exact package into Corsair Labs runner
+      - name: Corsair Labs exact-package host smoke
         shell: pwsh
         run: |
           $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
@@ -115,33 +115,24 @@ jobs:
           $stderr = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.err.log"
           $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $runnerDir -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           $process.Id | Set-Content "artifacts/corsair-runner.pid"
-          $ready = $false
-          for ($i = 0; $i -lt 30; $i++) {
-            try {
-              $response = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/api/widgets -TimeoutSec 2
-              if ($response.StatusCode -eq 200) { $ready = $true; break }
-            } catch {}
-            Start-Sleep -Seconds 1
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/api/widgets -TimeoutSec 2
+                if ($response.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Corsair Labs runner did not become ready.' }
+            node tools/xeneon/icue-runner-smoke.mjs http://127.0.0.1:8080/ "$env:WIDGET_SLUG" "artifacts/icue-runner/$env:WIDGET_SLUG"
+            if ($LASTEXITCODE -ne 0) { throw "Corsair Labs runner smoke failed with exit code $LASTEXITCODE" }
           }
-          if (-not $ready) {
-            Get-Content $stdout -ErrorAction SilentlyContinue
-            Get-Content $stderr -ErrorAction SilentlyContinue
-            throw 'Corsair Labs runner did not become ready.'
+          finally {
+            if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $stdout) { Copy-Item $stdout "artifacts/corsair-runner.stdout.log" }
+            if (Test-Path $stderr) { Copy-Item $stderr "artifacts/corsair-runner.stderr.log" }
           }
-
-      - name: Corsair Labs runner settings smoke
-        shell: pwsh
-        run: |
-          node tools/xeneon/icue-runner-smoke.mjs http://127.0.0.1:8080/ "$env:WIDGET_SLUG" "artifacts/icue-runner/$env:WIDGET_SLUG"
-
-      - name: Preserve runner logs
-        if: always()
-        shell: pwsh
-        run: |
-          $stdout = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.out.log"
-          $stderr = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.err.log"
-          if (Test-Path $stdout) { Copy-Item $stdout "artifacts/corsair-runner.stdout.log" }
-          if (Test-Path $stderr) { Copy-Item $stderr "artifacts/corsair-runner.stderr.log" }
 
       - name: Upload recovery evidence
         if: always()
