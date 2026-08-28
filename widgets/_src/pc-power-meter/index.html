@@ -9,8 +9,8 @@
 <meta name="x-icue-property" content="powerSensor" data-label="tr('Power Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','total-power-draw')" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
-<meta name="x-icue-property" content="graphColor" data-label="tr('Graph Color')" data-type="color" data-default="'#2BE86A'" />
 <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background Color')" data-type="color" data-default="'#070A0D'" />
+<meta name="x-icue-property" content="graphColor" data-label="tr('Graph Color')" data-type="color" data-default="'#2BE86A'" />
 
 <script type="application/json" id="x-icue-groups">
 [
@@ -21,7 +21,8 @@
   },
   {
     "title": "tr('Appearance')",
-    "properties": ["textColor", "accentColor", "graphColor", "backgroundColor"]
+    "properties": ["textColor", "accentColor", "backgroundColor", "graphColor"],
+    "info": "tr('Custom Style updates the widget even when no compatible power sensor is available.')"
   }
 ]
 </script>
