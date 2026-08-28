@@ -33,7 +33,6 @@ jobs:
 
     env:
       WIDGET_SLUG: ${{ matrix.slug }}
-      CORSAIR_RUNNER_DIR: ${{ runner.temp }}\icue-widget-runner-windows
 
     steps:
       - name: Checkout RatPack recovery branch
@@ -100,18 +99,21 @@ jobs:
       - name: Clone Corsair Labs iCUE Widget Runner
         shell: pwsh
         run: |
-          git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git "$env:CORSAIR_RUNNER_DIR"
-          git -C "$env:CORSAIR_RUNNER_DIR" rev-parse HEAD | Set-Content "artifacts/corsair-runner-commit.txt"
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          if (Test-Path $runnerDir) { Remove-Item -Recurse -Force $runnerDir }
+          git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git $runnerDir
+          git -C $runnerDir rev-parse HEAD | Set-Content "artifacts/corsair-runner-commit.txt"
 
       - name: Load exact package into Corsair Labs runner
         shell: pwsh
         run: |
-          $target = Join-Path "$env:CORSAIR_RUNNER_DIR\widgets" $env:WIDGET_SLUG
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          $target = Join-Path (Join-Path $runnerDir 'widgets') $env:WIDGET_SLUG
           if (Test-Path $target) { Remove-Item -Recurse -Force $target }
           Copy-Item -Recurse -Force "artifacts/extracted/$env:WIDGET_SLUG" $target
           $stdout = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.out.log"
           $stderr = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.err.log"
-          $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $env:CORSAIR_RUNNER_DIR -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $runnerDir -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
           $process.Id | Set-Content "artifacts/corsair-runner.pid"
           $ready = $false
           for ($i = 0; $i -lt 30; $i++) {
