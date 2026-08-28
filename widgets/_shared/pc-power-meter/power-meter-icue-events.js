@@ -5,6 +5,10 @@ var pluginSensorsdataproviderEvents;
 (function () {
   'use strict';
 
+  var STYLE_NAMES = ['textColor', 'accentColor', 'backgroundColor', 'graphColor'];
+  var styleSnapshot = '';
+  var styleWatchTimer = null;
+
   function read(name, fallback) {
     try {
       if (typeof globalThis.__ratpackIcueRead === 'function') {
@@ -56,6 +60,32 @@ var pluginSensorsdataproviderEvents;
     } catch (error) {}
   }
 
+  function styleSignature() {
+    return STYLE_NAMES.map(function (name) {
+      return String(read(name, ''));
+    }).join('|');
+  }
+
+  function applyStyleBindings() {
+    syncAllBindings();
+    var root = document.documentElement;
+    if (!root) return;
+    root.style.setProperty('--text', String(read('textColor', '#F4F6F8')));
+    root.style.setProperty('--accent', String(read('accentColor', '#2BE86A')));
+    root.style.setProperty('--background', String(read('backgroundColor', '#070A0D')));
+    root.style.setProperty('--graph', String(read('graphColor', '#2BE86A')));
+    styleSnapshot = styleSignature();
+  }
+
+  function startStyleWatcher() {
+    if (styleWatchTimer) return;
+    applyStyleBindings();
+    styleWatchTimer = setInterval(function () {
+      var next = styleSignature();
+      if (next !== styleSnapshot) applyStyleBindings();
+    }, 200);
+  }
+
   function forceSensorScan() {
     try {
       if (globalThis.PackRatPowerMeterTest && typeof globalThis.PackRatPowerMeterTest.forceScan === 'function') {
@@ -67,19 +97,14 @@ var pluginSensorsdataproviderEvents;
   }
 
   function refresh() {
-    syncAllBindings();
-    var root = document.documentElement;
-    if (root) {
-      root.style.setProperty('--text', String(read('textColor', '#F4F6F8')));
-      root.style.setProperty('--accent', String(read('accentColor', '#2BE86A')));
-      root.style.setProperty('--background', String(read('backgroundColor', '#070A0D')));
-      root.style.setProperty('--graph', String(read('graphColor', '#2BE86A')));
-    }
+    applyStyleBindings();
+    startStyleWatcher();
     forceSensorScan();
   }
 
   function onSensorsPluginReady() {
     syncAllBindings();
+    startStyleWatcher();
     forceSensorScan();
   }
 
@@ -95,6 +120,7 @@ var pluginSensorsdataproviderEvents;
   };
   globalThis.pluginSensorsdataproviderEvents = pluginSensorsdataproviderEvents;
 
+  startStyleWatcher();
   try {
     if (typeof iCUE_initialized !== 'undefined' && iCUE_initialized) refresh();
   } catch (error) {}
