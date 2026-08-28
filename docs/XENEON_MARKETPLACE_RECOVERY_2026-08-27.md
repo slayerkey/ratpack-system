@@ -166,6 +166,33 @@ Important disclosure: this evidence proves product logic and provider lifecycle 
 
 Final state: `qa_passed`, ready for revision submission with reviewer evidence attached. Hardware-origin video remains conditional on reviewer acceptance requirements.
 
+## Public regression follow-up
+
+After the seven rejected products were repaired, RatPack ran the same hardened host gate retroactively against every other canonical shipping widget under `widgets/_src/`.
+
+Workflow: `XENEON Public Regression Audit`
+
+Passing run: `33134693303`
+
+Result: **8 / 8 additional widgets passed**.
+
+Audited widgets:
+
+- `agenda-panel`
+- `helldivers`
+- `net-dashboard`
+- `now-playing`
+- `obs-dashboard`
+- `pc-power-meter-pro`
+- `rig-battery`
+- `snake`
+
+Every audited widget passed canonical generation, deterministic generation check, official CORSAIR validation, official packaging, exact-package integrity and extraction, lexical iCUE settings regression, and the Corsair Labs Windows exact-package host smoke.
+
+Combined with the seven Marketplace recovery products, this gives **15 / 15 current canonical shipping XENEON widget slugs passing the hardened public host gate**. `desk-notes-common` is shared source infrastructure rather than a shipping widget and is not counted as a product slug.
+
+No additional instance of the Marketplace rejection bug class was found in the remaining canonical widget set.
+
 ## System changes resulting from this recovery
 
 The recovery was not treated as seven isolated product patches.
@@ -179,6 +206,7 @@ RatPack now has:
 - explicit QA policy that Marketplace or real-host failures invalidate stale `qa_passed` evidence until the rejected behavior is covered by a passing regression
 - product-specific Desk Notes settings regression
 - reusable PC Power reviewer evidence workflow
+- a reusable full canonical public regression audit workflow
 
 The intended public QA order is now:
 
