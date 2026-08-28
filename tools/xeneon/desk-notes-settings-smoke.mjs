@@ -109,7 +109,7 @@ try {
   // property was refreshed. The generated runtime sync must detect the binding change,
   // mirror it, and invoke the normal widget update lifecycle without a long delay.
   await page.evaluate(() => globalThis.__setDeskNotesSettingsSmoke());
-  await page.waitForFunction(({ pro }) => {
+  await page.waitForFunction(({ pro, expectedTitle, expectedNote }) => {
     const css = getComputedStyle(document.documentElement);
     const title = document.getElementById("boardTitleView")?.textContent?.trim();
     const notes = [...document.querySelectorAll(".item-copy")].map((node) => node.textContent?.trim() || "");
@@ -118,13 +118,13 @@ try {
     const fontScale = (document.documentElement.style.getPropertyValue("--font-scale") || css.getPropertyValue("--font-scale")).trim();
     const alpha = (document.documentElement.style.getPropertyValue("--surface-alpha") || css.getPropertyValue("--surface-alpha")).trim();
     const history = document.getElementById("historyButton");
-    return title === ${JSON.stringify(afterTitle)}
-      && notes.includes("Settings path works")
+    return title === expectedTitle
+      && notes.includes(expectedNote)
       && theme === "paper"
       && fontScale === "1.25"
       && alpha === "0.6"
       && (!pro || (arrangement === "columns" && history && history.hidden === true));
-  }, { pro: isPro }, { timeout: 3000 });
+  }, { pro: isPro, expectedTitle: afterTitle, expectedNote: "Settings path works" }, { timeout: 3000 });
 
   report.updated = await snapshot();
   if (report.updated.boardTitle !== afterTitle) throw new Error(`updated board title mismatch: ${report.updated.boardTitle}`);
