@@ -26,15 +26,15 @@ const report = {
 
 let exitCode = 0;
 try {
-  await page.addInitScript(() => {
+  await page.addInitScript({ content: `
     let themePreset = 'matrix';
     let showTouchGuides = true;
     globalThis.__snakeSettingsFixture = {
       setTheme(value) { themePreset = value; },
       setGuides(value) { showTouchGuides = value; },
-      values() { return { themePreset, showTouchGuides }; },
+      values() { return { themePreset, showTouchGuides }; }
     };
-  });
+  ` });
 
   await page.goto(pathToFileURL(path.resolve(entry)).href, { waitUntil: 'load', timeout: 30_000 });
   await page.waitForFunction(() => document.body?.dataset?.theme === 'matrix');
