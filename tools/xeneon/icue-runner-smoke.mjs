@@ -32,7 +32,7 @@ function containsValue(object, expected) {
 }
 
 const report = {
-  schema_version: 2,
+  schema_version: 3,
   runner: "Corsair-Labs/iCUE-widget-runner-windows",
   runner_url: baseUrl,
   slug,
@@ -42,6 +42,7 @@ const report = {
   },
   initial: null,
   updated: null,
+  lifecycle_tested: false,
   style_tested: false,
   passed: false,
 };
@@ -78,6 +79,8 @@ async function snapshot(frame) {
       .filter(Boolean);
     return {
       declared,
+      hasOnICUEInitialized: !!(globalThis.icueEvents && typeof globalThis.icueEvents.onICUEInitialized === "function"),
+      hasOnDataUpdated: !!(globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function"),
       hasOwnTextColor: Object.prototype.hasOwnProperty.call(globalThis, "textColor"),
       hasOwnAccentColor: Object.prototype.hasOwnProperty.call(globalThis, "accentColor"),
       hasOwnBackgroundColor: Object.prototype.hasOwnProperty.call(globalThis, "backgroundColor"),
@@ -120,6 +123,13 @@ try {
   report.fidelity.property_injection = report.initial.hasOwnTextColor && report.initial.hasOwnAccentColor && report.initial.hasOwnBackgroundColor
     ? "window-object-properties"
     : "non-window-binding";
+
+  if (report.initial.declared.length) {
+    report.lifecycle_tested = true;
+    if (!report.initial.hasOnDataUpdated) {
+      throw new Error(`widget declares ${report.initial.declared.length} iCUE properties but does not expose icueEvents.onDataUpdated`);
+    }
+  }
 
   await page.screenshot({ path: path.join(outDir, `${slug}-runner-before.png`), fullPage: true });
 
