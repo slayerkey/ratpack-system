@@ -17,7 +17,7 @@ const html = fs.readFileSync(entry, "utf8");
 const required = ["textColor", "accentColor", "backgroundColor"];
 const declared = required.filter((name) => new RegExp(`name=[\"']x-icue-property[\"'][^>]*content=[\"']${name}[\"']|content=[\"']${name}[\"'][^>]*name=[\"']x-icue-property[\"']`, "i").test(html));
 const report = {
-  schema_version: 4,
+  schema_version: 5,
   entry: path.basename(entry),
   declared,
   initial: null,
@@ -83,16 +83,24 @@ async function snapshot() {
   return page.evaluate(() => {
     const root = document.documentElement;
     const css = getComputedStyle(root);
+    const firstVar = (...names) => {
+      for (const name of names) {
+        const value = root.style.getPropertyValue(name) || css.getPropertyValue(name);
+        if (String(value || "").trim()) return value;
+      }
+      return "";
+    };
     return {
+      hasOnDataUpdated: !!(globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function"),
       textBinding: globalThis.textColor,
       accentBinding: globalThis.accentColor,
       backgroundBinding: globalThis.backgroundColor,
       textReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("textColor") : undefined,
       accentReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("accentColor") : undefined,
       backgroundReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("backgroundColor") : undefined,
-      textVar: root.style.getPropertyValue("--text") || css.getPropertyValue("--text"),
-      accentVar: root.style.getPropertyValue("--accent") || css.getPropertyValue("--accent"),
-      backgroundVar: root.style.getPropertyValue("--bg") || css.getPropertyValue("--bg"),
+      textVar: firstVar("--text", "--text-color"),
+      accentVar: firstVar("--accent", "--accent-color"),
+      backgroundVar: firstVar("--bg", "--background", "--background-color"),
       bodyState: document.body ? document.body.getAttribute("data-connection") || document.body.getAttribute("data-state") || "" : "",
     };
   });
@@ -108,6 +116,9 @@ try {
   }
 
   report.initial = await snapshot();
+  if (!report.initial.hasOnDataUpdated) {
+    throw new Error("widget declares Custom Style but does not expose icueEvents.onDataUpdated");
+  }
   for (const [key, expected] of [
     ["textBinding", before.text], ["accentBinding", before.accent], ["backgroundBinding", before.background],
     ["textReader", before.text], ["accentReader", before.accent], ["backgroundReader", before.background],
@@ -119,7 +130,7 @@ try {
   await page.evaluate((next) => {
     if (typeof globalThis.__setRatpackIcueStyleSmoke !== "function") throw new Error("native style harness setter missing");
     globalThis.__setRatpackIcueStyleSmoke(next);
-    if (globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function") globalThis.icueEvents.onDataUpdated();
+    globalThis.icueEvents.onDataUpdated();
   }, after);
   await page.waitForTimeout(500);
   report.updated = await snapshot();
