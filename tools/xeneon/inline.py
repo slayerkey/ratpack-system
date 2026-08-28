@@ -6,12 +6,12 @@ Sources live in widgets/_src/<slug>/ and shipping files live in widgets/<slug>/.
 Local stylesheets and classic scripts referenced by the source HTML are inlined into
 widgets/<slug>/index.html before official iCUE validation and packaging.
 
-The generated document also installs a tiny compatibility bridge for iCUE property
-controls. Current iCUE exposes controls as JavaScript bindings before widget scripts,
-while some older RatPack widgets read settings through globalThis. The bridge uses
-statically generated direct binding reads, then exposes live globalThis getters only
-when the host binding exists. This avoids relying on Function/eval behavior that can
-differ between a normal browser, compatibility runners, and the real iCUE host.
+The generated document installs two small compatibility layers for iCUE property
+controls. The first exposes a static direct-binding reader for controls that iCUE
+creates as document-level JavaScript bindings. The second runs after authored widget
+scripts and mirrors those live values into writable globalThis properties for older
+RatPack runtimes that still read window properties. When a mirrored binding changes,
+the watcher invokes the widget's normal onDataUpdated lifecycle immediately.
 
 Usage:
     python tools/xeneon/inline.py <slug>
@@ -120,6 +120,90 @@ def binding_bridge(html: str) -> str:
 </script>"""
 
 
+def binding_runtime_sync(html: str) -> str:
+    names = icue_property_names(html)
+    if not names:
+        return ""
+    encoded = json.dumps(names, ensure_ascii=True, separators=(",", ":"))
+    return f"""<script>
+(function () {{
+  var names = {encoded};
+  var snapshot = Object.create(null);
+  var started = false;
+  var notifying = false;
+
+  function stable(value) {{
+    if (value === undefined) return '__ratpack_undefined__';
+    try {{ return JSON.stringify(value); }}
+    catch (error) {{ return String(value); }}
+  }}
+
+  function mirror(name, value) {{
+    if (value === undefined) return;
+    try {{
+      var descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+      if (descriptor && (descriptor.get || descriptor.set)) return;
+      if (!descriptor) {{
+        Object.defineProperty(globalThis, name, {{
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: value
+        }});
+      }} else if (descriptor.writable !== false) {{
+        globalThis[name] = value;
+      }}
+    }} catch (error) {{}}
+  }}
+
+  function sync() {{
+    var reader = globalThis.__ratpackIcueRead;
+    if (typeof reader !== 'function') return;
+    var changed = false;
+    names.forEach(function (name) {{
+      var value;
+      try {{ value = reader(name); }}
+      catch (error) {{ return; }}
+      if (value === undefined) return;
+      var next = stable(value);
+      if (Object.prototype.hasOwnProperty.call(snapshot, name) && snapshot[name] !== next) changed = true;
+      snapshot[name] = next;
+      mirror(name, value);
+    }});
+
+    if (started && changed && !notifying) {{
+      try {{
+        var events = globalThis.icueEvents;
+        if (events && typeof events.onDataUpdated === 'function') {{
+          notifying = true;
+          events.onDataUpdated();
+        }}
+      }} catch (error) {{}}
+      finally {{ notifying = false; }}
+    }}
+    started = true;
+  }}
+
+  sync();
+  globalThis.__ratpackIcueSyncGlobals = sync;
+  globalThis.__ratpackIcueBindingSync = {{ version: 1, names: names.slice() }};
+  setInterval(sync, 200);
+}})();
+</script>"""
+
+
+def validate_control_attributes(html: str) -> None:
+    for match in META_RE.finditer(html):
+        tag = match.group(0)
+        name_match = NAME_RE.search(tag)
+        if not name_match or name_match.group(1).lower() != "x-icue-property":
+            continue
+        type_match = re.search(r"\bdata-type\s*=\s*[\"']([^\"']+)[\"']", tag, re.I)
+        control_type = type_match.group(1).strip().lower() if type_match else ""
+        if control_type in {"combobox", "tab-buttons"} and re.search(r"\bdata-options\s*=", tag, re.I):
+            die("iCUE control uses unsupported data-options; use data-values for combobox/tab-buttons")
+
+
 def build(slug: str, check_only: bool) -> None:
     wdir = WIDGETS / slug
     src_dir = WIDGETS / "_src" / slug
@@ -132,6 +216,7 @@ def build(slug: str, check_only: bool) -> None:
         die(f"no widgets/{slug}/ package directory")
 
     html = entry.read_text(encoding="utf-8")
+    validate_control_attributes(html)
 
     def inline_link(match):
         href = HREF_RE.search(match.group(0))
@@ -158,6 +243,12 @@ def build(slug: str, check_only: bool) -> None:
         if "</head>" not in html:
             die("no </head> in built document")
         html = html.replace("</head>", bridge + "\n</head>", 1)
+
+    runtime_sync = binding_runtime_sync(html)
+    if runtime_sync:
+        if "</body>" not in html:
+            die("no </body> in built document")
+        html = html.replace("</body>", runtime_sync + "\n</body>", 1)
 
     parts, last = [], 0
     for match in BLOCK_RE.finditer(html):
