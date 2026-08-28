@@ -7,10 +7,11 @@ Local stylesheets and classic scripts referenced by the source HTML are inlined 
 widgets/<slug>/index.html before official iCUE validation and packaging.
 
 The generated document also installs a tiny compatibility bridge for iCUE property
-controls. Current iCUE injects controls as JavaScript bindings before widget scripts;
-some older RatPack widgets read settings through globalThis. The bridge exposes live
-getters for those injected bindings without copying or caching the values, so changes
-received through onDataUpdated are visible immediately in both access patterns.
+controls. Current iCUE exposes controls as JavaScript bindings before widget scripts,
+while some older RatPack widgets read settings through globalThis. The bridge uses
+statically generated direct binding reads, then exposes live globalThis getters only
+when the host binding exists. This avoids relying on Function/eval behavior that can
+differ between a normal browser, compatibility runners, and the real iCUE host.
 
 Usage:
     python tools/xeneon/inline.py <slug>
@@ -84,22 +85,37 @@ def binding_bridge(html: str) -> str:
     if not names:
         return ""
     encoded = json.dumps(names, ensure_ascii=True, separators=(",", ":"))
+    cases = []
+    for name in names:
+        key = json.dumps(name, ensure_ascii=True)
+        cases.append(
+            f"    case {key}:\n"
+            f"      try {{ return typeof {name} !== 'undefined' ? {name} : undefined; }}\n"
+            f"      catch (error) {{ return undefined; }}"
+        )
+    case_block = "\n".join(cases)
     return f"""<script>
 (function () {{
   var names = {encoded};
+  function readBinding(name) {{
+    switch (name) {{
+{case_block}
+      default: return undefined;
+    }}
+  }}
+  globalThis.__ratpackIcueRead = readBinding;
   names.forEach(function (name) {{
     try {{
       if (Object.prototype.hasOwnProperty.call(globalThis, name)) return;
-      var resolve = Function("return typeof " + name + " !== 'undefined' ? " + name + " : undefined;");
-      if (resolve() === undefined) return;
+      if (readBinding(name) === undefined) return;
       Object.defineProperty(globalThis, name, {{
         configurable: true,
         enumerable: true,
-        get: function () {{ try {{ return resolve(); }} catch (error) {{ return undefined; }} }}
+        get: function () {{ return readBinding(name); }}
       }});
     }} catch (error) {{}}
   }});
-  globalThis.__ratpackIcueBindingBridge = {{ version: 1, names: names.slice() }};
+  globalThis.__ratpackIcueBindingBridge = {{ version: 2, mode: 'direct-binding', names: names.slice() }};
 }})();
 </script>"""
 

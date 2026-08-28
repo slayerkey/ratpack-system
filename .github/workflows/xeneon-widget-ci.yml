@@ -48,7 +48,9 @@ jobs:
 
       - name: Generate shipping widget from canonical source
         shell: pwsh
-        run: python tools/xeneon/inline.py "$env:WIDGET_SLUG"
+        run: |
+          python tools/xeneon/inline.py "$env:WIDGET_SLUG"
+          python tools/xeneon/inline.py "$env:WIDGET_SLUG" --check
 
       - name: Show iCUE Widget CLI version
         shell: pwsh
@@ -71,6 +73,22 @@ jobs:
             Select-Object -First 1
           if (-not $pkg) { throw 'icuewidget package did not produce an archive under widgets/' }
           Copy-Item $pkg.FullName "artifacts/$env:WIDGET_SLUG.icuewidget"
+          @'
+          import os, pathlib, zipfile
+          slug = os.environ['WIDGET_SLUG']
+          package = pathlib.Path('artifacts') / f'{slug}.icuewidget'
+          if not zipfile.is_zipfile(package):
+              raise SystemExit(f'official package is not a valid ZIP-compatible .icuewidget: {package}')
+          with zipfile.ZipFile(package) as archive:
+              bad = archive.testzip()
+              if bad:
+                  raise SystemExit(f'official package contains a corrupt member: {bad}')
+              names = {name.replace('\\', '/') for name in archive.namelist()}
+          for required in ('index.html', 'manifest.json'):
+              if required not in names:
+                  raise SystemExit(f'official package is missing root {required}')
+          print(f'OK exact official package integrity: {package}')
+          '@ | python -
           $manifest = Get-Content "widgets/$env:WIDGET_SLUG/manifest.json" -Raw | ConvertFrom-Json
           $info = [ordered]@{
             slug = $env:WIDGET_SLUG
@@ -95,9 +113,109 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  icue-host:
+    name: iCUE host compatibility gate
+    needs: [resolve-slug, validate-package]
+    runs-on: windows-latest
+    env:
+      WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Download exact official package
+        uses: actions/download-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-package
+          path: artifacts/input
+
+      - name: Extract and recheck exact official package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "artifacts/extracted/$env:WIDGET_SLUG" | Out-Null
+          @'
+          import os, pathlib, zipfile
+          slug = os.environ['WIDGET_SLUG']
+          package = pathlib.Path('artifacts/input') / f'{slug}.icuewidget'
+          out = pathlib.Path('artifacts/extracted') / slug
+          if not zipfile.is_zipfile(package):
+              raise SystemExit(f'package is not a valid ZIP-compatible .icuewidget: {package}')
+          with zipfile.ZipFile(package) as archive:
+              bad = archive.testzip()
+              if bad:
+                  raise SystemExit(f'corrupt member in package: {bad}')
+              archive.extractall(out)
+          for required in ('index.html', 'manifest.json'):
+              if not (out / required).is_file():
+                  raise SystemExit(f'package missing root {required}')
+          print(f'OK exact package extracted: {package} -> {out}')
+          '@ | python -
+
+      - name: Install host smoke dependencies
+        shell: pwsh
+        run: |
+          npm install --no-save playwright@1.62.1
+          npx playwright install chromium
+
+      - name: Lexical iCUE Custom Style regression
+        shell: pwsh
+        run: |
+          node tools/xeneon/native-style-smoke.mjs "artifacts/extracted/$env:WIDGET_SLUG/index.html" "artifacts/native-style/$env:WIDGET_SLUG"
+
+      - name: Clone Corsair Labs iCUE Widget Runner
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          if (Test-Path $runnerDir) { Remove-Item -Recurse -Force $runnerDir }
+          git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git $runnerDir
+          git -C $runnerDir rev-parse HEAD | Set-Content "artifacts/corsair-runner-commit.txt"
+
+      - name: Corsair Labs exact-package host and settings smoke
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          $target = Join-Path (Join-Path $runnerDir 'widgets') $env:WIDGET_SLUG
+          if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+          Copy-Item -Recurse -Force "artifacts/extracted/$env:WIDGET_SLUG" $target
+          $stdout = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.out.log"
+          $stderr = Join-Path $env:RUNNER_TEMP "corsair-runner-$env:WIDGET_SLUG.err.log"
+          $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $runnerDir -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/api/widgets -TimeoutSec 2
+                if ($response.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Corsair Labs runner did not become ready.' }
+            node tools/xeneon/icue-runner-smoke.mjs http://127.0.0.1:8080/ "$env:WIDGET_SLUG" "artifacts/icue-runner/$env:WIDGET_SLUG"
+            if ($LASTEXITCODE -ne 0) { throw "Corsair Labs runner smoke failed with exit code $LASTEXITCODE" }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $stdout) { Copy-Item $stdout "artifacts/corsair-runner.stdout.log" }
+            if (Test-Path $stderr) { Copy-Item $stderr "artifacts/corsair-runner.stderr.log" }
+          }
+
+      - name: Upload iCUE host evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-icue-host
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
   streamspell:
     name: StreamSpell packaged preview
-    needs: [resolve-slug, validate-package]
+    needs: [resolve-slug, validate-package, icue-host]
     runs-on: ubuntu-latest
     env:
       WIDGET_SLUG: ${{ needs.resolve-slug.outputs.slug }}
