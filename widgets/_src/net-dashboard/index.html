@@ -19,7 +19,7 @@
   {
     "title": "tr('Monitoring')",
     "properties": ["probeHosts", "probeInterval", "warnAt"],
-    "info": "tr('The first HTTPS host drives the ribbon. Add up to five CORS compatible HTTPS URLs, one per line.')"
+    "info": "tr('The first HTTPS host drives the ribbon. Add up to five HTTPS URLs, one per line. The widget measures browser HTTPS response timing, not ICMP ping, and does not read cross-origin response contents.')"
   },
   {
     "title": "tr('Appearance')",
@@ -101,5 +101,6 @@
   </div>
 </main>
 <script src="network.js"></script>
+<script src="network-transport-patch.js"></script>
 </body>
 </html>
