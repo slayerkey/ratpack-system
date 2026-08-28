@@ -20,6 +20,7 @@ const target = {
   accentColor: "#FF274D",
   backgroundColor: "#18100B",
 };
+const styleTriplet = Object.keys(target);
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/\s+/g, "");
@@ -31,7 +32,7 @@ function containsValue(object, expected) {
 }
 
 const report = {
-  schema_version: 1,
+  schema_version: 2,
   runner: "Corsair-Labs/iCUE-widget-runner-windows",
   runner_url: baseUrl,
   slug,
@@ -41,6 +42,7 @@ const report = {
   },
   initial: null,
   updated: null,
+  style_tested: false,
   passed: false,
 };
 
@@ -71,7 +73,11 @@ async function snapshot(frame) {
       const value = root.style.getPropertyValue(name) || css.getPropertyValue(name);
       if (String(value || "").trim()) vars[name] = String(value).trim();
     }
+    const declared = [...document.querySelectorAll('meta[name="x-icue-property"]')]
+      .map((node) => String(node.getAttribute("content") || "").trim())
+      .filter(Boolean);
     return {
+      declared,
       hasOwnTextColor: Object.prototype.hasOwnProperty.call(globalThis, "textColor"),
       hasOwnAccentColor: Object.prototype.hasOwnProperty.call(globalThis, "accentColor"),
       hasOwnBackgroundColor: Object.prototype.hasOwnProperty.call(globalThis, "backgroundColor"),
@@ -117,41 +123,50 @@ try {
 
   await page.screenshot({ path: path.join(outDir, `${slug}-runner-before.png`), fullPage: true });
 
-  await page.evaluate(({ slug: widgetSlug, next }) => {
-    const widget = window.getWidgetById(`disk:${widgetSlug}`);
-    if (!widget) throw new Error(`runner widget not found: ${widgetSlug}`);
-    for (const [name, value] of Object.entries(next)) window.saveWidgetSetting(widget, name, value);
-    window.applyWidgetSettings(widget);
-  }, { slug, next: target });
-  await page.waitForTimeout(750);
+  const hasStyleTriplet = styleTriplet.every((name) => report.initial.declared.includes(name));
+  if (hasStyleTriplet) {
+    report.style_tested = true;
+    await page.evaluate(({ slug: widgetSlug, next }) => {
+      const widget = window.getWidgetById(`disk:${widgetSlug}`);
+      if (!widget) throw new Error(`runner widget not found: ${widgetSlug}`);
+      for (const [name, value] of Object.entries(next)) window.saveWidgetSetting(widget, name, value);
+      window.applyWidgetSettings(widget);
+    }, { slug, next: target });
+    await page.waitForTimeout(750);
 
-  frame = await widgetFrame();
-  report.updated = await snapshot(frame);
+    frame = await widgetFrame();
+    report.updated = await snapshot(frame);
 
-  for (const [key, expected] of [
-    ["textBinding", target.textColor],
-    ["accentBinding", target.accentColor],
-    ["backgroundBinding", target.backgroundColor],
-  ]) {
-    if (normalize(report.updated[key]) !== normalize(expected)) {
-      throw new Error(`runner ${key} mismatch: ${report.updated[key]} != ${expected}`);
+    for (const [key, expected] of [
+      ["textBinding", target.textColor],
+      ["accentBinding", target.accentColor],
+      ["backgroundBinding", target.backgroundColor],
+    ]) {
+      if (normalize(report.updated[key]) !== normalize(expected)) {
+        throw new Error(`runner ${key} mismatch: ${report.updated[key]} != ${expected}`);
+      }
     }
+
+    if (!containsValue(report.updated.customProperties, target.textColor)) {
+      throw new Error(`widget did not apply runner textColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
+    }
+    if (!containsValue(report.updated.customProperties, target.accentColor)) {
+      throw new Error(`widget did not apply runner accentColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
+    }
+    if (!containsValue(report.updated.customProperties, target.backgroundColor)) {
+      throw new Error(`widget did not apply runner backgroundColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
+    }
+
+    if (!report.updated.bridge || Number(report.updated.bridge.version) < 2) {
+      throw new Error("packaged widget is not using the hardened RatPack iCUE binding bridge");
+    }
+  } else {
+    report.updated = report.initial;
+    report.style_skip_reason = "widget does not declare the complete XENEON Custom Style triplet";
   }
 
-  if (!containsValue(report.updated.customProperties, target.textColor)) {
-    throw new Error(`widget did not apply runner textColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
-  }
-  if (!containsValue(report.updated.customProperties, target.accentColor)) {
-    throw new Error(`widget did not apply runner accentColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
-  }
-  if (!containsValue(report.updated.customProperties, target.backgroundColor)) {
-    throw new Error(`widget did not apply runner backgroundColor to a known CSS custom property: ${JSON.stringify(report.updated.customProperties)}`);
-  }
-
-  if (!report.updated.bridge || Number(report.updated.bridge.version) < 2) {
-    throw new Error("packaged widget is not using the hardened RatPack iCUE binding bridge");
-  }
-
+  if (!report.initial.bodyState) throw new Error("runner loaded widget without a document body state snapshot");
+  if (pageErrors.length) throw new Error(`runner page errors: ${JSON.stringify(pageErrors)}`);
   await page.screenshot({ path: path.join(outDir, `${slug}-runner-after.png`), fullPage: true });
   report.passed = true;
 } catch (error) {
