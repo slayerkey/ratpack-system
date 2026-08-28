@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
     paths:
+      - 'tools/xeneon/inline.py'
+      - 'tools/xeneon/native-style-smoke.mjs'
+      - 'tools/xeneon/icue-runner-smoke.mjs'
+      - '.github/workflows/xeneon-public-regression-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/xeneon/inline.py'
+      - 'tools/xeneon/native-style-smoke.mjs'
+      - 'tools/xeneon/icue-runner-smoke.mjs'
       - '.github/workflows/xeneon-public-regression-audit.yml'
   workflow_dispatch:
 
