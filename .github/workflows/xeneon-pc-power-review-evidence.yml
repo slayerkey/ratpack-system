@@ -1,6 +1,15 @@
 name: XENEON PC Power Review Evidence
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/xeneon/pc-power-review-demo.mjs'
+      - 'tools/xeneon/inline.py'
+      - 'widgets/_src/pc-power-meter/**'
+      - 'widgets/_shared/pc-power-meter/**'
+      - 'widgets/pc-power-meter/**'
+      - '.github/workflows/xeneon-pc-power-review-evidence.yml'
   pull_request:
     branches: [main]
     paths:
