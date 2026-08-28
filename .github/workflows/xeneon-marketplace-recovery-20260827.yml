@@ -96,6 +96,12 @@ jobs:
         run: |
           node tools/xeneon/native-style-smoke.mjs "artifacts/extracted/$env:WIDGET_SLUG/index.html" "artifacts/native-style/$env:WIDGET_SLUG"
 
+      - name: Desk Notes content settings regression
+        if: startsWith(matrix.slug, 'desk-notes')
+        shell: pwsh
+        run: |
+          node tools/xeneon/desk-notes-settings-smoke.mjs "artifacts/extracted/$env:WIDGET_SLUG/index.html" "artifacts/desk-notes-settings/$env:WIDGET_SLUG"
+
       - name: Clone Corsair Labs iCUE Widget Runner
         shell: pwsh
         run: |
