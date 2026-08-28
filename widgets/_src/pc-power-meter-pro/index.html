@@ -7,7 +7,6 @@
 <title>tr('PC Power Meter Pro')</title>
 
 <meta name="x-icue-property" content="primarySensor" data-label="tr('Primary Power Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','total-power-draw')" />
-<meta name="x-icue-property" content="comparisonSensors" data-label="tr('Comparison Power Sensors')" data-type="sensors-factory" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power')" />
 <meta name="x-icue-property" content="electricityRate" data-label="tr('Electricity Rate')" data-type="slider" data-default="0.15" data-min="0" data-max="2" data-step="0.01" data-unit-label="'/ kWh'" />
 <meta name="x-icue-property" content="currencySymbol" data-label="tr('Currency Symbol')" data-type="textfield" data-default="'$'" />
 <meta name="x-icue-property" content="graphWindow" data-label="tr('Graph Window')" data-type="combobox" data-default="'180'" data-values="[{'key':'60','value':tr('60 seconds')},{'key':'180','value':tr('3 minutes')},{'key':'300','value':tr('5 minutes')},{'key':'600','value':tr('10 minutes')}]" />
@@ -20,14 +19,14 @@
 <script type="application/json" id="x-icue-groups">
 [
   {
-    "title": "tr('Power Sources')",
-    "properties": ["primarySensor", "comparisonSensors"],
-    "info": "tr('The primary sensor drives energy, cost, daily usage and session history. Comparison sensors are displayed separately and are never silently summed into total PC draw.')"
+    "title": "tr('Power Source')",
+    "properties": ["primarySensor"],
+    "info": "tr('The selected power sensor drives live watts, energy, cost, daily usage and session history. The widget never substitutes unrelated sensors for power.')"
   },
   {
     "title": "tr('Energy Cost')",
     "properties": ["electricityRate", "currencySymbol"],
-    "info": "tr('Estimated cost is primary sensor energy in kWh multiplied by your configured rate.')"
+    "info": "tr('Estimated cost is measured energy in kWh multiplied by your configured rate.')"
   },
   {
     "title": "tr('Graph and Threshold')",
@@ -44,6 +43,8 @@
 
 <link rel="stylesheet" href="../../_shared/pc-power-meter/power-meter.css" />
 <style>
+#comparisonBoard { display: none; }
+body[data-edition="pro"] #proStrip { grid-template-columns: 1fr; }
 body[data-edition="pro"][data-slot="s-v"] #dashboard {
   grid-template-columns: 1fr 1fr;
   grid-template-rows: .7fr 1.18fr .72fr;
@@ -122,9 +123,9 @@ body[data-edition="pro"][data-slot="s-v"] #proStrip { display: none; }
     <button id="closeInfo" type="button" aria-label="Close">×</button>
     <div id="infoBody">
       <p id="infoScope">Metrics are calculated only from the selected iCUE power sensor.</p>
-      <p>The primary sensor alone drives session energy, daily energy, history and cost. Comparison sensors stay separate. Pro does not add CPU and GPU sensors together and call the result whole-PC power.</p>
-      <p>Estimated cost is integrated primary-sensor kWh multiplied by your configured electricity rate. Missing or disconnected intervals are never filled in.</p>
-      <p>Idle versus active classification is intentionally not claimed in V1 because iCUE does not expose a universal workload-state signal that would make that label reliable across PCs.</p>
+      <p>The selected sensor drives session energy, daily energy, history and cost. Pro does not combine unrelated sensor readings and call the result whole PC power.</p>
+      <p>Estimated cost is integrated measured kWh multiplied by your configured electricity rate. Missing or disconnected intervals are never filled in.</p>
+      <p>Idle versus active classification is intentionally not claimed in V1 because iCUE does not expose a universal workload state signal that would make that label reliable across PCs.</p>
     </div>
     <div id="infoActions"><button id="resetSession" class="actionButton" type="button">Archive and reset session</button></div>
   </section>
