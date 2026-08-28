@@ -28,6 +28,30 @@ Generated shipping HTML uses the RatPack direct-binding bridge from `tools/xeneo
 
 The lexical-binding regression in `tools/xeneon/native-style-smoke.mjs` is mandatory for widgets that declare the XENEON Custom Style triplet. A browser or compatibility runner that writes settings directly onto `window` is not sufficient evidence by itself.
 
+Keep `textColor`, `accentColor`, and `backgroundColor` together and in that order inside a Custom Style property group. Product-specific colors such as a graph color belong after the native triplet.
+
+For products that have shown callback latency in real iCUE, test live binding changes without manually invoking `icueEvents.onDataUpdated`. `tools/xeneon/native-style-autosync-smoke.mjs` is the canonical regression for that failure class.
+
+Do not infer metadata validity from the runtime value shape of an iCUE control. For example, a `sensors-factory` runtime value may be an array while its `data-default` still must follow the current CORSAIR control contract and use the documented sensor expression. Real iCUE importer failures override a green CLI result and must become exact-package regressions.
+
+Keep top-level settings groups within a practical real iCUE viewport. If a product's groups run off screen with no usable navigation, consolidate closely related controls rather than accepting unreachable settings.
+
+## Physical device layout
+
+The iCUE preview is useful but is not proof of physical XENEON readability. Preview and device viewport behavior can differ enough that fixed-pixel typography looks correct in iCUE while becoming undersized on a 1688x696 or 2536x696 physical layout.
+
+Use one deliberate baseline variable for physical-device scaling and derive text, icon, touch target and spacing sizes from it. If a compact preview treatment should remain unchanged, gate the physical override by orientation and/or viewport height instead of globally scaling every surface.
+
+For information-dense wide widgets, add an automated native-resolution readability check at 1688x696 and/or 2536x696. Minimum readable text and icon dimensions should be asserted from computed layout, not judged only from marketing captures.
+
+## Local file origin and network transport
+
+Imported iCUE widgets execute from a local `file://` origin. Arbitrary external endpoints cannot be assumed to grant CORS to that origin.
+
+If a feature needs only reachability or request-to-response timing, do not require a readable CORS response. A tested opaque `no-cors` HTTPS request can provide browser request timing without exposing cross-origin contents. Label the result honestly as HTTPS response timing, not ICMP ping, and label failed attempts as probe loss rather than literal IP packet loss.
+
+If response contents or transferred byte counts are required, such as for a throughput test, use an endpoint that explicitly supports the needed cross-origin read path and validate it separately.
+
 ## Typography safety
 
 Text that lives inside a clipping or marquee viewport must reserve real glyph room, including descenders and overshoot. Do not use compressed line heights that visibly crop letters such as `g`, `y`, `p`, `q`, or `j`.
@@ -71,3 +95,5 @@ A XENEON widget may reach release candidate without a physical XENEON Edge only 
 A product with user facing iCUE controls must not be marked Marketplace ready merely because browser fixtures or StreamSpell pass. Its exact package must pass the lexical settings gate and Corsair Labs runner gate as applicable.
 
 If compatible hardware or a real iCUE host becomes available, run it as an additional smoke test rather than treating it as the place where ordinary code, layout, settings, or packaging bugs should first be discovered.
+
+When physical iCUE behavior contradicts an emulator, runner, preview, or CLI, treat the physical observation as authoritative. Diagnose the mismatch, fix the product or tooling, and add an automated regression for that exact failure before release status is restored.
