@@ -7,15 +7,15 @@
 <title>tr('PC Power Meter Pro')</title>
 
 <meta name="x-icue-property" content="primarySensor" data-label="tr('Primary Power Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','total-power-draw')" />
-<meta name="x-icue-property" content="comparisonSensors" data-label="tr('Comparison Power Sensors')" data-type="sensors-factory" data-default="[]" />
+<meta name="x-icue-property" content="comparisonSensors" data-label="tr('Comparison Power Sensors')" data-type="sensors-factory" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power')" />
 <meta name="x-icue-property" content="electricityRate" data-label="tr('Electricity Rate')" data-type="slider" data-default="0.15" data-min="0" data-max="2" data-step="0.01" data-unit-label="'/ kWh'" />
 <meta name="x-icue-property" content="currencySymbol" data-label="tr('Currency Symbol')" data-type="textfield" data-default="'$'" />
 <meta name="x-icue-property" content="graphWindow" data-label="tr('Graph Window')" data-type="combobox" data-default="'180'" data-values="[{'key':'60','value':tr('60 seconds')},{'key':'180','value':tr('3 minutes')},{'key':'300','value':tr('5 minutes')},{'key':'600','value':tr('10 minutes')}]" />
 <meta name="x-icue-property" content="highPowerThreshold" data-label="tr('High Power Threshold')" data-type="slider" data-default="0" data-min="0" data-max="2000" data-step="25" data-unit-label="'W'" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
-<meta name="x-icue-property" content="graphColor" data-label="tr('Primary Graph Color')" data-type="color" data-default="'#2BE86A'" />
 <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background Color')" data-type="color" data-default="'#070A0D'" />
+<meta name="x-icue-property" content="graphColor" data-label="tr('Primary Graph Color')" data-type="color" data-default="'#2BE86A'" />
 
 <script type="application/json" id="x-icue-groups">
 [
@@ -36,7 +36,8 @@
   },
   {
     "title": "tr('Appearance')",
-    "properties": ["textColor", "accentColor", "graphColor", "backgroundColor"]
+    "properties": ["textColor", "accentColor", "backgroundColor", "graphColor"],
+    "info": "tr('Custom Style updates the widget even when no compatible power sensor is available.')"
   }
 ]
 </script>
