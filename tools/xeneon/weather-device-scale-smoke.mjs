@@ -14,7 +14,7 @@ if (!entry || !fs.existsSync(entry)) {
 fs.mkdirSync(outDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
-const report = { schema_version: 1, entry: path.basename(entry), passed: false };
+const report = { schema_version: 2, entry: path.basename(entry), passed: false };
 let exitCode = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 2536, height: 696 } });
@@ -53,14 +53,14 @@ try {
 
   const d = report.device;
   if (d.viewport[0] !== 2536 || d.viewport[1] !== 696) throw new Error(`wrong device viewport: ${JSON.stringify(d)}`);
-  if (d.currentTempPx < 60) throw new Error(`current temperature too small on device: ${d.currentTempPx}px`);
-  if (d.currentIconPx < 60) throw new Error(`current icon too small on device: ${d.currentIconPx}px`);
-  if (d.locationPx < 16) throw new Error(`location text too small on device: ${d.locationPx}px`);
-  if (d.hourTimePx < 11) throw new Error(`hour time too small on device: ${d.hourTimePx}px`);
-  if (d.hourTempPx < 24) throw new Error(`hour temperature too small on device: ${d.hourTempPx}px`);
-  if (d.hourIconPx < 44) throw new Error(`hour icon too small on device: ${d.hourIconPx}px`);
-  if (d.rainPx < 9) throw new Error(`precipitation text too small on device: ${d.rainPx}px`);
-  if (d.timelineHeaderPx < 11) throw new Error(`timeline heading too small on device: ${d.timelineHeaderPx}px`);
+  if (d.currentTempPx < 70) throw new Error(`current temperature too small on device: ${d.currentTempPx}px`);
+  if (d.currentIconPx < 75) throw new Error(`current icon too small on device: ${d.currentIconPx}px`);
+  if (d.locationPx < 20) throw new Error(`location text too small on device: ${d.locationPx}px`);
+  if (d.hourTimePx < 14) throw new Error(`hour time too small on device: ${d.hourTimePx}px`);
+  if (d.hourTempPx < 29) throw new Error(`hour temperature too small on device: ${d.hourTempPx}px`);
+  if (d.hourIconPx < 55) throw new Error(`hour icon too small on device: ${d.hourIconPx}px`);
+  if (d.rainPx < 12) throw new Error(`precipitation text too small on device: ${d.rainPx}px`);
+  if (d.timelineHeaderPx < 14) throw new Error(`timeline heading too small on device: ${d.timelineHeaderPx}px`);
 
   await page.screenshot({ path: path.join(outDir, "weather-xl-2536x696.png") });
   await context.close();
