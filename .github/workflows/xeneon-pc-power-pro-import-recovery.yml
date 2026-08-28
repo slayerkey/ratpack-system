@@ -1,0 +1,158 @@
+name: XENEON PC Power Pro Import Recovery
+
+on:
+  push:
+    branches:
+      - 'fix/pc-power-pro-real-icue-import-*'
+    paths:
+      - 'widgets/_src/pc-power-meter-pro/**'
+      - 'widgets/_shared/pc-power-meter/**'
+      - 'widgets/pc-power-meter-pro/manifest.json'
+      - 'tools/xeneon/**'
+      - '.github/workflows/xeneon-pc-power-pro-import-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import-recovery:
+    name: Power Pro real iCUE import candidate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build validate and package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/package | Out-Null
+          New-Item -ItemType Directory -Force -Path artifacts/extracted | Out-Null
+          python tools/xeneon/inline.py pc-power-meter-pro
+          if ($LASTEXITCODE -ne 0) { throw 'inline generation failed' }
+          python tools/xeneon/inline.py pc-power-meter-pro --check
+          if ($LASTEXITCODE -ne 0) { throw 'inline determinism failed' }
+          npx --yes icuewidget-cli@0.4.47 validate widgets/pc-power-meter-pro
+          if ($LASTEXITCODE -ne 0) { throw 'official validation failed' }
+          npx --yes icuewidget-cli@0.4.47 package widgets/pc-power-meter-pro
+          if ($LASTEXITCODE -ne 0) { throw 'official package failed' }
+          $pkg = Get-ChildItem widgets -Filter *.icuewidget -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $pkg) { throw 'official package missing' }
+          Copy-Item $pkg.FullName artifacts/package/pc-power-meter-pro.icuewidget
+          @'
+          import json, pathlib, zipfile
+          package = pathlib.Path('artifacts/package/pc-power-meter-pro.icuewidget')
+          if not zipfile.is_zipfile(package):
+              raise SystemExit('archive is not ZIP compatible')
+          with zipfile.ZipFile(package) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f'corrupt member: {bad}')
+              names = set(z.namelist())
+              for required in ('index.html', 'manifest.json'):
+                  if required not in names:
+                      raise SystemExit(f'missing root {required}')
+              z.extractall('artifacts/extracted')
+          manifest = json.loads(pathlib.Path('artifacts/extracted/manifest.json').read_text(encoding='utf-8'))
+          if manifest.get('version') != '1.0.0':
+              raise SystemExit(f"wrong revision version: {manifest.get('version')}")
+          html = pathlib.Path('artifacts/extracted/index.html').read_text(encoding='utf-8')
+          if 'sensors-factory' in html or 'comparisonSensors' in html:
+              raise SystemExit('Pro candidate still contains sensors-factory/comparisonSensors metadata')
+          if 'content="primarySensor"' not in html or 'data-type="sensors-combobox"' not in html:
+              raise SystemExit('primary sensor selector missing')
+          for name in ('textColor','accentColor','backgroundColor','graphColor'):
+              if f'content="{name}"' not in html:
+                  raise SystemExit(f'missing style control {name}')
+          print('Power Pro single-sensor V1 import contract passed')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'exact package contract failed' }
+
+      - name: Install Playwright
+        shell: pwsh
+        run: |
+          npm install --no-save playwright@1.62.1
+          npx playwright install chromium
+
+      - name: Prove Custom Style and sensor lifecycle
+        shell: pwsh
+        run: |
+          node tools/xeneon/native-style-autosync-smoke.mjs artifacts/extracted/index.html artifacts/style
+          if ($LASTEXITCODE -ne 0) { throw 'Power Pro no-callback style regression failed' }
+          node tools/xeneon/pc-power-sensor-init-smoke.mjs artifacts/extracted/index.html artifacts/sensors
+          if ($LASTEXITCODE -ne 0) { throw 'Power Pro Sensors lifecycle failed' }
+
+      - name: Clone Corsair Labs runner
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          if (Test-Path $runnerDir) { Remove-Item -Recurse -Force $runnerDir }
+          git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git $runnerDir
+          $target = Join-Path (Join-Path $runnerDir 'widgets') 'pc-power-meter-pro'
+          if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+          Copy-Item -Recurse -Force artifacts/extracted $target
+
+      - name: Corsair Labs exact-package smoke
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          $stdout = Join-Path $env:RUNNER_TEMP 'corsair-power-pro.out.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'corsair-power-pro.err.log'
+          $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $runnerDir -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/api/widgets -TimeoutSec 2
+                if ($response.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Corsair Labs runner did not become ready' }
+            node tools/xeneon/icue-runner-smoke.mjs http://127.0.0.1:8080/ pc-power-meter-pro artifacts/runner
+            if ($LASTEXITCODE -ne 0) { throw 'Corsair runner failed' }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Write tester note and hashes
+        shell: pwsh
+        run: |
+          @'
+          PC POWER METER PRO — REAL iCUE IMPORT RETEST
+
+          This candidate intentionally removes the Pro-only sensors-factory / comparison-sensor control from V1.
+          Lite already installs on the same machine. The factory control was the remaining Pro-only metadata type and is the strongest suspect for the real iCUE unsupported/corrupted import error.
+
+          Please test only:
+          1. Does pc-power-meter-pro.icuewidget install successfully?
+          2. If it installs, does the widget appear normally with the expected settings?
+          3. Change Custom Style colors once and confirm they respond.
+
+          Real watt telemetry still cannot be tested on a PC where iCUE exposes no compatible power sensor.
+          '@ | Set-Content -Encoding UTF8 artifacts/package/TESTER-NOTE.txt
+          $hash = Get-FileHash artifacts/package/pc-power-meter-pro.icuewidget -Algorithm SHA256
+          "$($hash.Hash.ToLower())  pc-power-meter-pro.icuewidget" | Set-Content -Encoding ASCII artifacts/package/SHA256SUMS.txt
+
+      - name: Upload Power Pro physical candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-power-meter-pro-real-icue-import-candidate
+          path: artifacts/package/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-power-meter-pro-real-icue-import-evidence
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
