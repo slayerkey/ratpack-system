@@ -1,6 +1,6 @@
 name: Marketplace Listing V2 Prototype CI
 
-# Dedicated visual-system gate for the representative V2 products.
+# Dedicated visual-system gate for representative XENEON and Stream Deck products.
 on:
   pull_request:
     paths:
@@ -12,6 +12,7 @@ on:
       - 'widgets/_src/pc-power-meter-pro/**'
       - 'widgets/_src/weather-timeline/**'
       - 'widgets/_src/weather-timeline-pro/**'
+      - 'plugins/claude-auto-queue/**'
       - '.github/workflows/marketplace-listing-v2-ci.yml'
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  render-prototype:
+  render-xeneon-prototype:
     name: Render ${{ matrix.slug }}
     runs-on: windows-latest
     strategy:
@@ -85,5 +86,48 @@ jobs:
         with:
           name: marketplace-v2-${{ matrix.slug }}
           path: artifacts/marketplace-v2/${{ matrix.slug }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  render-stream-deck-prototype:
+    name: Render claude-auto-queue
+    runs-on: windows-latest
+    env:
+      RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
+      RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deterministic art dependencies
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check Pillow==12.3.0
+
+      - name: Render Stream Deck V2 candidate
+        shell: pwsh
+        run: ./plugins/claude-auto-queue/rat-art.ps1 -Destination "artifacts/marketplace-v2/claude-auto-queue/review"
+
+      - name: Verify Stream Deck V2 contract
+        shell: pwsh
+        run: |
+          $dir = "artifacts/marketplace-v2/claude-auto-queue/review"
+          $report = Get-Content "$dir/rat-art-report.json" -Raw | ConvertFrom-Json
+          if ($report.image_generation -ne 'disabled') { throw 'Image generation must stay disabled.' }
+          if ($report.design_system -ne 'marketplace-listing-v2') { throw 'Stream Deck prototype did not render through Marketplace Listing V2.' }
+          if (-not (Test-Path "$dir/contact-sheet.jpg")) { throw 'Missing Stream Deck V2 contact sheet.' }
+          if (-not (Test-Path "$dir/thumbnail-sheet.jpg")) { throw 'Missing Stream Deck V2 thumbnail sheet.' }
+          foreach ($name in @('01_search_icon.png','02_cover.png','03_gallery_01.png','04_gallery_02.png','05_gallery_03.png','06_gallery_04.png')) {
+            if (-not (Test-Path "$dir/$name")) { throw "Missing $name" }
+          }
+
+      - name: Upload Stream Deck V2 candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-v2-claude-auto-queue
+          path: artifacts/marketplace-v2/claude-auto-queue/
           if-no-files-found: error
           retention-days: 30
