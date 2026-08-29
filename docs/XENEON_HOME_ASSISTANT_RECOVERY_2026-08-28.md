@@ -12,7 +12,9 @@ The screenshot shows a LAN HTTP URL, a Long-Lived Access Token field, and a manu
 
 As of this recovery, current `main` contains neither `widgets/_src/home-assistant/` nor `widgets/home-assistant/`. Repository code search and the accessible Slayerkey repository list do not reveal a separate Home Assistant source repository.
 
-Do not recreate the published product identity from scratch. Locate the actual local published source/package before changing the product.
+The product owner has confirmed the published Home Assistant source may exist only on the local development computer. Treat that local source as authoritative if found.
+
+**Do not reconstruct or replace the published Home Assistant product from scratch.** The GitHub work in this recovery branch is transport research and diagnostics only. Once the transport root cause is proven, apply the smallest compatible patch to the existing local published source/package.
 
 ## Current transport diagnosis
 
@@ -43,6 +45,8 @@ The temporary `tools/xeneon/home-assistant-diagnostic/` widget tests, in real iC
 5. Home Assistant native WebSocket authentication + `get_states`.
 
 The browser regression runs from a real `file://` document against deterministic local HTTP/WebSocket fixtures. It asserts that REST preflight sends `Origin: null`, that Authorization is preflighted, and that WebSocket can still succeed when REST CORS is intentionally denied.
+
+A second CI gate starts a clean Home Assistant Core 2026.8 instance, creates a temporary QA user/token, seeds a real entity through the REST API, then runs the exact diagnostic page from `file://`. This proves or disproves the WebSocket fallback against real Home Assistant rather than only mocks.
 
 No real user token is used in CI.
 
