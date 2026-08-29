@@ -7,7 +7,12 @@
 <title>tr('PC Power Meter Pro')</title>
 
 <meta name="x-icue-property" content="primarySensor" data-label="tr('Primary Power Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','total-power-draw')" />
-<meta name="x-icue-property" content="comparisonSensors" data-label="tr('Comparison Power Sensors')" data-type="sensors-factory" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power')" />
+<meta name="x-icue-property" content="comparisonSensor1" data-label="'Comparison Sensor 1'" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','package')" />
+<meta name="x-icue-property" content="comparisonColor1" data-label="'Comparison Color 1'" data-type="color" data-default="'#4CC9F0'" />
+<meta name="x-icue-property" content="comparisonSensor2" data-label="'Comparison Sensor 2'" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','power-out')" />
+<meta name="x-icue-property" content="comparisonColor2" data-label="'Comparison Color 2'" data-type="color" data-default="'#FFB44A'" />
+<meta name="x-icue-property" content="comparisonSensor3" data-label="'Comparison Sensor 3'" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('power','power-in')" />
+<meta name="x-icue-property" content="comparisonColor3" data-label="'Comparison Color 3'" data-type="color" data-default="'#B47CFF'" />
 <meta name="x-icue-property" content="electricityRate" data-label="tr('Electricity Rate')" data-type="slider" data-default="0.15" data-min="0" data-max="2" data-step="0.01" data-unit-label="'/ kWh'" />
 <meta name="x-icue-property" content="currencySymbol" data-label="tr('Currency Symbol')" data-type="textfield" data-default="'$'" />
 <meta name="x-icue-property" content="graphWindow" data-label="tr('Graph Window')" data-type="combobox" data-default="'180'" data-values="[{'key':'60','value':tr('60 seconds')},{'key':'180','value':tr('3 minutes')},{'key':'300','value':tr('5 minutes')},{'key':'600','value':tr('10 minutes')}]" />
@@ -21,8 +26,8 @@
 [
   {
     "title": "tr('Power Sources')",
-    "properties": ["primarySensor", "comparisonSensors"],
-    "info": "tr('The primary sensor drives energy, cost, daily usage and session history. Comparison sensors are displayed separately and are never silently summed into total PC draw.')"
+    "properties": ["primarySensor", "comparisonSensor1", "comparisonColor1", "comparisonSensor2", "comparisonColor2", "comparisonSensor3", "comparisonColor3"],
+    "info": "'The primary sensor alone drives energy, cost, daily usage and history. Up to three comparison sensors are graphed separately and duplicate selections are ignored.'"
   },
   {
     "title": "tr('Energy Cost')",
@@ -130,6 +135,7 @@ body[data-edition="pro"][data-slot="s-v"] #proStrip { display: none; }
   </section>
 </main>
 <script src="edition.js"></script>
+<script src="comparison-selectors.js"></script>
 <script src="../../_shared/pc-power-meter/power-math.js"></script>
 <script src="../../_shared/pc-power-meter/power-meter-core.js"></script>
 <script src="../../_shared/pc-power-meter/power-meter-icue-events.js"></script>
