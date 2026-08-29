@@ -1,1 +1,49 @@
-{"schema_version":1,"hero":{"subtitle":"Your next 24 hours, with the detail that matters."},"showcase":{"title":"The whole forecast day in one ribbon.","subtitle":"Twenty-four hours, richer detail, saved locations and a three day glance without becoming a weather terminal.","shot":"XL_H.png"},"features":{"title":"The natural upgrade from Lite.","subtitle":"More horizon and more useful detail exactly where regular weather users reach for it.","shot":"M_V.png","items":[["Full 24 hour horizon","Large slots show the whole day; compact slots use a touch-controlled first 12 / next 12 hour view."],["Hour details that answer follow-ups","Feels-like temperature, precipitation amount, wind speed and direction, and UV appear on touch."],["Three places, one tap","Save up to three locations and tap the location header to switch without digging through settings."],["Twilight feels natural","Sunrise, sunset, civil dawn and civil dusk are integrated into the actual forecast ribbon."]]},"settings":{"title":"More control, same glanceability.","subtitle":"Eight themes, three saved locations and the same automatic unit behavior as Lite.","panels":[{"label":"24 hour board","file":"XL_H.png"},{"label":"Rich hour detail","file":"VARIANT_HOUR_DETAIL.png"},{"label":"Next 12 hours","file":"VARIANT_NEXT_12.png"},{"label":"Snow","file":"VARIANT_SNOW.png"}],"tags":"24 hours   •   3 saved locations   •   wind + feels + UV   •   8 themes"},"sizes":{"title":"Detailed without shrinking everything.","subtitle":"Compact layouts page the forecast; larger layouts use the width for the full 24 hour horizon.","footer":"8 tuned layouts total   •   4 sizes   •   horizontal + vertical"}}
+{
+  "schema_version": 2,
+  "accent": "#66C8FF",
+  "hero": {
+    "title_mode": "use_case",
+    "label": "WEATHER",
+    "edition": "PRO",
+    "platform_label": "XENEON EDGE",
+    "shot": "XL_H.png"
+  },
+  "demo": {
+    "recommended": true,
+    "reason": "Touch-controlled hour details, first-12/next-12 paging on compact slots, and saved-location switching are meaningful interactions worth showing.",
+    "concept_seconds": 13,
+    "beats": ["24-HOUR VIEW", "TAP FOR DETAILS", "NEXT 12 HOURS", "SWITCH LOCATIONS"]
+  },
+  "features": {
+    "title": "A full day of weather, not a wall of cards.",
+    "subtitle": "Pro extends the timeline with more horizon and the details you reach for after the first glance.",
+    "shot": "M_V.png",
+    "items": [
+      ["See all 24 hours", "Large slots show the full day; compact slots page between the first 12 and next 12 hours."],
+      ["Tap for hour details", "Feels-like temperature, precipitation amount, wind, and UV appear when you want the deeper read."],
+      ["Save three places", "Switch saved locations from the display instead of digging back through settings."],
+      ["Follow the light", "Sunrise, sunset, civil dawn, and civil dusk are integrated into the forecast timeline."]
+    ]
+  },
+  "showcase": {
+    "title": "The whole forecast day in one ribbon.",
+    "subtitle": "Twenty-four hours use the width of XENEON Edge while compact slots keep the same information readable through paging.",
+    "shot": "XL_H.png"
+  },
+  "settings": {
+    "title": "More detail when you ask for it.",
+    "subtitle": "Hour details, next-12 paging, saved places, and weather states add depth without cluttering the main glance.",
+    "panels": [
+      {"label": "24-hour board", "file": "XL_H.png"},
+      {"label": "Hour details", "file": "VARIANT_HOUR_DETAIL.png"},
+      {"label": "Next 12 hours", "file": "VARIANT_NEXT_12.png"},
+      {"label": "Snow", "file": "VARIANT_SNOW.png"}
+    ],
+    "tags": "24 hours   •   3 saved locations   •   wind + feels-like + UV   •   8 themes"
+  },
+  "sizes": {
+    "title": "More forecast without smaller text.",
+    "subtitle": "Compact layouts page the day; larger layouts use the width for the complete 24-hour horizon.",
+    "footer": "8 tuned layouts   •   S, M, L + XL   •   horizontal + vertical"
+  }
+}
