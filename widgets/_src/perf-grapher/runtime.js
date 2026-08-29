@@ -82,3 +82,8 @@ function packratEvents(onData) {
         onDataUpdated: function () { applyPersonalization(); if (onData) onData(); }
     };
 }
+
+/* iCUE's document-level property bindings already exist before authored body scripts
+ * execute. Apply the current Custom Style values immediately instead of waiting for
+ * iCUE_initialized so first paint and strict lexical-host tests cannot see defaults. */
+applyPersonalization();
