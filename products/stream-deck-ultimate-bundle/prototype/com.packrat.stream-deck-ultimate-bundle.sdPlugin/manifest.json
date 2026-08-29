@@ -15,12 +15,12 @@
   "Description":"A ready-to-use Windows control bundle for apps, workspaces, windows, clipboard, capture and media.",
   "Icon":"imgs/plugin/marketplace",
   "Name":"Stream Deck Ultimate Bundle",
-  "Nodejs":{"Version":"24"},
+  "Nodejs":{"Version":"20"},
   "OS":[{"Platform":"windows","MinimumVersion":"10"}],
   "Profiles":[{"Name":"profiles/Stream Deck Ultimate Bundle - Windows","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true}],
   "PropertyInspectorPath":"ui/property-inspector.html",
   "SDKVersion":2,
-  "Software":{"MinimumVersion":"7.1"},
+  "Software":{"MinimumVersion":"6.6"},
   "UUID":"com.packrat.stream-deck-ultimate-bundle",
   "Version":"0.1.0.0"
 }
