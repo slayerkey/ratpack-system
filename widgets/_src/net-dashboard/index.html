@@ -27,7 +27,7 @@
   {
     "title": "tr('Appearance')",
     "properties": ["customHeader", "hostTextSize", "textColor", "accentColor", "backgroundColor", "transparency"],
-    "info": "'Leave Custom Header blank to keep LATENCY HISTORY. Background Transparency changes surfaces without fading the data itself.'"
+    "info": "'Custom Header changes the product title at the top of the widget. Leave it blank for NETWORK DASHBOARD. Background Transparency affects only the outer widget background; dashboard panels stay opaque and readable.'"
   }
 ]
 </script>
@@ -37,6 +37,11 @@
 </head>
 <body data-slot="s-h" data-state="fresh">
 <main id="stage" aria-label="Network Dashboard">
+  <header id="networkTopbar">
+    <span id="networkHeaderTitle">NETWORK DASHBOARD</span>
+    <span id="networkHeaderStatus">HTTPS TELEMETRY</span>
+  </header>
+
   <section id="metrics" aria-label="Network summary">
     <article class="metric-card metric-primary">
       <div class="metric-label" id="pingLabel">PING</div>
