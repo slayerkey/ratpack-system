@@ -1,0 +1,52 @@
+:root {
+  --net-user-host-size: 15px;
+  --net-background-factor: 1;
+}
+
+/* User-controlled background transparency fades surfaces only. Text, graphs,
+ * status colors and touch targets keep full opacity/readability. */
+body {
+  background: transparent;
+}
+
+#stage {
+  background:
+    radial-gradient(
+      circle at 20% -12%,
+      color-mix(in srgb, var(--accent) calc(10% * var(--net-background-factor)), transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, color-mix(in srgb, var(--bg) 94%, white) calc(100% * var(--net-background-factor)), transparent),
+      color-mix(in srgb, var(--bg) calc(100% * var(--net-background-factor)), transparent)
+    );
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) calc(100% * var(--net-background-factor)), transparent);
+  box-shadow:
+    inset 0 1px rgba(255,255,255,calc(0.035 * var(--net-background-factor))),
+    0 18px 48px rgba(0,0,0,calc(0.18 * var(--net-background-factor)));
+}
+
+#ribbonWrap {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,calc(0.025 * var(--net-background-factor))),
+      rgba(255,255,255,calc(0.005 * var(--net-background-factor)))
+    ),
+    rgba(0,0,0,calc(0.15 * var(--net-background-factor)));
+}
+
+/* The user setting intentionally wins over slot defaults. The minimum remains
+ * readable on the smallest 840x344 composition; long hostnames still ellipsize. */
+.host-name,
+.host-ms {
+  font-size: max(12px, var(--net-user-host-size));
+}
+
+.host-sub {
+  font-size: max(11px, calc(var(--net-user-host-size) * 0.76));
+}
