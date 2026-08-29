@@ -1,62 +1,48 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "accent": "#8B7CFF",
   "hero": {
-    "subtitle": "Your music, designed for the Edge."
-  },
-  "showcase": {
-    "title": "Now playing, without the alt tab.",
-    "subtitle": "Song, artist and three media controls across the display.",
+    "title_mode": "use_case",
+    "label": "MUSIC CONTROL",
+    "platform_label": "XENEON EDGE",
     "shot": "XL_H.png"
   },
+  "demo": {
+    "recommended": true,
+    "reason": "Playback controls, changing track state, artist-reactive palettes, recent tracks, and idle behavior are faster to understand in motion.",
+    "concept_seconds": 12,
+    "beats": ["NOW PLAYING", "CONTROL PLAYBACK", "4 PALETTES", "AMBIENT IDLE"]
+  },
   "features": {
-    "title": "Typography is the artwork.",
-    "subtitle": "Built around the media data iCUE actually exposes.",
+    "title": "Your music stays glanceable.",
+    "subtitle": "The track is the focus; the controls are always right there.",
     "shot": "M_V.png",
     "items": [
-      [
-        "Track first",
-        "Huge auto fitting title and artist, with marquee only when it truly needs it."
-      ],
-      [
-        "Artist driven color",
-        "Each artist deterministically gets its own gradient field and visual character."
-      ],
-      [
-        "Three honest controls",
-        "Previous, play or pause, and next. Nothing the Media provider cannot actually do."
-      ],
-      [
-        "Ambient when idle",
-        "When music stops, the panel becomes a clean clock instead of a dead rectangle."
-      ]
+      ["See the track", "Large auto-fitting title and artist use the display instead of shrinking into a card."],
+      ["Control playback", "Previous, play or pause, and next stay available as large touch targets."],
+      ["Changes with the artist", "Four artist-reactive palette styles keep the panel visually alive without fake album art."],
+      ["Useful when idle", "When music stops, the panel becomes a clean clock instead of a dead rectangle."]
     ]
   },
+  "showcase": {
+    "title": "Control it from the display.",
+    "subtitle": "See the current song and handle the three media actions without going back to the desktop.",
+    "shot": "XL_H.png"
+  },
   "settings": {
-    "title": "Four palettes. Still your artist.",
-    "subtitle": "Every preset stays artist sensitive instead of becoming a fixed wallpaper.",
+    "title": "Pick the look that fits.",
+    "subtitle": "Each palette still reacts to the current artist instead of becoming a fixed wallpaper.",
     "panels": [
-      {
-        "label": "Artist",
-        "file": "VARIANT_ARTIST.png"
-      },
-      {
-        "label": "Neon",
-        "file": "VARIANT_NEON.png"
-      },
-      {
-        "label": "Ember",
-        "file": "VARIANT_EMBER.png"
-      },
-      {
-        "label": "Ocean",
-        "file": "VARIANT_OCEAN.png"
-      }
+      {"label": "Artist", "file": "VARIANT_ARTIST.png"},
+      {"label": "Neon", "file": "VARIANT_NEON.png"},
+      {"label": "Ember", "file": "VARIANT_EMBER.png"},
+      {"label": "Ocean", "file": "VARIANT_OCEAN.png"}
     ],
-    "tags": "Gradient motion   •   24 hour time   •   recent tracks   •   text, accent and background colors"
+    "tags": "4 artist-reactive palettes   •   recent tracks on XL   •   ambient idle clock"
   },
   "sizes": {
-    "title": "Built for every slot.",
-    "subtitle": "S, M, L and XL each get their own horizontal and vertical composition.",
-    "footer": "8 tuned layouts total   •   4 sizes   •   horizontal + vertical"
+    "title": "Fits every XENEON slot.",
+    "subtitle": "Each size and orientation gets its own composition instead of a scaled-down desktop card.",
+    "footer": "8 tuned layouts   •   S, M, L + XL   •   horizontal + vertical"
   }
 }
