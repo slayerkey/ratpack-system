@@ -20,7 +20,7 @@ for (const tag of tags) {
 }
 
 const report = {
-  schema_version: 1,
+  schema_version: 2,
   entry: path.basename(entry),
   controls: {},
   sliderCount: 0,
@@ -29,7 +29,10 @@ const report = {
 };
 
 function attr(tag, name) {
-  return tag.match(new RegExp(`\\b${name}=["']([^"']*)["']`, "i"))?.[1] ?? null;
+  const doubleQuoted = tag.match(new RegExp(`\\b${name}="([^"]*)"`, "i"));
+  if (doubleQuoted) return doubleQuoted[1];
+  const singleQuoted = tag.match(new RegExp(`\\b${name}='([^']*)'`, "i"));
+  return singleQuoted ? singleQuoted[1] : null;
 }
 function requireControl(name, type) {
   const tag = byName.get(name);
