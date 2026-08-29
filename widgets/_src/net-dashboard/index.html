@@ -10,9 +10,12 @@
 <meta name="x-icue-property" content="probeInterval" data-label="tr('Primary Probe Interval')" data-type="slider" data-default="10" data-min="5" data-max="60" data-step="5" data-unit-label="'s'" />
 <meta name="x-icue-property" content="warnAt" data-label="tr('Latency Warning')" data-type="slider" data-default="100" data-min="25" data-max="500" data-step="5" data-unit-label="'ms'" />
 
+<meta name="x-icue-property" content="customHeader" data-label="'Custom Header'" data-type="textfield" data-default="''" />
+<meta name="x-icue-property" content="hostTextSize" data-label="'Monitored Hosts Text Size'" data-type="slider" data-default="15" data-min="12" data-max="24" data-step="1" data-unit-label="'px'" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
 <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background Color')" data-type="color" data-default="'#07090D'" />
+<meta name="x-icue-property" content="transparency" data-label="'Background Transparency'" data-type="slider" data-default="100" data-min="0" data-max="100" data-step="5" data-unit-label="'%'" />
 
 <script type="application/json" id="x-icue-groups">
 [
@@ -23,12 +26,14 @@
   },
   {
     "title": "tr('Appearance')",
-    "properties": ["textColor", "accentColor", "backgroundColor"]
+    "properties": ["customHeader", "hostTextSize", "textColor", "accentColor", "backgroundColor", "transparency"],
+    "info": "'Leave Custom Header blank to keep LATENCY HISTORY. Background Transparency changes surfaces without fading the data itself.'"
   }
 ]
 </script>
 
 <link rel="stylesheet" href="network.css" />
+<link rel="stylesheet" href="network-ui-patch.css" />
 </head>
 <body data-slot="s-h" data-state="fresh">
 <main id="stage" aria-label="Network Dashboard">
@@ -102,5 +107,6 @@
 </main>
 <script src="network.js"></script>
 <script src="network-transport-patch.js"></script>
+<script src="network-ui-patch.js"></script>
 </body>
 </html>
