@@ -1,5 +1,6 @@
 name: Marketplace Listing V2 Prototype CI
 
+# Dedicated visual-system gate for the representative V2 products.
 on:
   pull_request:
     paths:
