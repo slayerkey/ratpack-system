@@ -17,7 +17,7 @@ const html = fs.readFileSync(entry, "utf8");
 const required = ["textColor", "accentColor", "backgroundColor"];
 const declared = required.filter((name) => new RegExp(`name=[\"']x-icue-property[\"'][^>]*content=[\"']${name}[\"']|content=[\"']${name}[\"'][^>]*name=[\"']x-icue-property[\"']`, "i").test(html));
 const report = {
-  schema_version: 3,
+  schema_version: 5,
   entry: path.basename(entry),
   declared,
   initial: null,
@@ -37,12 +37,10 @@ if (declared.length !== required.length) {
 const before = { text: "#E9EEF2", accent: "#19A8FF", background: "#071018" };
 const after = { text: "#FFF3D6", accent: "#FF274D", background: "#18100B" };
 
-// iCUE property controls are JavaScript bindings in the widget document. Playwright's
-// addInitScript runs in a different initialization context and does not reproduce that
-// global lexical environment faithfully. Instrument a copy of the exact packaged HTML
-// with one classic script before RatPack's bridge, so the test exercises the same
-// document-level binding semantics that iCUE uses while leaving the official package
-// artifact itself untouched.
+// Real iCUE controls behave as document-level JavaScript bindings. This harness
+// deliberately uses lexical `let` bindings instead of assigning values to window.
+// A widget that only works when a compatibility runner places settings on globalThis
+// must fail here even if it looks healthy in an ordinary browser.
 const harness = `<script id="ratpack-native-style-harness">
 let textColor = ${JSON.stringify(before.text)};
 let accentColor = ${JSON.stringify(before.accent)};
@@ -73,9 +71,6 @@ const page = await context.newPage();
 const pageErrors = [];
 const consoleErrors = [];
 page.on("pageerror", (error) => pageErrors.push(String(error)));
-// Network-capable widgets can legitimately emit browser console connection errors while
-// a native-style-only smoke runs without their external service. Preserve those messages
-// as evidence, but leave transport correctness to each product's packaged network smoke.
 page.on("console", (message) => {
   if (message.type() === "error") consoleErrors.push(message.text());
 });
@@ -88,13 +83,24 @@ async function snapshot() {
   return page.evaluate(() => {
     const root = document.documentElement;
     const css = getComputedStyle(root);
+    const firstVar = (...names) => {
+      for (const name of names) {
+        const value = root.style.getPropertyValue(name) || css.getPropertyValue(name);
+        if (String(value || "").trim()) return value;
+      }
+      return "";
+    };
     return {
+      hasOnDataUpdated: !!(globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function"),
       textBinding: globalThis.textColor,
       accentBinding: globalThis.accentColor,
       backgroundBinding: globalThis.backgroundColor,
-      textVar: root.style.getPropertyValue("--text") || css.getPropertyValue("--text"),
-      accentVar: root.style.getPropertyValue("--accent") || css.getPropertyValue("--accent"),
-      backgroundVar: root.style.getPropertyValue("--bg") || css.getPropertyValue("--bg"),
+      textReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("textColor") : undefined,
+      accentReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("accentColor") : undefined,
+      backgroundReader: typeof globalThis.__ratpackIcueRead === "function" ? globalThis.__ratpackIcueRead("backgroundColor") : undefined,
+      textVar: firstVar("--text", "--text-color"),
+      accentVar: firstVar("--accent", "--accent-color"),
+      backgroundVar: firstVar("--bg", "--background", "--background-color"),
       bodyState: document.body ? document.body.getAttribute("data-connection") || document.body.getAttribute("data-state") || "" : "",
     };
   });
@@ -105,16 +111,18 @@ try {
   await page.goto(pathToFileURL(instrumentedEntry).href, { waitUntil: "load", timeout: 30_000 });
   await page.waitForTimeout(400);
   report.bridge = await page.evaluate(() => globalThis.__ratpackIcueBindingBridge || null);
-  if (!report.bridge || report.bridge.version !== 1) throw new Error("packaged widget is missing RatPack iCUE binding bridge");
+  if (!report.bridge || report.bridge.version !== 2 || report.bridge.mode !== "direct-binding") {
+    throw new Error("packaged widget is missing RatPack direct-binding iCUE bridge v2");
+  }
 
   report.initial = await snapshot();
+  if (!report.initial.hasOnDataUpdated) {
+    throw new Error("widget declares Custom Style but does not expose icueEvents.onDataUpdated");
+  }
   for (const [key, expected] of [
-    ["textBinding", before.text],
-    ["accentBinding", before.accent],
-    ["backgroundBinding", before.background],
-    ["textVar", before.text],
-    ["accentVar", before.accent],
-    ["backgroundVar", before.background],
+    ["textBinding", before.text], ["accentBinding", before.accent], ["backgroundBinding", before.background],
+    ["textReader", before.text], ["accentReader", before.accent], ["backgroundReader", before.background],
+    ["textVar", before.text], ["accentVar", before.accent], ["backgroundVar", before.background],
   ]) {
     if (normalize(report.initial[key]) !== normalize(expected)) throw new Error(`initial ${key} mismatch: ${report.initial[key]} != ${expected}`);
   }
@@ -122,18 +130,15 @@ try {
   await page.evaluate((next) => {
     if (typeof globalThis.__setRatpackIcueStyleSmoke !== "function") throw new Error("native style harness setter missing");
     globalThis.__setRatpackIcueStyleSmoke(next);
-    if (globalThis.icueEvents && typeof globalThis.icueEvents.onDataUpdated === "function") globalThis.icueEvents.onDataUpdated();
+    globalThis.icueEvents.onDataUpdated();
   }, after);
   await page.waitForTimeout(500);
   report.updated = await snapshot();
 
   for (const [key, expected] of [
-    ["textBinding", after.text],
-    ["accentBinding", after.accent],
-    ["backgroundBinding", after.background],
-    ["textVar", after.text],
-    ["accentVar", after.accent],
-    ["backgroundVar", after.background],
+    ["textBinding", after.text], ["accentBinding", after.accent], ["backgroundBinding", after.background],
+    ["textReader", after.text], ["accentReader", after.accent], ["backgroundReader", after.background],
+    ["textVar", after.text], ["accentVar", after.accent], ["backgroundVar", after.background],
   ]) {
     if (normalize(report.updated[key]) !== normalize(expected)) throw new Error(`updated ${key} mismatch: ${report.updated[key]} != ${expected}`);
   }
