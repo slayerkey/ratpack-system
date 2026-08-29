@@ -1,32 +1,51 @@
-/* Network Dashboard user-facing polish that is intentionally isolated from the
- * probe/speed transport. This keeps monitoring behavior stable while exposing
- * the same kind of presentation controls used by mature PackRat dashboards. */
+/* Network Dashboard real-iCUE settings reconciliation.
+ *
+ * Physical testing showed iCUE can update the document-level property bindings
+ * before (or without) delivering onDataUpdated. The core widget historically read
+ * window properties only, so changes appeared after a dashboard page transition.
+ * This patch reads the canonical direct-binding bridge itself and reconciles only
+ * when a setting value actually changes. */
 (function () {
   "use strict";
 
-  var applyingHeader = false;
-  var headerObserver = null;
-  var defaultHeaderText = "LATENCY HISTORY";
+  var DEFAULT_HEADER = "NETWORK DASHBOARD";
+  var WATCH_MS = 140;
+  var watchTimer = null;
+  var lastSignature = "";
+  var eventHooksInstalled = false;
+  var accessorInstalled = false;
+
+  function usable(value) {
+    return value !== undefined && value !== null && value !== ""
+      && !(typeof Node !== "undefined" && value instanceof Node);
+  }
 
   function directBinding(name) {
     try {
       if (typeof globalThis.__ratpackIcueRead === "function") {
         var bridged = globalThis.__ratpackIcueRead(name);
-        if (bridged !== undefined && bridged !== null) return bridged;
+        if (usable(bridged)) return bridged;
       }
     } catch (error) { }
 
+    /* Source/preview fallback. The exact package gets the generated bridge above. */
     try {
       switch (name) {
+        case "probeHosts": return typeof probeHosts !== "undefined" ? probeHosts : undefined;
+        case "probeInterval": return typeof probeInterval !== "undefined" ? probeInterval : undefined;
+        case "warnAt": return typeof warnAt !== "undefined" ? warnAt : undefined;
         case "customHeader": return typeof customHeader !== "undefined" ? customHeader : undefined;
         case "hostTextSize": return typeof hostTextSize !== "undefined" ? hostTextSize : undefined;
+        case "textColor": return typeof textColor !== "undefined" ? textColor : undefined;
+        case "accentColor": return typeof accentColor !== "undefined" ? accentColor : undefined;
+        case "backgroundColor": return typeof backgroundColor !== "undefined" ? backgroundColor : undefined;
         case "transparency": return typeof transparency !== "undefined" ? transparency : undefined;
       }
     } catch (error) { }
 
     try {
       var globalValue = globalThis[name];
-      if (globalValue !== undefined && globalValue !== null) return globalValue;
+      if (usable(globalValue)) return globalValue;
     } catch (error) { }
     return undefined;
   }
@@ -42,19 +61,26 @@
     return value == null ? "" : String(value).trim().slice(0, 48);
   }
 
-  function setHeaderText(node, value) {
-    if (!node || node.textContent === value) return;
-    applyingHeader = true;
-    node.textContent = value;
-    applyingHeader = false;
+  function installCoreAccessor() {
+    if (accessorInstalled) return;
+    var previous = typeof globalThis.getIcueProperty === "function" ? globalThis.getIcueProperty : null;
+    globalThis.getIcueProperty = function (name, fallback) {
+      var live = directBinding(name);
+      if (usable(live)) return live;
+      if (previous) {
+        try { return previous(name, fallback); } catch (error) { }
+      }
+      return fallback;
+    };
+    accessorInstalled = true;
   }
 
   function applyHeader() {
     if (typeof document === "undefined") return;
-    var node = document.getElementById("ribbonEyebrow");
+    var node = document.getElementById("networkHeaderTitle");
     if (!node) return;
-    var heading = customHeading();
-    setHeaderText(node, heading || defaultHeaderText);
+    var heading = customHeading() || DEFAULT_HEADER;
+    if (node.textContent !== heading) node.textContent = heading;
   }
 
   function applyNetworkUiSettings() {
@@ -62,62 +88,99 @@
     var root = document.documentElement;
     var size = clamp(directBinding("hostTextSize"), 12, 24, 15);
     var opacity = clamp(directBinding("transparency"), 0, 100, 100);
+    var text = String(directBinding("textColor") || "#F4F6F8");
+    var accent = String(directBinding("accentColor") || "#2BE86A");
+    var background = String(directBinding("backgroundColor") || "#07090D");
+
     root.style.setProperty("--net-user-host-size", size + "px");
-    /* CORSAIR's control convention is 100 = opaque, 0 = transparent. */
     root.style.setProperty("--net-background-factor", String(opacity / 100));
+    root.style.setProperty("--text", text);
+    root.style.setProperty("--accent", accent);
+    root.style.setProperty("--bg", background);
     applyHeader();
   }
 
-  function watchTranslatedHeader() {
-    if (typeof MutationObserver !== "function" || typeof document === "undefined") return;
-    var node = document.getElementById("ribbonEyebrow");
-    if (!node || headerObserver) return;
-    if (!customHeading() && node.textContent) defaultHeaderText = node.textContent;
-    headerObserver = new MutationObserver(function () {
-      if (applyingHeader) return;
-      var heading = customHeading();
-      if (heading) {
-        /* If async translation replaced our custom text, remember that translated
-         * value as the default before restoring the user's header. */
-        if (node.textContent && node.textContent !== heading) defaultHeaderText = node.textContent;
-        applyHeader();
-      } else if (node.textContent) {
-        defaultHeaderText = node.textContent;
+  function settingSnapshot() {
+    return [
+      "probeHosts", "probeInterval", "warnAt", "customHeader", "hostTextSize",
+      "textColor", "accentColor", "backgroundColor", "transparency"
+    ].map(function (name) {
+      var value = directBinding(name);
+      if (value === undefined) return name + "=<undefined>";
+      if (typeof value === "object") {
+        try { return name + "=" + JSON.stringify(value); } catch (error) { }
       }
-    });
-    headerObserver.observe(node, { childList: true, characterData: true, subtree: true });
+      return name + "=" + String(value);
+    }).join("\u001f");
+  }
+
+  function reconcile(forceCore) {
+    installCoreAccessor();
+    applyNetworkUiSettings();
+    if (forceCore && typeof globalThis.applySettings === "function") {
+      try { globalThis.applySettings(); } catch (error) { }
+    }
+  }
+
+  function pollBindings() {
+    var next = settingSnapshot();
+    if (next === lastSignature) return;
+    lastSignature = next;
+    reconcile(true);
   }
 
   function installEventHooks() {
+    if (eventHooksInstalled) return;
     try {
-      if (!globalThis.icueEvents || globalThis.icueEvents.__networkUiPatch) return;
+      if (!globalThis.icueEvents) return;
       var originalInit = globalThis.icueEvents.onICUEInitialized;
       var originalUpdate = globalThis.icueEvents.onDataUpdated;
       globalThis.icueEvents.onICUEInitialized = function () {
         if (typeof originalInit === "function") originalInit.apply(this, arguments);
-        applyNetworkUiSettings();
-        watchTranslatedHeader();
+        lastSignature = "";
+        pollBindings();
       };
       globalThis.icueEvents.onDataUpdated = function () {
         if (typeof originalUpdate === "function") originalUpdate.apply(this, arguments);
-        applyNetworkUiSettings();
+        lastSignature = "";
+        pollBindings();
       };
-      globalThis.icueEvents.__networkUiPatch = true;
+      eventHooksInstalled = true;
     } catch (error) { }
   }
 
+  function installPageRestoreHooks() {
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) {
+          lastSignature = "";
+          pollBindings();
+        }
+      });
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("pageshow", function () {
+        lastSignature = "";
+        pollBindings();
+      });
+    }
+  }
+
   function start() {
-    applyNetworkUiSettings();
-    watchTranslatedHeader();
+    installCoreAccessor();
     installEventHooks();
-    /* Translation is asynchronous. One delayed pass covers hosts where the
-     * MutationObserver is unavailable without polling continuously. */
-    setTimeout(applyNetworkUiSettings, 250);
+    installPageRestoreHooks();
+    pollBindings();
+    clearInterval(watchTimer);
+    watchTimer = setInterval(pollBindings, WATCH_MS);
   }
 
   globalThis.__netDashboardUiTest = {
     apply: applyNetworkUiSettings,
+    reconcile: reconcile,
+    poll: pollBindings,
     customHeading: customHeading,
+    directBinding: directBinding,
     clamp: clamp
   };
 
