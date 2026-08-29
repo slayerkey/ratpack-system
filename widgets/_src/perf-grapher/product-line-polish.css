@@ -1,0 +1,10 @@
+/* Keep PackRat telemetry products visually related without changing the data UI.
+ * Network Dashboard uses the same restrained accent wash in the upper-left canvas.
+ * Tie it to background opacity so full transparency remains truly transparent. */
+#stage {
+    background: radial-gradient(
+        circle at 8% -12%,
+        color-mix(in srgb, var(--accent) calc(11% * var(--bg-alpha)), transparent),
+        transparent 34%
+    );
+}
