@@ -2,83 +2,74 @@
 
 Date: 2026-08-28
 
-Status: prototype implementation in progress on `marketplace/listing-v2`
+Status: prototype system implemented on `marketplace/listing-v2`; full live-catalog rollout is source-gated.
 
 ## Executive conclusion
 
-PackRat does not need a larger branding system. It needs a stricter presentation system.
+PackRat does not need a larger branding exercise. It needs a stricter presentation system.
 
-The strongest existing PackRat work already has the right technical foundation: real product captures, deterministic compositing, reusable device plates, centralized Rat Art, product metadata, QA, and shipping evidence. The main weakness is the information hierarchy around those truthful assets.
+The strongest current PackRat work already has the correct technical foundation: real product captures, deterministic compositing, reusable device plates, product metadata, QA evidence, and centralized Rat Art. The main weakness is the hierarchy around those truthful assets.
 
-The highest-impact change is simple:
+The highest-impact change is:
 
-**Make the actual product substantially more dominant, reduce title/marketing chrome, make every later asset answer a new buyer question, and move discoverability work into real Marketplace metadata rather than customer-facing keyword clutter.**
+**Make the real product substantially more dominant, reduce title/marketing chrome, make every later asset answer a new buyer question, and move discoverability work into real Marketplace metadata instead of customer-facing keyword clutter.**
 
 ## 1. Current PackRat audit
 
 ### What is already strong
 
-- `ratpack-system` is the correct source of truth for shared art, product state, QA, and shipping.
-- XENEON products already use deterministic real widget captures rather than generated mock UI.
+- `ratpack-system` is the correct source of truth for shared art rules, product state, QA, and shipping.
+- Current XENEON source uses deterministic real widget captures rather than generated mock UI.
 - The calibrated XENEON device plate is reusable and truthful.
-- Existing ART_REVIEW files document provenance and reject misleading states.
-- Rat Art already creates contact sheets and enforces a deliberate gallery sequence.
-- Current footer branding is restrained to the rat mark instead of a repeated giant PACKRAT wordmark.
-- Several recent product descriptions are technically careful and disclose real platform/provider limitations.
-- The PackRat maker identity already exists publicly and the customer-facing PackRat site has a clear human tone.
+- Product-level `ART_REVIEW.md`, `rat-art.json`, and `submission.json` already give the system useful places to record claims, presentation choices, and evidence.
+- Rat Art already creates contact sheets and can enforce marketplace ordering.
+- Existing PackRat branding is restrained enough to evolve instead of redesigning the brand.
+- Recent descriptions are technically careful and often disclose genuine platform/provider limitations.
 
 ### What is holding conversion back
 
 #### Hero chrome competes with the product
 
-The current XENEON renderer automatically makes the full product name the largest element at the top of every hero, adds a subtitle, then reserves a substantial footer. Even when the device is large, the composition reads partly like a title card rather than a product view.
+The legacy XENEON renderer automatically makes the full product name a large centered headline, adds a subtitle, then reserves a substantial footer. Even when the device is reasonably large, the composition still reads partly like a title card.
 
-V2 removes the giant repeated title by default. The listing title already names the product.
+V2 removes the giant repeated product title by default. The Marketplace page already supplies the listing title.
 
-#### Some galleries repeat the hero before teaching anything new
+#### Some galleries repeat instead of progress
 
-Now Playing is the clearest example. The current cover already shows the full product strongly, then the next static frame shows nearly the same primary state under a different headline. That is wasted attention.
+Now Playing was the clearest example: a strong cover was followed by another nearly identical main-state screenshot under different copy. V2 requires each prime gallery slot to answer a new buyer question.
 
-V2 makes the second asset answer a new question: practical value or product-in-action, with video inserted immediately after the hero when motion is genuinely useful.
+#### Feature copy can be implementation-led
 
-#### Feature copy is sometimes too implementation-led
-
-Existing XENEON copy is honest but often explains why the implementation is careful before communicating the customer result.
+Technical accuracy remains mandatory, but prime marketplace space should lead with the customer result.
 
 Example direction:
 
-- from: `Correct energy math`
-- toward: `SEE WHAT THE WATTS COST`
+- implementation-first: `Correct energy math`
+- customer-first: `SEE WHAT THE WATTS COST`
 
-The technical truth still belongs in the description/QA, but the marketplace visual should lead with why the buyer cares.
+The proof and caveats remain in the product state, description, and QA.
 
-#### Static asset counts are treated too uniformly
+#### Static asset counts are too uniform
 
-The existing shared XENEON renderer always produces the same five marketplace images. That is useful operationally but should not imply that every product needs the same five customer-facing ideas.
-
-V2 keeps deterministic output for QA while allowing the actual listing journey to choose whether demo media replaces or supplements a static frame.
+A shared renderer producing five QA images is operationally useful. It should not imply that every customer-facing listing needs the same five ideas. Motion products can use a real demo early; simple products can stay static.
 
 #### Legacy SEO clutter exists
 
-At least one current marketplace prep document appends a raw keyword line at the bottom of the customer-facing description. This should be metadata, not prose.
-
-V2 explicitly prohibits unexplained keyword dumps in descriptions.
+Raw keyword blocks have appeared in customer-facing marketplace prep copy. V2 moves discoverability work into supported Marketplace metadata and keeps descriptions readable.
 
 #### Catalog source-of-truth drift exists
 
-The live Marketplace currently exposes PackRat listings that are not represented by the same current names in `products/index.json` (examples found during the 2026-08-28 audit include Minimal Icons, Glass Icons, Golden Icons, and Prism Pastel Icons).
+The live Marketplace currently exposes PackRat listings whose current names do not appear that way in `products/index.json`. Examples found during the 2026-08-28 audit include Minimal Icons, Glass Icons, Golden Icons, and Prism Pastel Icons.
 
-Therefore `products/index.json` cannot currently prove the complete set of active Marketplace SKUs by itself.
+Therefore `products/index.json` cannot currently prove the complete active Marketplace catalog by itself. Maker Console's Published list must be reconciled before `FULL_CATALOG_COMPLETE` is claimed.
 
-Before final full-catalog migration, reconcile Maker Console's Published product list against the canonical registry.
+#### Legacy product source is not fully migrated
 
-#### Legacy Stream Deck source is not fully migrated
+`RATPACK.md` records that local `ratpack-projects` and `_shared` remain migration dependencies. The linked GitHub account does not contain another hidden PackRat repository with those missing legacy source/marketing trees.
 
-`RATPACK.md` explicitly records that local `ratpack-projects` and `_shared` remain compatibility dependencies during migration.
+This affects old published Stream Deck products **and old published XENEON products whose registry IDs no longer have matching `widgets/_src/<id>` directories**.
 
-The linked GitHub account does not contain another hidden PackRat repository with those legacy source/marketing folders.
-
-Therefore old published plugin/profile/icon listing art must not be regenerated from memory. Mark it `SOURCE_REQUIRED` until the real source tree is migrated or mounted.
+Those products are `SOURCE_REQUIRED`. Do not regenerate them from memory, old copy, or fabricated UI.
 
 ## 2. Current Marketplace research
 
@@ -91,274 +82,273 @@ Primary current sources reviewed:
 - Stream Deck Profile Guidelines — https://docs.elgato.com/guidelines/stream-deck/profiles/
 - Stream Deck Icon Guidelines — https://docs.elgato.com/guidelines/stream-deck/icons/
 - Marketplace Organization / Maker profile guidance — https://docs.elgato.com/maker-console/organization/
-- PackRat live maker page — https://marketplace.elgato.com/maker/packrat
+- PackRat maker page — https://marketplace.elgato.com/maker/packrat
 
-### Marketplace rules that directly support V2
+Current guidance supports the V2 direction:
 
-Elgato's current product guidance explicitly requires/recommends:
-
-- 1920 × 960 PNG thumbnails/gallery images
-- accurate depiction of the product and its functionality
+- 1920 × 960 PNG marketplace images
+- accurate product/function depiction
 - accurate Elgato devices
-- clear, legible text
-- useful setup guidance in descriptions
-- avoiding unhelpful filler and inaccurate AI-generated description copy
-- using tags/metadata for discoverability on supported product types
+- legible copy
+- useful setup information
+- avoiding filler/inaccurate AI-generated copy
+- using supported tags/metadata for discoverability
 
-Current icon guidance explicitly recommends describing icon count/content and using color/style/theme tags for discoverability.
+Current icon guidance specifically supports describing pack contents and using style/theme/color metadata instead of keyword stuffing the description.
 
-Current Maker Console guidance makes product metadata, media, release notes, and product management separate surfaces. That supports keeping SEO/discoverability data out of customer-facing paragraphs.
+### Strong current listing pattern
 
-### What strong current listings do well
+Across first-party examples and stronger creator listings, the common strength is compression:
 
-Across first-party Elgato examples and stronger creator listings, the recurring useful pattern is not elaborate branding. It is compression:
-
-- one obvious product idea per frame
+- one obvious idea per frame
 - product-specific visual proof
 - large readable subject
-- short headline
-- enough contrast to scan at card size
-- consistent creator identity without covering the product
+- short copy
+- enough contrast for card-size scanning
+- creator identity that does not cover the product
 
-### Common weak-listing failure modes
+### Common weak-listing pattern
 
-- tiny hardware inside a large decorative scene
-- giant product-name typography that repeats the Marketplace title
-- feature cards that explain obvious functionality instead of value
-- several screenshots that prove the same thing
-- generic `ultimate / elevate / unlock` copy
-- setup instructions dominating before the buyer understands why the product is useful
-- keyword stuffing at the bottom of descriptions
+- tiny hardware inside a decorative scene
+- giant title copy that repeats the Marketplace title
+- several screenshots proving the same thing
+- feature cards explaining obvious implementation instead of value
+- generic `ultimate / elevate / unlock / revolutionize` language
+- setup dominating before the buyer understands why the product is useful
+- SEO keyword dumps in customer-facing prose
 
-## 3. Final PackRat Listing V2 design system
+## 3. PackRat Listing V2 design system
 
-Canonical detailed rules live in `standards/marketplace-listing-v2.md`.
+Canonical detailed rules: `standards/marketplace-listing-v2.md`.
 
-### Hero
-
-Default V2 hierarchy:
+### Hero hierarchy
 
 1. real product/device
-2. real UI
+2. real product UI
 3. optional 2–4 word use-case label
 4. restrained PackRat mark
-5. background
+5. supporting background
 
 Default hero chrome:
 
 - PackRat mark: top center
 - use-case label: top left when useful
 - edition/platform: small top right
-- device/product: dominant center
-- no duplicate hero-footer logo
+- product/device: dominant center
+- no duplicate PackRat footer logo on the hero
 
-The product should normally occupy about 78–92% of usable width for a hardware composition when the form factor allows it.
+For hardware compositions, target roughly 78–92% of usable canvas width when the form factor allows it.
 
 ### Background
 
-Restrained dark studio field with subtle family/product ambient accent.
-
-No fake HUDs, random desks, rooms, props, particles, or RGB explosions.
+Use a restrained dark studio field with subtle product/family ambient accent. No fake HUDs, random desks, rooms, props, particles, or RGB explosions.
 
 ### Lite / Pro / Free
 
-Same family framing, typography, logo location, background language, and use-case label.
-
-Edition is a small badge/label. The actual product UI remains truthful.
+Use the same family framing, typography, logo location, background language, and use-case treatment. Edition is a small label. The real UI/function difference does the selling.
 
 ### Thumbnail gate
 
-Every V2 hero generates a review sheet at:
+Every V2 hero is reviewed at:
 
 - 480 × 240
 - 320 × 160
 - 240 × 120
 
-The 320 × 160 view is the practical decision gate. If the product stops being obvious, simplify the hero rather than adding more text.
+At 320 × 160, the actual product must remain the obvious subject.
 
-## 4. User journey
-
-Default journey:
+## 4. Default user journey
 
 1. HERO — What is this?
-2. DEMO / ACTION — What does it actually do? (only when motion/state is meaningful)
+2. DEMO / ACTION — What does it actually do? when motion matters
 3. CORE VALUE — Why do I care?
-4. DIFFERENTIATOR — What makes this better/more useful than the obvious version?
-5. DEPTH — What else can it do that matters?
-6. EASE — Is setup/use annoying? (only when this is a real objection)
-7. COMPATIBILITY — Will this work in my setup?
-8. TRUST — Usually handled by consistent PackRat identity + maker profile rather than a dedicated poster
+4. DIFFERENTIATOR — What makes this more useful than the obvious version?
+5. DEPTH — What else matters?
+6. EASE — Is setup/use annoying? only if this is a real objection
+7. COMPATIBILITY — Will it work for me?
+8. TRUST — usually supplied cumulatively by consistent PackRat identity and truthful product media
 
-Do not force every product to have eight assets.
+Do not force every product to contain eight assets.
 
 ## 5. Demo system
 
-Recommend demo media when value depends on live data, animation, interaction, modes, navigation, touch controls, or state transitions.
+Recommend video when value materially depends on live data, animation, interaction, modes, navigation, touch controls, or state transitions.
 
-Typical structure:
+Conceptual structure:
 
-- 0–2 s: product immediately
+- 0–2 s: real product immediately
 - 2–5 s: primary job
 - 5–9 s: strongest second state/interaction
-- 9–14 s: depth or result
-- optional short ending only if it does not delay understanding
+- 9–14 s: useful depth/result
+- optional short close only if it does not delay understanding
 
-No long intro animation.
+No long logo intro. Overlay copy normally stays at 2–5 words.
 
-Overlay copy: normally 2–5 words.
+The canonical repo does not currently contain a reusable MP4/FFmpeg/demo recorder. V2 therefore records demo intent/beat structure but does not fake motion by crossfading static screenshots. Actual demos require truthful interaction capture.
 
 Prototype decisions:
 
+- Auto Queue for Claude Code: DEMO RECOMMENDED
 - Now Playing Panel: DEMO RECOMMENDED
 - PC Power Meter Pro: DEMO RECOMMENDED
 - Weather Timeline Lite: STATIC IS ENOUGH
-- Weather Timeline Pro: DEMO RECOMMENDED for hour details, paging, and saved-location switching
+- Weather Timeline Pro: DEMO RECOMMENDED
 
 ## 6. Feature asset system
 
-Use the format that best proves the feature.
+Choose the proof format based on the feature:
 
-- static image for visually obvious states
-- short video for movement/state change
-- before/after for transformation
-- headline + real screen when UI proves the claim
-- small checklist only for simple inclusions
+- static image for visually obvious state
+- short real video for motion/state change
+- before/after when the difference is the value
+- headline + real screen when the UI itself proves the claim
+- small checklist only for genuinely useful simple inclusions
 
-Feature headlines should normally be 2–6 words.
-
-Run the `SO WHAT?` test. Implementation detail moves behind the customer outcome unless the implementation itself resolves a trust objection.
+Feature headlines should normally be 2–6 words. Run the `SO WHAT?` test before accepting a feature frame.
 
 ## 7. Description system
 
-Default:
+Default structure:
 
 1. direct one-line value proposition
-2. 2–5 concise useful benefits
-3. setup only if buyers need to know it
+2. 2–5 concise benefits
+3. setup only when buyers need it before purchase
 4. compatibility/requirements
-5. Lite/Pro distinction when relevant
-6. `Made by PackRat.` or another short human close
+5. Lite/Pro relationship where relevant
+6. short PackRat close
 
-Do not append raw keyword paragraphs.
-
-The first sentence should survive marketplace-card truncation and still explain why the product exists.
+Do not append raw SEO keyword paragraphs. The first sentence should still explain the product when later copy is truncated.
 
 ## 8. Representative before / after decisions
 
-### Now Playing Panel
+### Auto Queue for Claude Code — Stream Deck plugin
 
 Before:
 
-- full product name is the dominant top headline
-- subtitle adds another line of marketing chrome
+- deterministic product art existed, but the simulated Stream Deck competed with a large marketing-text layout
+- the core state transition was not framed as the primary buyer value
+
+V2:
+
+- hero label: `CLAUDE QUEUE`
+- large deterministic Stream Deck/key layout is the dominant subject
+- benefits progress from queueing → state visibility → queue control → local privacy
+- setup moves later and is framed as one-time friction
+- demo is recommended because queueing while Claude works and handing off at a turn boundary is inherently temporal
+
+### Now Playing Panel — XENEON
+
+Before:
+
+- full product name dominates the upper hierarchy
+- subtitle adds more marketing chrome
 - next static frame largely repeats the main state
-- strongest changing behaviors are distributed across later static graphics
 
 V2:
 
 - hero label: `MUSIC CONTROL`
-- real XENEON product is the dominant subject
-- PackRat mark moves to restrained top center
-- demo recommended immediately after hero
-- benefit frame leads with track visibility, controls, artist-reactive palettes, and useful idle state
-- customer description is materially shorter and removes the raw SEO keyword dump
+- real XENEON product dominates
+- PackRat mark is restrained top center
+- demo moves immediately after hero when available
+- benefit communication leads with track visibility, controls, reactive palettes, and useful idle behavior
 
-### PC Power Meter Pro
+### PC Power Meter Pro — complex dashboard
 
 Before:
 
-- technically excellent, but marketplace copy leads heavily with measurement methodology
-- full product-name hero consumes hierarchy that could belong to the real meter
+- technically careful but marketplace copy leads heavily with methodology
+- repeated full product-name hero chrome consumes useful hierarchy
 
 V2:
 
 - hero label: `PC POWER`
 - small `PRO` edition label
-- energy/cost is communicated as the main reason to care
-- accuracy language remains, but as trust proof rather than the first marketing idea
-- demo recommended because synchronized live watts, graphs, comparisons, energy, and cost are best understood changing together
+- energy/cost is communicated as the primary reason to care
+- measurement-scope accuracy stays as trust proof
+- demo is recommended because watts, graph, comparisons, energy, and cost are best understood changing together
 
-### Weather Timeline Lite / Pro
-
-Before:
-
-- family relationship exists in product naming but each listing still follows generic v1 title-card hierarchy
-- Lite feature art spends prime space saying `Free should still feel finished`
-- Pro feature art spends prime space saying it is the natural upgrade
+### Weather Timeline Lite / Pro — family test
 
 V2:
 
-- both heroes use the same `WEATHER` family composition and same ambient background family
-- only the restrained `LITE` / `PRO` label changes
-- Lite sells the complete 12-hour timeline itself, not the fact that it is free
+- both heroes use the same `WEATHER` composition and background family
+- restrained `LITE` / `PRO` label changes
+- Lite sells the complete 12-hour experience rather than merely saying it is free
 - Pro sells 24-hour horizon, tap details, saved locations, and richer solar context
-- Lite does not get a demo just to match Pro
+- Lite does not get a video just to match Pro
 
-## 9. Automation changes implemented on prototype branch
+## 9. Automation implemented
 
-`tools/art/rat_art.py` now supports schema v1 and v2.
+### Shared XENEON renderer
 
-Schema v1 remains intentionally legacy-compatible.
+`tools/art/rat_art.py` now supports schema v1 and schema v2.
+
+Schema v1 remains intentionally backward-compatible.
 
 Schema v2 adds:
 
 - short use-case hero labels
 - restrained top-center PackRat mark
-- edition/platform labeling
+- edition/platform labels
 - larger product/device band
 - configurable ambient accent
 - compact gallery headers
 - product-first feature composition
-- V2 contact sheet in actual marketplace order
+- V2 contact sheet in marketplace order
 - thumbnail review sheet at three card sizes
 - duplicate marketplace-image rejection
-- demo recommendation recorded in the Rat Art report
-- V2 report identity (`marketplace-listing-v2`)
+- demo recommendation in the Rat Art report
+- `marketplace-listing-v2` report identity
 
-`skills/rat-art/SKILL.md` now routes future migrations through the V2 standard and explicitly treats missing legacy source as a blocker rather than permission to fabricate art.
+### Stream Deck prototype renderer
+
+`plugins/claude-auto-queue/scripts/rat_art.py` now follows the same product-first hierarchy and generates its own V2 contact/thumbnail sheets without generative media.
+
+### Rat Art skill
+
+`skills/rat-art/SKILL.md` routes future marketplace art through V2 and explicitly treats missing canonical source as a blocker rather than permission to fabricate.
+
+### Catalog safety automation
+
+`tools/art/marketplace_catalog_audit.py` checks registry products against plausible canonical source directories and emits `SOURCE_AVAILABLE`, `SOURCE_REQUIRED`, or `SOURCE_RULE_UNKNOWN`.
+
+It deliberately does **not** claim the registry equals Maker Console's live Published catalog.
+
+`tools/art/marketplace_catalog_contact_sheet.py` creates a repeatable cross-catalog hero contact sheet from explicit 1920×960 hero inputs.
 
 ## 10. Full catalog rollout state
 
-### Prototype / migrated source available
+### V2 prototype/source available now
 
-The current branch actively prototypes:
-
+- Auto Queue for Claude Code
 - Now Playing Panel
 - PC Power Meter Pro
 - Weather Timeline Lite
 - Weather Timeline Pro
 
-These have canonical source/captures and can be rendered truthfully in CI.
+The XENEON four have already passed a full Windows CI build → real capture → deterministic V2 render gate. Auto Queue is under the same CI gate.
 
-### Known published products in the canonical registry that still need legacy source reconciliation
+### Other source directories currently present in `widgets/_src`
 
-The registry includes published Stream Deck products such as:
+Current GitHub contains newer/migrated widget source such as:
 
-- Better Hotkeys & Mouse
-- Better Hotkeys & Mouse Pro
-- Valorant profile
-- Palworld profile
-- Discord Essentials
-- DaVinci Resolve
-- DaVinci Resolve Lite
-- DaVinci Resolve Pro
-- Streamer Starter Pack
-- Streamer University
-- Claude Usage
-- Screensaver Scheduler
-- NFL Tracker
-- NBA Tracker
-- NHL Tracker
-- Soccer Tracker
-- NASCAR Tracker
-- UFC Tracker
-- Neon Blue / Green / Pink / Yellow / Black / Purple / White / Red icon packs
+- Agenda Panel
+- Desk Notes / Desk Notes Pro
+- Helldivers
+- Net Dashboard
+- OBS Dashboard
+- PC Power Meter Lite
+- Rig Battery
+- Snake
+- Work Session Tracker / Work Session Tracker Pro
 
-Do not regenerate these from memory. Reconcile each with the actual current source/marketing files first.
+These directories are useful future V2 candidates **but their presence does not prove they are currently published Marketplace SKUs**.
 
-### Current published XENEON products in registry
+### Published registry products that are source-gated
 
-Known current published widgets include:
+Published legacy Stream Deck products include Better Hotkeys & Mouse, profiles such as Valorant/Palworld/DaVinci Resolve, Claude Usage, Screensaver Scheduler, sports trackers, and the old Neon icon series.
+
+Published registry widgets include:
 
 - Market Command Center
 - Crypto Portfolio
@@ -368,9 +358,11 @@ Known current published widgets include:
 - AI Usage Dashboard
 - Home Assistant Panel
 
-Their current `widgets/_src` source is available in `ratpack-system`, so these are the safest next rollout batch after the V2 prototype passes visual QA.
+At the time of this audit, those old widget IDs do **not** have matching current `widgets/_src/<id>` directories. They are therefore `SOURCE_REQUIRED` too, even though some are visibly live on the Marketplace.
 
-### Live Marketplace products discovered outside the registry's current naming
+Do not regenerate any of these products from memory.
+
+### Live Marketplace products discovered outside current registry naming
 
 Marketplace search currently surfaces PackRat products including:
 
@@ -379,31 +371,32 @@ Marketplace search currently surfaces PackRat products including:
 - Golden Icons
 - Prism Pastel Icons
 
-Additional live products may exist. This list is evidence of registry drift, not an exhaustive replacement for Maker Console's Published list.
+Additional live products may exist. This is evidence of registry drift, not a complete replacement for Maker Console's Published list.
 
 ### Full-catalog completion gate
 
 Before marking `FULL_CATALOG_COMPLETE`:
 
-1. Export/read Maker Console's Published product list.
+1. Read/export Maker Console's Published product list.
 2. Reconcile every live SKU into `products/index.json`.
-3. Migrate/mount the remaining local `ratpack-projects` and `_shared` source/marketing folders.
-4. Regenerate only from real current source.
-5. Render every V2 hero/contact sheet/thumbnail sheet.
-6. Build one cross-catalog hero contact sheet.
-7. Fix outliers.
-8. Update Maker Console media and descriptions product by product.
-9. Verify the public Marketplace after propagation.
+3. Migrate/mount remaining `ratpack-projects` / `_shared` source and marketing assets.
+4. Run `marketplace_catalog_audit.py` and clear all source blockers for active SKUs.
+5. Regenerate only from real current source.
+6. Render every V2 hero/contact/thumbnail sheet.
+7. Build one cross-catalog hero sheet.
+8. Fix visual outliers.
+9. Update Maker Console media/descriptions product by product.
+10. Verify the public Marketplace after propagation.
 
-## 11. Maker identity recommendation
+## 11. Maker identity
 
 Current public maker copy includes generic language such as `elevate your setup`.
 
-Recommended future maker profile direction:
+Recommended direction:
 
 `Useful Stream Deck tools, profiles, icon packs, and XENEON Edge widgets — built by PackRat to make your setup more useful without making it more complicated.`
 
-Keep support/social links in the maker profile and Marketplace fields rather than placing URLs in listing art.
+Keep support/social links in maker/profile fields instead of placing URLs in listing art.
 
 ## 12. QA / score gate
 
@@ -419,19 +412,19 @@ V2 rubric:
 - Consistency: 5
 - Description quality: 5
 
-Target: 95+ after rendered prototype review.
+Target: 95+.
 
-Do not assign the final numeric score until the CI-rendered V2 contact sheets and thumbnail sheets have been visually inspected.
+Mandatory failures override arithmetic score.
 
-Mandatory failures override score.
+The final prototype score should only be assigned after the Stream Deck and XENEON rendered contact/thumbnail sheets are all visually inspected.
 
 ## 13. Remaining owner-bound inputs
 
-The new logo is **not blocked**: the current PackRat rat/package vector was positively identified in `slayerkey/packrat-site/assets/packrat-logo.svg`, with the existing Rat Art PNG treated as a renderer-friendly derivative.
+The logo is **not blocked**. The current PackRat rat/package vector was positively identified in `slayerkey/packrat-site/assets/packrat-logo.svg`; the existing Rat Art PNG is a renderer-friendly derivative.
 
 The two genuine inputs required for a literal every-live-listing rollout are:
 
-1. the unmigrated legacy `ratpack-projects` / `_shared` source and marketing tree (or its migration into `ratpack-system`), and
+1. the unmigrated legacy `ratpack-projects` / `_shared` source and marketing tree (or its migration/mount into the canonical environment), and
 2. the Maker Console Published-product list/export so the live catalog can be reconciled against `products/index.json`.
 
-Neither blocker should stop the V2 system or the already-migrated XENEON catalog from moving forward.
+Neither blocker should stop the V2 system or source-available prototypes from moving forward.
