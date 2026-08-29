@@ -17,6 +17,10 @@ on:
       - '.github/workflows/marketplace-listing-v2-ci.yml'
   workflow_dispatch:
 
+concurrency:
+  group: marketplace-listing-v2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
