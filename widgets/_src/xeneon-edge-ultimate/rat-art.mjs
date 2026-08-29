@@ -4,7 +4,7 @@ export const variants = [
   { name: 'ambient', slot: 'XL_H', mode: 'ambient' },
 ];
 
-const FIXED_NOW = Date.parse('2026-08-29T10:42:00-07:00');
+const FIXED_LOCAL = { year: 2026, month: 7, day: 29, hour: 10, minute: 42, second: 0 };
 
 function modeFor(context) {
   return context.variant?.mode || 'home';
@@ -38,13 +38,23 @@ export async function prepare(page, context) {
     await route.fulfill({ status: 200, contentType: 'text/plain', body: 'fl=fixture\nip=127.0.0.1\n' });
   });
 
-  await page.addInitScript(({ fixedNow }) => {
+  await page.addInitScript(({ fixedLocal }) => {
     const NativeDate = Date;
+    const fixedNow = new NativeDate(
+      fixedLocal.year,
+      fixedLocal.month,
+      fixedLocal.day,
+      fixedLocal.hour,
+      fixedLocal.minute,
+      fixedLocal.second,
+      0,
+    ).getTime();
     class FixedDate extends NativeDate {
       constructor(...args) { super(...(args.length ? args : [fixedNow])); }
       static now() { return fixedNow; }
     }
     globalThis.Date = FixedDate;
+    globalThis.__ratArtFixedNow = fixedNow;
     globalThis.uniqueId = 'rat-art-ultimate';
     globalThis.iCUE = { isPreview: false };
     globalThis.preset = 'everyday';
@@ -97,14 +107,15 @@ export async function prepare(page, context) {
     const media = makeAsync({ getSongName:()=> 'Midnight Circuit', getArtist:()=> 'Velvet Static' });
     media.triggerPreviousTrack=()=>{}; media.triggerPlayPause=()=>{}; media.triggerNextTrack=()=>{};
     globalThis.plugins = { Sensorsdataprovider:sensors, Fpsdataprovider:fps, Mediadataprovider:media };
-  }, { fixedNow: FIXED_NOW });
+  }, { fixedLocal: FIXED_LOCAL });
 }
 
 export async function ready(page, context) {
   const mode = modeFor(context);
   await page.waitForFunction(() => globalThis.state?.started === true, { timeout: 10000 });
   await page.waitForFunction(() => document.getElementById('gpuTemp')?.textContent?.trim() !== '—', { timeout: 10000 });
-  await page.evaluate(({ mode, fixedNow }) => {
+  await page.evaluate(({ mode }) => {
+    const fixedNow = globalThis.__ratArtFixedNow || Date.now();
     for (const timer of state.timers || []) clearInterval(timer);
     state.timers = [];
     const samples = 76;
@@ -142,7 +153,7 @@ export async function ready(page, context) {
     updateClock();
     setMode(mode, false);
     renderAll();
-  }, { mode, fixedNow: FIXED_NOW });
+  }, { mode });
   await page.waitForTimeout(120);
 }
 
