@@ -16,27 +16,52 @@ The product owner has confirmed the published Home Assistant source may exist on
 
 **Do not reconstruct or replace the published Home Assistant product from scratch.** The GitHub work in this recovery branch is transport research and diagnostics only. Once the transport root cause is proven, apply the smallest compatible patch to the existing local published source/package.
 
-## Current transport diagnosis
+## Proven root cause class
 
 The published settings guidance tells users to add `null` to Home Assistant CORS allowed origins. That strongly suggests the product calls the REST API directly from an imported `file://` widget.
 
-Modern browsers normally serialize a `file:` document as the opaque CORS origin `null`. Home Assistant's current HTTP CORS setup accepts configured origin strings and includes `Authorization` among allowed CORS headers.
+A `file:` widget has an opaque web origin. Authenticated Home Assistant REST calls include an `Authorization` header and therefore require browser CORS permission before the API response can be read.
 
-Home Assistant 2026.8 moved HTTP server settings into Settings > System > Network. Saving changes restarts Home Assistant, and an administrator must confirm the new settings within five minutes or Home Assistant automatically reverts them.
+A real Home Assistant Core 2026.8.3 regression now reproduces the important behavior from an actual `file://` document:
 
-Because the REST call includes an Authorization header, it requires a CORS preflight. A missing/reverted `null` origin permission can therefore make every entity look broken before entity lookup ever occurs.
+* The Home Assistant server is reachable from the widget.
+* The authenticated REST API is blocked by browser CORS under the default Home Assistant configuration.
+* The native `/api/websocket` endpoint connects from the same file-origin widget.
+* WebSocket bearer-token authentication succeeds.
+* `get_states` returns a real seeded entity correctly.
 
-## Better transport candidate
+Observed exact result:
+
+`REST CORS is blocked, but WebSocket WORKS`
+
+and the seeded entity returned as:
+
+`sensor.ratpack_temperature = 72`
+
+This is strong evidence that the customer can have a completely valid server URL, token, and entity id while a REST-only implementation still appears unable to recognize any entities.
+
+## Recommended repaired transport
 
 Home Assistant officially exposes `/api/websocket`.
 
-The WebSocket flow authenticates by sending the access token after connection and supports `get_states` plus live `state_changed` subscriptions. The current Home Assistant WebSocket HTTP handler does not use the configured REST CORS middleware.
+Use the WebSocket API as the primary transport for the published panel:
 
-This makes the native WebSocket API a strong candidate for the repaired published product if real iCUE proves it can connect from the imported widget. It would remove the fragile `null` REST CORS setup requirement and enable live push instead of polling.
+1. Connect to `<server>/api/websocket` using `ws:` or `wss:` based on the configured HTTP scheme.
+2. Wait for `auth_required`.
+3. Send `{ "type": "auth", "access_token": token }`.
+4. After `auth_ok`, issue `get_states` for the initial snapshot.
+5. Subscribe to `state_changed` events for live updates instead of REST polling.
+6. Use `call_service` for control actions.
+7. Reconnect with bounded backoff after network loss.
+8. Reconnect immediately when server address or token changes in iCUE.
+
+This removes the fragile requirement that every user manually allow the opaque `null` REST origin and also gives the panel live push updates instead of polling.
+
+REST can remain only as an optional diagnostic/fallback path where a named allowed origin is explicitly available. It should no longer be required for normal operation.
 
 ## Diagnostic gate
 
-The temporary `tools/xeneon/home-assistant-diagnostic/` widget tests, in real iCUE:
+The temporary `tools/xeneon/home-assistant-diagnostic/` widget tests:
 
 1. LAN reachability with an opaque no-CORS request.
 2. REST API readability / CORS.
@@ -44,14 +69,25 @@ The temporary `tools/xeneon/home-assistant-diagnostic/` widget tests, in real iC
 4. Exact entity lookup.
 5. Home Assistant native WebSocket authentication + `get_states`.
 
-The browser regression runs from a real `file://` document against deterministic local HTTP/WebSocket fixtures. It asserts that REST preflight sends `Origin: null`, that Authorization is preflighted, and that WebSocket can still succeed when REST CORS is intentionally denied.
+The deterministic browser regression asserts that REST preflight sends an opaque origin, that Authorization is preflighted, and that WebSocket can still succeed when REST CORS is intentionally denied.
 
-A second CI gate starts a clean Home Assistant Core 2026.8 instance, creates a temporary QA user/token, seeds a real entity through the REST API, then runs the exact diagnostic page from `file://`. This proves or disproves the WebSocket fallback against real Home Assistant rather than only mocks.
+The stronger CI gate starts clean Home Assistant Core 2026.8.3, performs real onboarding, creates a temporary QA access token, seeds a real entity through Home Assistant, then runs the diagnostic from `file://`. That real-server gate passes.
 
 No real user token is used in CI.
+
+## Local source patch rule
+
+When the original Home Assistant source is found on the local PC:
+
+* Preserve the current UI, product identity, settings names, styles, and entity configuration model unless a change is technically required.
+* Replace only the connection/data transport layer first.
+* Do not make the customer re-enter unrelated settings.
+* Remove or downgrade the old `null` CORS setup requirement once the WebSocket path is confirmed in physical iCUE.
+* Add a visible connection state that distinguishes server unreachable, token rejected, connected, and entity missing.
+* Test the repaired package against at least one sensor and one controllable entity before publishing.
 
 ## Security
 
 The support screenshot exposed a real Long-Lived Access Token. The user should revoke it immediately and create a fresh temporary token before further testing. Never attach screenshots containing tokens to issues or CI artifacts.
 
-Allowing the CORS origin `null` is also broader than an ordinary named web origin. Prefer the authenticated WebSocket transport if physical iCUE proves it viable.
+Allowing the CORS origin `null` is broader than an ordinary named web origin. The authenticated WebSocket transport avoids requiring that setup for normal use.
