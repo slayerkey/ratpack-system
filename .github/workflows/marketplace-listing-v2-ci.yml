@@ -1,0 +1,88 @@
+name: Marketplace Listing V2 Prototype CI
+
+on:
+  pull_request:
+    paths:
+      - 'tools/art/**'
+      - 'skills/rat-art/**'
+      - 'standards/marketplace-listing-v2.md'
+      - 'docs/MARKETPLACE_LISTING_V2_AUDIT.md'
+      - 'widgets/_src/now-playing/**'
+      - 'widgets/_src/pc-power-meter-pro/**'
+      - 'widgets/_src/weather-timeline/**'
+      - 'widgets/_src/weather-timeline-pro/**'
+      - '.github/workflows/marketplace-listing-v2-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-prototype:
+    name: Render ${{ matrix.slug }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slug:
+          - now-playing
+          - pc-power-meter-pro
+          - weather-timeline
+          - weather-timeline-pro
+    env:
+      WIDGET_SLUG: ${{ matrix.slug }}
+      RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
+      RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deterministic art dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==12.3.0
+          npm install --no-save playwright@1.62.1
+          npm audit --audit-level=high
+          npx playwright install chromium
+
+      - name: Build shipping widget from canonical source
+        shell: pwsh
+        run: python tools/xeneon/inline.py $env:WIDGET_SLUG
+
+      - name: Capture real widget at native XENEON slots
+        shell: pwsh
+        run: node tools/art/capture_xeneon.mjs $env:WIDGET_SLUG "artifacts/marketplace-v2/$env:WIDGET_SLUG/shots"
+
+      - name: Render Marketplace Listing V2 candidate
+        shell: pwsh
+        run: python tools/art/rat_art.py xeneon $env:WIDGET_SLUG --shots "artifacts/marketplace-v2/$env:WIDGET_SLUG/shots" --out "artifacts/marketplace-v2/$env:WIDGET_SLUG/review"
+
+      - name: Verify V2 contract
+        shell: pwsh
+        run: |
+          $dir = "artifacts/marketplace-v2/$env:WIDGET_SLUG/review"
+          $report = Get-Content "$dir/rat-art-report.json" -Raw | ConvertFrom-Json
+          if ($report.image_generation -ne 'disabled') { throw 'Image generation must stay disabled.' }
+          if ($report.design_system -ne 'marketplace-listing-v2') { throw 'Prototype did not render through Marketplace Listing V2.' }
+          if ($report.schema_version -ne 4) { throw 'V2 report schema must be 4.' }
+          if (-not (Test-Path "$dir/contact-sheet.jpg")) { throw 'Missing V2 contact sheet.' }
+          if (-not (Test-Path "$dir/thumbnail-sheet.jpg")) { throw 'Missing V2 thumbnail sheet.' }
+          foreach ($name in @('1-hero.png','2-showcase.png','3-features.png','4-settings.png','5-sizes.png')) {
+            if (-not (Test-Path "$dir/$name")) { throw "Missing $name" }
+          }
+
+      - name: Upload V2 candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-v2-${{ matrix.slug }}
+          path: artifacts/marketplace-v2/${{ matrix.slug }}/
+          if-no-files-found: error
+          retention-days: 30
