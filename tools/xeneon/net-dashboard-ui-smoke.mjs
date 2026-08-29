@@ -27,8 +27,14 @@ let transparency = 35;
 let uniqueId = "ratpack-network-ui-smoke";
 globalThis.tr = async function(value){ return value; };
 globalThis.__setNetworkUi = function(next) {
+  if (next.probeHosts !== undefined) probeHosts = String(next.probeHosts);
+  if (next.probeInterval !== undefined) probeInterval = Number(next.probeInterval);
+  if (next.warnAt !== undefined) warnAt = Number(next.warnAt);
   if (next.customHeader !== undefined) customHeader = String(next.customHeader);
   if (next.hostTextSize !== undefined) hostTextSize = Number(next.hostTextSize);
+  if (next.textColor !== undefined) textColor = String(next.textColor);
+  if (next.accentColor !== undefined) accentColor = String(next.accentColor);
+  if (next.backgroundColor !== undefined) backgroundColor = String(next.backgroundColor);
   if (next.transparency !== undefined) transparency = Number(next.transparency);
 };
 </script>`;
@@ -36,7 +42,7 @@ const instrumented = original.replace(/<head(\s[^>]*)?>/i, (match) => match + "\
 const temp = path.join(path.dirname(path.resolve(entry)), "__ratpack-net-ui-instrumented.html");
 fs.writeFileSync(temp, instrumented, "utf8");
 
-const report = { schema_version: 1, entry: path.basename(entry), passed: false };
+const report = { schema_version: 2, entry: path.basename(entry), passed: false };
 let exitCode = 0;
 const browser = await chromium.launch({ headless: true });
 try {
@@ -46,35 +52,92 @@ try {
   page.on("pageerror", (error) => pageErrors.push(String(error)));
   await page.goto(pathToFileURL(temp).href, { waitUntil: "load", timeout: 30_000 });
   await page.waitForFunction(() => Boolean(globalThis.__netDashboardUiTest && globalThis.icueEvents), null, { timeout: 10_000 });
-  await page.waitForFunction(() => document.getElementById("ribbonEyebrow")?.textContent === "MY NETWORK", null, { timeout: 5_000 });
+  await page.waitForFunction(() => document.getElementById("networkHeaderTitle")?.textContent === "MY NETWORK", null, { timeout: 5_000 });
 
-  report.initial = await page.evaluate(() => ({
-    header: document.getElementById("ribbonEyebrow")?.textContent,
-    hostSize: getComputedStyle(document.documentElement).getPropertyValue("--net-user-host-size").trim(),
-    backgroundFactor: getComputedStyle(document.documentElement).getPropertyValue("--net-background-factor").trim(),
-    slot: document.body.getAttribute("data-slot")
-  }));
-  if (report.initial.header !== "MY NETWORK") throw new Error(`custom header missing: ${JSON.stringify(report.initial)}`);
+  report.initial = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const panel = getComputedStyle(document.getElementById("hostsPanel"));
+    const topbar = document.getElementById("networkTopbar").getBoundingClientRect();
+    const metrics = document.getElementById("metrics").getBoundingClientRect();
+    return {
+      header: document.getElementById("networkHeaderTitle")?.textContent,
+      ribbonHeader: document.getElementById("ribbonEyebrow")?.textContent,
+      hostSize: root.getPropertyValue("--net-user-host-size").trim(),
+      backgroundFactor: root.getPropertyValue("--net-background-factor").trim(),
+      text: root.getPropertyValue("--text").trim(),
+      accent: root.getPropertyValue("--accent").trim(),
+      background: root.getPropertyValue("--bg").trim(),
+      panelBackground: panel.backgroundColor,
+      panelOpacity: panel.opacity,
+      topbarAboveMetrics: topbar.bottom <= metrics.top + 1,
+      slot: document.body.getAttribute("data-slot")
+    };
+  });
+  if (report.initial.header !== "MY NETWORK") throw new Error(`product header missing: ${JSON.stringify(report.initial)}`);
+  if (report.initial.ribbonHeader !== "LATENCY HISTORY") throw new Error(`custom header still replaced ribbon label: ${JSON.stringify(report.initial)}`);
   if (report.initial.hostSize !== "22px") throw new Error(`host size setting missing: ${JSON.stringify(report.initial)}`);
-  if (Math.abs(Number(report.initial.backgroundFactor) - 0.35) > 0.001) throw new Error(`transparency setting missing: ${JSON.stringify(report.initial)}`);
+  if (Math.abs(Number(report.initial.backgroundFactor) - 0.35) > 0.001) throw new Error(`background opacity setting missing: ${JSON.stringify(report.initial)}`);
+  if (report.initial.panelOpacity !== "1" || /rgba\([^)]*,\s*0(?:\.0+)?\)/i.test(report.initial.panelBackground)) throw new Error(`dashboard panel became transparent: ${JSON.stringify(report.initial)}`);
+  if (!report.initial.topbarAboveMetrics) throw new Error(`product header overlaps metrics: ${JSON.stringify(report.initial)}`);
   if (report.initial.slot !== "s-h") throw new Error(`small composition not detected: ${JSON.stringify(report.initial)}`);
 
+  // Critical real-iCUE regression: mutate lexical bindings and DO NOT call
+  // icueEvents.onDataUpdated. The widget itself must detect and repaint them.
   await page.evaluate(() => {
-    globalThis.__setNetworkUi({ customHeader: "", hostTextSize: 18, transparency: 70 });
-    globalThis.icueEvents.onDataUpdated();
+    globalThis.__setNetworkUi({
+      customHeader: "OFFICE NET",
+      hostTextSize: 18,
+      transparency: 70,
+      textColor: "#FFF4D6",
+      accentColor: "#FFB84D",
+      backgroundColor: "#140C06"
+    });
   });
-  await page.waitForFunction(() => document.getElementById("ribbonEyebrow")?.textContent === "LATENCY HISTORY", null, { timeout: 5_000 });
-  report.updated = await page.evaluate(() => ({
-    header: document.getElementById("ribbonEyebrow")?.textContent,
+  await page.waitForFunction(() => {
+    const root = getComputedStyle(document.documentElement);
+    return document.getElementById("networkHeaderTitle")?.textContent === "OFFICE NET"
+      && root.getPropertyValue("--net-user-host-size").trim() === "18px"
+      && Math.abs(Number(root.getPropertyValue("--net-background-factor")) - 0.70) < 0.001
+      && root.getPropertyValue("--accent").trim().toLowerCase() === "#ffb84d";
+  }, null, { timeout: 3_000 });
+
+  report.updatedWithoutCallback = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const panel = getComputedStyle(document.getElementById("ribbonPanel"));
+    return {
+      header: document.getElementById("networkHeaderTitle")?.textContent,
+      ribbonHeader: document.getElementById("ribbonEyebrow")?.textContent,
+      hostSize: root.getPropertyValue("--net-user-host-size").trim(),
+      backgroundFactor: root.getPropertyValue("--net-background-factor").trim(),
+      text: root.getPropertyValue("--text").trim(),
+      accent: root.getPropertyValue("--accent").trim(),
+      background: root.getPropertyValue("--bg").trim(),
+      panelBackground: panel.backgroundColor,
+      panelOpacity: panel.opacity
+    };
+  });
+  if (report.updatedWithoutCallback.header !== "OFFICE NET") throw new Error(`live header update failed without callback: ${JSON.stringify(report.updatedWithoutCallback)}`);
+  if (report.updatedWithoutCallback.ribbonHeader !== "LATENCY HISTORY") throw new Error(`ribbon label changed with product header: ${JSON.stringify(report.updatedWithoutCallback)}`);
+  if (report.updatedWithoutCallback.hostSize !== "18px") throw new Error(`live host size update failed without callback: ${JSON.stringify(report.updatedWithoutCallback)}`);
+  if (Math.abs(Number(report.updatedWithoutCallback.backgroundFactor) - 0.70) > 0.001) throw new Error(`live background update failed without callback: ${JSON.stringify(report.updatedWithoutCallback)}`);
+  if (report.updatedWithoutCallback.panelOpacity !== "1" || /rgba\([^)]*,\s*0(?:\.0+)?\)/i.test(report.updatedWithoutCallback.panelBackground)) throw new Error(`panel transparency leaked after update: ${JSON.stringify(report.updatedWithoutCallback)}`);
+
+  // Simulate leaving and returning to the XENEON dashboard page. Values must stay
+  // stable and must not wait for a page transition to become visible.
+  await page.evaluate(() => {
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+  });
+  await page.waitForTimeout(300);
+  report.afterPageReturn = await page.evaluate(() => ({
+    header: document.getElementById("networkHeaderTitle")?.textContent,
     hostSize: getComputedStyle(document.documentElement).getPropertyValue("--net-user-host-size").trim(),
     backgroundFactor: getComputedStyle(document.documentElement).getPropertyValue("--net-background-factor").trim()
   }));
-  if (report.updated.hostSize !== "18px") throw new Error(`live host size update failed: ${JSON.stringify(report.updated)}`);
-  if (Math.abs(Number(report.updated.backgroundFactor) - 0.70) > 0.001) throw new Error(`live transparency update failed: ${JSON.stringify(report.updated)}`);
+  if (report.afterPageReturn.header !== "OFFICE NET" || report.afterPageReturn.hostSize !== "18px") throw new Error(`settings did not persist through page return: ${JSON.stringify(report.afterPageReturn)}`);
 
   report.pageErrors = pageErrors;
   if (pageErrors.length) throw new Error(`runtime page errors: ${JSON.stringify(pageErrors)}`);
-  await page.screenshot({ path: path.join(outDir, "network-dashboard-small-readable.png") });
+  await page.screenshot({ path: path.join(outDir, "network-dashboard-small-live-settings.png") });
   await context.close();
   report.passed = true;
 } catch (error) {
