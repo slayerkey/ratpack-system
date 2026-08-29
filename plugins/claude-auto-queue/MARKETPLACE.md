@@ -1,34 +1,65 @@
-# Auto Queue for Claude Code
+# Auto Queue for Claude Code marketplace prep
 
-Keep Claude working without going back to your keyboard.
+## Metadata
 
-Auto Queue for Claude Code lets you line up follow-up work from Stream Deck while Claude is already busy. The next request is saved locally and handed to the same Claude Code chat when the current turn finishes.
+Name: Auto Queue for Claude Code
 
-## What it does
+Category: Productivity
 
-- Queue reusable Claude Code prompts without interrupting the current turn.
-- See when Claude is working, finished, waiting for you, or hit an error.
-- See the next queued request and how many requests are waiting.
-- Remove the next request, move it to the end, or clear the queue from Stream Deck.
-- Auto follows the Claude chat you used most recently, with optional per-key chat binding.
-- Includes ready-made profiles for Stream Deck, Stream Deck Mini, Stream Deck XL, Stream Deck +, and Stream Deck Neo.
+OS: Windows 10+
 
-## Ready-made commands
+Claude Code: 2.1.163+
 
-The included profiles arrive with useful starting actions such as Run Tests, Fix Errors, Review Code, Continue, Document, Verify, Plan Next, Summarize, and queue controls. Every Queue Prompt key can be renamed and edited in the Property Inspector.
+Supported devices: Stream Deck, Stream Deck Mini, Stream Deck XL, Stream Deck +, Stream Deck Neo
 
-## Setup
+Keywords: Claude Code, queue, developer tools, productivity, Stream Deck
 
-Open Setup from any Auto Queue action and click **Connect Claude Code** once. Auto Queue adds its supported Claude Code hooks while preserving your existing Claude settings and other hooks. Then use Claude Code normally in VS Code or the Claude Code CLI.
+## Description
 
-Claude Code 2.1.163 or newer is required.
+Queue Claude Code's next job from Stream Deck without interrupting the turn it is already working on.
 
-## Local by design
+- Press a Queue Prompt key while Claude is busy; the prompt waits locally and becomes the next request in the same chat after the current turn finishes.
+- See working, finished, attention, and error states on Stream Deck.
+- See what is next, remove it, move it, or clear the queue.
+- Auto follows the Claude chat that most recently sent a real user message, with optional per-key chat binding.
+- Ready-made layouts are included for Stream Deck, Mini, XL, Plus, and Neo. Every Queue Prompt key is editable.
 
-Queued prompts and queue state stay on this computer. Auto Queue does not read or modify Claude credentials, does not upload prompts, and does not require a PackRat account or hosted service.
+Setup: open Setup, click Connect Claude Code once, then send one normal message in the Claude chat you want Auto to follow. After that, use Claude normally and queue follow-up work whenever you need it.
 
-## Current platform support
+Queued prompts stay on this computer. PackRat does not read or modify Claude credentials and does not upload your prompts. Existing Claude settings and other hooks are preserved.
 
-Windows 10 or newer. Claude Code in the official VS Code extension and common Windows CLI installations are supported.
+Compatibility: Windows 10+ and Claude Code 2.1.163 or newer. Works with the official Claude Code VS Code extension and common Windows CLI installations.
 
-Part of the PackRat ecosystem.
+Made by PackRat.
+
+## Media strategy
+
+The V2 hero makes the Stream Deck/key layout the dominant subject instead of surrounding a small deck with marketing copy.
+
+Recommended customer journey:
+
+1. `02_cover.png` — what this is: Claude queue controls on Stream Deck.
+2. Demo video when truthful interaction capture is available — queue while Claude works, then show the turn-boundary handoff.
+3. `03_gallery_01.png` — core value: queue, status, control, and local behavior.
+4. `04_gallery_02.png` — ready-made command-center layout.
+5. `05_gallery_03.png` — one-time setup and local privacy.
+6. `06_gallery_04.png` — supported Stream Deck family.
+
+`01_search_icon.png` is a search/app icon, not gallery content.
+
+Do not create a fake demo by crossfading static frames. The demo is valuable only if it shows the real queue state transition.
+
+## Release notes
+
+- Queue follow-up Claude Code work without interrupting the current turn.
+- One-time Connect setup with a clear first-message activation step for Auto chat detection.
+- Live working, finished, attention, and error states.
+- Active-chat Auto targeting with optional explicit chat binding.
+- Local persistent queue with remove, rotate, and clear controls.
+- Ready-made profiles for Stream Deck, Mini, XL, Plus, and Neo.
+
+## Submission cautions
+
+Pricing remains `REQUIRES_EXPLICIT_APPROVAL_BEFORE_MAKER_CONSOLE_DRAFT` in `submission.json`; do not invent or silently set a Marketplace price.
+
+The final Marketplace Submit action remains human-controlled.
