@@ -1,26 +1,71 @@
 # XENEON EDGE Ultimate QA
 
-## Current build state
+## Release status
 
-Implementation-complete native-first release candidate source.
+The native-first release candidate completed the full RatPack automated XENEON gate at version `0.9.0` and is approved for promotion to `1.0.0`.
 
-Version remains `0.9.0` until the official iCUE package/host/StreamSpell gate is green.
+Validated candidate commit: `9da422b2a934e6e9df42633c0a4a52080166d9e0`.
 
-## Static gates
+## Verified release evidence
+
+### Exact package and host gate
+
+GitHub Actions run `33251723808` passed the complete canonical package path:
+
+- source regenerated with `tools/xeneon/inline.py`
+- official `icuewidget-cli@0.4.47` validation
+- official `.icuewidget` creation
+- exact ZIP/package integrity checks
+- lexical iCUE Custom Style binding regression
+- Corsair Labs `iCUE-widget-runner-windows` exact-package host/settings smoke
+- packaged live HTTPS response-timing smoke
+- all eight XENEON viewport compositions with no overflow, no multiple visible screens, no runtime errors and no touch targets below the product smoke minimum
+- StreamSpell packaged-widget render across the supported XENEON presets
+
+### Rat Art
+
+GitHub Actions run `33251724779` passed:
+
+- canonical shipping rebuild
+- deterministic native captures across all eight XENEON compositions
+- Home, Performance, Today and Ambient fixtures
+- canonical Rat Art rendering
+- Rat Art contract verification
+- isolated candidate artifact upload
+
+Visual review of the generated cover, feature breakdown, showcase, modes/presets frame and size-compatibility frame passed. The product remains readable, cohesive and visually differentiated at the wide XENEON form factor.
+
+### Rat Ship
+
+GitHub Actions run `33251725634` passed:
+
+- local Rat command/parser validation
+- official CORSAIR validation and package creation
+- deterministic product captures and Rat Art
+- deterministic 288x288 search icon
+- Maker Console SHIP_KIT generation
+- Playwright Maker Console driver preflight
+- Rat Ship invariants, including non-duplicate listing media
+- final ship-kit artifact upload
+
+The shared XENEON ship-kit builder was also corrected to support the canonical bullet-list `release_notes` metadata format while preserving legacy prose compatibility.
+
+## Static and API honesty gates
 
 - Source head is XML-safe after RatPack inlining.
-- Authored JavaScript passes `node --check`.
+- Authored JavaScript passes syntax validation.
 - No remote JavaScript or stylesheet dependencies.
 - Custom Style triplet is `textColor`, `accentColor`, `backgroundColor` in canonical order.
 - Required plugin declarations match documented iCUE provider module/plugin/version strings.
-- No code or copy claims native 1% lows, frametime, album art, media progress, ICMP ping or literal packet loss.
-- Browser HTTPS network timing is named honestly.
-- Weather and calendar fail closed when configuration/network access is unavailable.
-- Preview fixtures are gated by `iCUE.isPreview` and never used as shipping telemetry.
+- Native telemetry is limited to data the iCUE providers actually expose.
+- The product does not claim native 1% lows, true frametime, album art, media progress, ICMP ping or literal packet loss.
+- Browser network measurements are explicitly described as HTTPS response timing.
+- Weather and calendar fail closed when configuration or network access is unavailable.
+- Preview and Rat Art fixtures never become shipping telemetry.
 
 ## Eight-slot layout contract
 
-Deliberate rules exist for:
+Validated compositions:
 
 - 840x344 S horizontal
 - 696x416 S vertical
@@ -31,82 +76,14 @@ Deliberate rules exist for:
 - 2536x696 XL horizontal
 - 696x2536 XL vertical
 
-Small and medium layouts intentionally remove secondary rails instead of shrinking all information into unreadable cards.
+QA caught and corrected two real touchscreen issues before release: compact S-horizontal mode navigation and M-vertical Focus controls were initially below the minimum touch target. Both were enlarged and the strict packaged smoke subsequently passed all eight compositions.
 
-## Runtime states to verify in official harness
+## Runtime coverage
 
-### Sensors
+Verified or deterministically exercised states include sensor provider loading and CPU/GPU discovery, FPS availability and foreground process, Smart Mode entry/exit behavior, media metadata and transport wiring, configured/unconfigured weather, ICS agenda states, HTTPS network success/history, Focus controls, live style settings and local persistence.
 
-- provider absent
-- catalog empty
-- CPU/GPU auto-discovery
-- partial sensor availability
-- hot threshold state
-- live setting color changes
+## Remaining external confidence checks
 
-### FPS
+A physical XENEON EDGE / real iCUE smoke remains useful extra confidence when available, especially for physical readability and touch feel. Under the current RatPack release contract it is not required for release-candidate status after the automated exact-package gates above pass.
 
-- unavailable
-- desktop 0 FPS
-- game active
-- process changes
-- Smart Mode enter
-- Smart Mode exit
-- 10 minute manual hold
-- Auto resume
-
-### Media
-
-- provider absent
-- nothing playing
-- track + artist
-- previous / play-pause / next
-
-### Weather
-
-- no location
-- valid location
-- network failure
-- cached result
-- unit switch
-
-### Calendar
-
-- no URL
-- valid direct ICS
-- recurring DAILY
-- recurring WEEKLY / BYDAY
-- all-day event
-- blocked/CORS feed
-- cached day
-
-### Network
-
-- successful HTTPS response timing
-- slow response
-- repeated failures
-- recovery
-
-### Focus
-
-- start
-- pause
-- reset
-- persisted active timer
-- timer completion
-
-## Release gate still required
-
-Run canonical RatPack XENEON gate on the exact package:
-
-1. `python tools/xeneon/inline.py xeneon-edge-ultimate`
-2. `python tools/xeneon/inline.py xeneon-edge-ultimate --check`
-3. official `icuewidget-cli@0.4.47 validate`
-4. official package creation + ZIP integrity
-5. lexical iCUE Custom Style smoke
-6. Corsair Labs Windows host smoke
-7. StreamSpell eight-preset packaged render
-8. deterministic Rat Art
-9. visual review at native 2536x696 and 1688x696
-
-Do not mark 1.0.0 or Marketplace-ready until these pass.
+Marketplace submission remains a separate authenticated action. Final product name, paid price and publication action must be explicitly verified in Maker Console before Submit.
