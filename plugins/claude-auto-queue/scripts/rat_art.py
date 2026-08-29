@@ -312,7 +312,7 @@ def report(out_dir: Path) -> None:
         "marketplace_order": images,
         "thumbnail_sheet": "thumbnail-sheet.jpg",
         "contact_sheet": "contact-sheet.jpg",
-        "demo_recommended": true,
+        "demo_recommended": True,
         "demo_reason": "The product's core value is a state transition: queue while Claude is working, then hand off the next prompt at the turn boundary.",
         "outputs": {name: {"size": Image.open(out_dir / name).size, "sha256": sha(out_dir / name)} for name in images},
     }
