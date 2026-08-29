@@ -1,0 +1,47 @@
+body[data-slot="s-v"] .screen,
+body[data-slot="m-v"] .screen,
+body[data-slot="l-v"] .screen,
+body[data-slot="xl-v"] .screen { left: 0; top: calc(var(--base) * 4.2); }
+
+body[data-slot="s-v"] { --base: clamp(10px, 1.9vh, 15px); }
+body[data-slot="s-v"] #screenHome { grid-template-columns: 1fr; grid-template-rows: .9fr 1.1fr; }
+body[data-slot="s-v"] .homeHealth { display: none; }
+body[data-slot="s-v"] .homeStrip { display: none; }
+body[data-slot="s-v"] #screenPerformance { grid-template-columns: 1fr; grid-template-rows: .72fr 1fr; }
+body[data-slot="s-v"] .perfRail { display: none; }
+body[data-slot="s-v"] #screenToday { grid-template-columns: 1fr; grid-template-rows: .75fr 1fr; }
+body[data-slot="s-v"] .todayTools { display: none; }
+
+body[data-slot="m-h"] { --base: clamp(12px, 1.7vh, 18px); }
+body[data-slot="m-h"] #screenHome { grid-template-columns: 32% 1fr; }
+body[data-slot="m-h"] .homeHealth { display: none; }
+body[data-slot="m-h"] #screenPerformance { grid-template-columns: 29% 1fr; }
+body[data-slot="m-h"] .perfRail { display: none; }
+body[data-slot="m-h"] #screenToday { grid-template-columns: 30% 1fr; }
+body[data-slot="m-h"] .todayTools { display: none; }
+
+body[data-slot="m-v"] { --base: clamp(11px, 1.5vh, 18px); }
+body[data-slot="m-v"] #screenHome { grid-template-columns: 1fr; grid-template-rows: .8fr 1fr .9fr; }
+body[data-slot="m-v"] #screenPerformance { grid-template-columns: 1fr; grid-template-rows: .55fr 1fr .75fr; }
+body[data-slot="m-v"] #screenToday { grid-template-columns: 1fr; grid-template-rows: .62fr 1fr .7fr; }
+
+body[data-slot="xl-h"] { --base: clamp(14px, 1.75vh, 22px); }
+
+body[data-slot="l-h"] { --base: clamp(13px, 1.7vh, 20px); }
+body[data-slot="l-h"] #screenHome { grid-template-columns: 31% 29% 1fr; }
+body[data-slot="l-h"] #screenPerformance { grid-template-columns: 27% 1fr 25%; }
+
+body[data-slot="l-v"] { --base: clamp(11px, 1.2vh, 19px); }
+body[data-slot="l-v"] #screenHome, body[data-slot="xl-v"] #screenHome { grid-template-columns: 1fr; grid-template-rows: .75fr .88fr 1.1fr; }
+body[data-slot="l-v"] #screenPerformance, body[data-slot="xl-v"] #screenPerformance { grid-template-columns: 1fr; grid-template-rows: .5fr 1.05fr .75fr; }
+body[data-slot="l-v"] #screenToday, body[data-slot="xl-v"] #screenToday { grid-template-columns: 1fr; grid-template-rows: .55fr 1.1fr .72fr; }
+body[data-slot="l-v"] .heroClock, body[data-slot="xl-v"] .heroClock { margin-top: calc(var(--base) * .4); }
+body[data-slot="l-v"] .weatherSummary, body[data-slot="xl-v"] .weatherSummary { margin-top: calc(var(--base) * .55); }
+body[data-slot="l-v"] .healthGrid, body[data-slot="xl-v"] .healthGrid { grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 1fr; }
+body[data-slot="l-v"] .homeStrip, body[data-slot="xl-v"] .homeStrip { height: calc(var(--base) * 3.4); }
+
+body[data-preset="minimal"] .homeHealth { opacity: .42; }
+body[data-preset="minimal"] .homeStrip { display: none; }
+body[data-preset="minimal"] .contextBody { max-width: 70%; }
+body[data-preset="gaming"] .homeContext #contextCard { background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 13%, rgba(255,255,255,.05)), rgba(255,255,255,.02)); }
+body[data-preset="enthusiast"] .metricTrend { color: rgba(245,247,250,.72); }
