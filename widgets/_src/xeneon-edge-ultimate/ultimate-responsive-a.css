@@ -29,7 +29,8 @@ body[data-context-alert="danger"] #contextCard { box-shadow: inset 0 0 0 1px col
   .screen, .railBar i { transition: none !important; }
 }
 
-body[data-slot="s-h"] { --base: clamp(10px, 2.4vh, 14px); --nav: calc(var(--base) * 4.2); }
+body[data-slot="s-h"] { --base: clamp(10px, 2.4vh, 14px); --nav: calc(var(--base) * 4.7); }
+body[data-slot="s-h"] #modeNav { padding-left: calc(var(--base) * .55); padding-right: calc(var(--base) * .55); }
 body[data-slot="s-h"] #screenHome { grid-template-columns: 36% 1fr; }
 body[data-slot="s-h"] .homeHealth { display: none; }
 body[data-slot="s-h"] .homeStrip { display: none; }
