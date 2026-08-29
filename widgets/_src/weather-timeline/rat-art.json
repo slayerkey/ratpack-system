@@ -1,1 +1,47 @@
-{"schema_version":1,"hero":{"subtitle":"Understand the rest of your day at a glance."},"showcase":{"title":"Weather belongs on a timeline.","subtitle":"Twelve hours of temperature, conditions and rain chance use the full width of XENEON Edge.","shot":"XL_H.png"},"features":{"title":"Free should still feel finished.","subtitle":"The Lite version keeps the core weather experience complete and dependable.","shot":"M_V.png","items":[["See the day unfold","A real NOW marker, hour-by-hour weather and day/night shading make the next 12 hours immediately readable."],["Solar events live in time","Sunrise and sunset are markers on the ribbon, not disconnected text cards."],["Failure stays readable","The last successful forecast remains visible with a clear stale state when a refresh fails."],["Pro stays optional","A single unobtrusive info action can open the Pro Marketplace listing through the official Link Provider."]]},"settings":{"title":"Set it once, then glance.","subtitle":"Location, automatic units, refresh cadence and four themes stay in iCUE settings.","panels":[{"label":"Wide ribbon","file":"XL_H.png"},{"label":"Vertical","file":"M_V.png"},{"label":"Rain","file":"VARIANT_RAIN.png"},{"label":"Night","file":"VARIANT_NIGHT.png"}],"tags":"12 hour timeline   •   4 themes   •   automatic °F / °C   •   cached forecast"},"sizes":{"title":"Built for every slot.","subtitle":"Horizontal slots stretch the ribbon; vertical slots reflow hours without becoming a tiny desktop card.","footer":"8 tuned layouts total   •   4 sizes   •   horizontal + vertical"}}
+{
+  "schema_version": 2,
+  "accent": "#66C8FF",
+  "hero": {
+    "title_mode": "use_case",
+    "label": "WEATHER",
+    "edition": "LITE",
+    "platform_label": "XENEON EDGE",
+    "shot": "XL_H.png"
+  },
+  "demo": {
+    "recommended": false,
+    "reason": "The core Lite value is a readable 12-hour forecast timeline; a static real forecast state communicates it faster than a mandatory video."
+  },
+  "features": {
+    "title": "See the rest of your day.",
+    "subtitle": "A 12-hour forecast ribbon makes the next weather change obvious at a glance.",
+    "shot": "M_V.png",
+    "items": [
+      ["Follow the timeline", "NOW, hourly conditions, temperature, rain chance, and day/night shading live in one continuous view."],
+      ["See sunrise + sunset", "Solar events sit on the timeline where they actually happen instead of becoming separate cards."],
+      ["Keep the last forecast", "If a refresh fails, the last successful forecast stays visible with a clear stale state."],
+      ["Set it once", "Location, automatic units, refresh cadence, and theme stay in iCUE settings."]
+    ]
+  },
+  "showcase": {
+    "title": "Weather makes more sense in time.",
+    "subtitle": "Temperature, conditions, rain chance, and the NOW marker use the full width of the display.",
+    "shot": "XL_H.png"
+  },
+  "settings": {
+    "title": "Four useful weather looks.",
+    "subtitle": "The same timeline stays readable across normal, rain, and night states.",
+    "panels": [
+      {"label": "Wide timeline", "file": "XL_H.png"},
+      {"label": "Vertical", "file": "M_V.png"},
+      {"label": "Rain", "file": "VARIANT_RAIN.png"},
+      {"label": "Night", "file": "VARIANT_NIGHT.png"}
+    ],
+    "tags": "12-hour timeline   •   4 themes   •   automatic °F / °C   •   cached forecast"
+  },
+  "sizes": {
+    "title": "Forecasts built for the slot.",
+    "subtitle": "Horizontal layouts stretch the timeline; vertical layouts reflow it instead of shrinking the same screen.",
+    "footer": "8 tuned layouts   •   S, M, L + XL   •   horizontal + vertical"
+  }
+}
