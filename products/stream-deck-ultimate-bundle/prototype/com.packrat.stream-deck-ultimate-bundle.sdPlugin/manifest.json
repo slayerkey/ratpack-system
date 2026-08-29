@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Actions": [
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/smart-app/icon","Name":"Smart App","States":[{"Image":"imgs/actions/smart-app/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Launch an app or bring its existing window forward.","UUID":"com.packrat.stream-deck-ultimate-bundle.smart-app"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/workspace/icon","Name":"Workspace","States":[{"Image":"imgs/actions/workspace/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Launch/focus a set of apps and arrange them as a workspace.","UUID":"com.packrat.stream-deck-ultimate-bundle.workspace"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/window/icon","Name":"Window Control","States":[{"Image":"imgs/actions/window/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Snap, maximize, or move the active window to another monitor.","UUID":"com.packrat.stream-deck-ultimate-bundle.window"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/clipboard/icon","Name":"Clipboard Slot","States":[{"Image":"imgs/actions/clipboard/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Show and paste one of the four most recent text clipboard entries.","UUID":"com.packrat.stream-deck-ultimate-bundle.clipboard"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/capture/icon","Name":"Capture","States":[{"Image":"imgs/actions/capture/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Open the Windows region capture overlay.","UUID":"com.packrat.stream-deck-ultimate-bundle.capture"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/media/icon","Name":"Media Control","States":[{"Image":"imgs/actions/media/key","TitleAlignment":"bottom","TitleColor":"#FFFFFF","FontSize":"11"}],"Tooltip":"Mute, adjust system volume, or play/pause media.","UUID":"com.packrat.stream-deck-ultimate-bundle.media"}
+  ],
+  "Author":"Packrat 🐀",
+  "Category":"Stream Deck Ultimate Bundle",
+  "CategoryIcon":"imgs/plugin/category",
+  "CodePath":"bin/plugin.js",
+  "Description":"A ready-to-use Windows control bundle for apps, workspaces, windows, clipboard, capture and media.",
+  "Icon":"imgs/plugin/marketplace",
+  "Name":"Stream Deck Ultimate Bundle",
+  "Nodejs":{"Version":"24"},
+  "OS":[{"Platform":"windows","MinimumVersion":"10"}],
+  "Profiles":[{"Name":"profiles/Stream Deck Ultimate Bundle - Windows","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true}],
+  "PropertyInspectorPath":"ui/property-inspector.html",
+  "SDKVersion":2,
+  "Software":{"MinimumVersion":"6.6"},
+  "UUID":"com.packrat.stream-deck-ultimate-bundle",
+  "Version":"0.1.0.0"
+}
