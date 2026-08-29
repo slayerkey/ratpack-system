@@ -8,6 +8,13 @@ on:
       - 'widgets/_src/xeneon-edge-ultimate/**'
       - 'widgets/xeneon-edge-ultimate/**'
       - '.github/workflows/xeneon-edge-ultimate-trigger.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'widgets/_src/xeneon-edge-ultimate/**'
+      - 'widgets/xeneon-edge-ultimate/**'
+      - '.github/workflows/xeneon-edge-ultimate-trigger.yml'
   workflow_dispatch:
 
 permissions:
