@@ -64,8 +64,7 @@
 .focusTimer { margin-top: calc(var(--base) * .55); background: var(--panel); border-radius: var(--radius); padding: calc(var(--base) * 1.0); }
 .focusTimer > strong { display: block; font-size: calc(var(--base) * 3.2); line-height: 1; letter-spacing: -.05em; }
 .focusButtons { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--base) * .45); margin-top: calc(var(--base) * .8); }
-.focusButtons button { min-height: calc(var(--base) * 2.35); border-radius: calc(var(--radius) * .75); background: var(--accent); color: #041008; font-weight: 850; font-size: calc(var(--base) * .58); letter-spacing: .08em; }
+.focusButtons button { min-height: max(36px, calc(var(--base) * 2.35)); border-radius: calc(var(--radius) * .75); background: var(--accent); color: #041008; font-weight: 850; font-size: calc(var(--base) * .58); letter-spacing: .08em; }
 .focusButtons .secondary { color: var(--text); background: rgba(255,255,255,.08); }
 .noteCard { margin-top: calc(var(--base) * .7); flex: 1; min-height: 0; border-radius: var(--radius); background: var(--panel); padding: calc(var(--base) * .9); }
 .noteCard #noteText { margin-top: calc(var(--base) * .6); font-size: calc(var(--base) * .95); line-height: 1.35; overflow: hidden; }
-
