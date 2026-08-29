@@ -6,6 +6,7 @@
 
   var applyingHeader = false;
   var headerObserver = null;
+  var defaultHeaderText = "LATENCY HISTORY";
 
   function directBinding(name) {
     try {
@@ -41,16 +42,19 @@
     return value == null ? "" : String(value).trim().slice(0, 48);
   }
 
+  function setHeaderText(node, value) {
+    if (!node || node.textContent === value) return;
+    applyingHeader = true;
+    node.textContent = value;
+    applyingHeader = false;
+  }
+
   function applyHeader() {
     if (typeof document === "undefined") return;
     var node = document.getElementById("ribbonEyebrow");
     if (!node) return;
     var heading = customHeading();
-    if (!heading) return;
-    if (node.textContent === heading) return;
-    applyingHeader = true;
-    node.textContent = heading;
-    applyingHeader = false;
+    setHeaderText(node, heading || defaultHeaderText);
   }
 
   function applyNetworkUiSettings() {
@@ -68,8 +72,18 @@
     if (typeof MutationObserver !== "function" || typeof document === "undefined") return;
     var node = document.getElementById("ribbonEyebrow");
     if (!node || headerObserver) return;
+    if (!customHeading() && node.textContent) defaultHeaderText = node.textContent;
     headerObserver = new MutationObserver(function () {
-      if (!applyingHeader && customHeading()) applyHeader();
+      if (applyingHeader) return;
+      var heading = customHeading();
+      if (heading) {
+        /* If async translation replaced our custom text, remember that translated
+         * value as the default before restoring the user's header. */
+        if (node.textContent && node.textContent !== heading) defaultHeaderText = node.textContent;
+        applyHeader();
+      } else if (node.textContent) {
+        defaultHeaderText = node.textContent;
+      }
     });
     headerObserver.observe(node, { childList: true, characterData: true, subtree: true });
   }
