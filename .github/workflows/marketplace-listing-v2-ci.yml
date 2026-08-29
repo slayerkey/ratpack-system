@@ -8,6 +8,7 @@ on:
       - 'skills/rat-art/**'
       - 'standards/marketplace-listing-v2.md'
       - 'docs/MARKETPLACE_LISTING_V2_AUDIT.md'
+      - 'products/index.json'
       - 'widgets/_src/now-playing/**'
       - 'widgets/_src/pc-power-meter-pro/**'
       - 'widgets/_src/weather-timeline/**'
@@ -20,6 +21,32 @@ permissions:
   contents: read
 
 jobs:
+  catalog-safety-audit:
+    name: Audit published catalog source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Audit registry source availability
+        run: |
+          python tools/art/marketplace_catalog_audit.py \
+            --status published \
+            --json-out artifacts/catalog/published-source-audit.json \
+            --md-out artifacts/catalog/published-source-audit.md
+          python -m py_compile tools/art/marketplace_catalog_audit.py tools/art/marketplace_catalog_contact_sheet.py
+
+      - name: Upload catalog source audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-v2-published-source-audit
+          path: artifacts/catalog/
+          if-no-files-found: error
+          retention-days: 30
+
   render-xeneon-prototype:
     name: Render ${{ matrix.slug }}
     runs-on: windows-latest
