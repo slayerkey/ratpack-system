@@ -1,6 +1,13 @@
 {
-  "slug":"weather-timeline","name":"Weather Timeline Lite","type":"widget","price_usd":0,"version":"1.0.0",
-  "marketplace_category":["Utilities"],"marketplace_dashboard_sizes":["Extra large","Large","Medium","Small"],"marketplace_language":["English"],"marketplace_auto_publish":true,
-  "description":"Weather Timeline Lite for CORSAIR XENEON Edge.\n\nTurn the unusually wide display into a readable 12 hour weather ribbon instead of another current weather card. See the temperature, condition and precipitation chance hour by hour, with a precise NOW marker and daylight versus darkness built directly into the timeline.\n\nSunrise and sunset appear where they actually happen in the forecast. Current conditions and the daily high and low stay visible at the side, and temperature units follow iCUE automatically unless you override them.\n\nForecasts are cached per widget instance. If a refresh fails, the last successful forecast stays on screen and is clearly marked stale instead of disappearing.\n\nChoose from four polished themes and use any of the eight XENEON Edge slot compositions. Tap an hour for a focused temperature and precipitation view.\n\nWeather access uses iCUE automatically when available. If your iCUE build does not provide weather access, you can paste your own free WeatherAPI.com key in settings as a local fallback.\n\nWeather Timeline Lite is free. The optional Pro version expands the timeline and adds richer forecast detail without putting an ad inside the main weather ribbon.\n\nPart of the PackRat 🐀 collection for CORSAIR XENEON Edge.",
-  "release_notes":"Initial free release. 12 hour weather timeline, current conditions, hourly temperature and condition icons, precipitation probability, daily high and low, iCUE-aware units, selected location, sunrise and sunset markers, cached stale-data fallback, four themes, touch hour detail, and all eight XENEON Edge layouts."
+  "slug": "weather-timeline",
+  "name": "Weather Timeline Lite",
+  "type": "widget",
+  "price_usd": 0,
+  "version": "1.0.0",
+  "marketplace_category": ["Utilities"],
+  "marketplace_dashboard_sizes": ["Extra large", "Large", "Medium", "Small"],
+  "marketplace_language": ["English"],
+  "marketplace_auto_publish": true,
+  "description": "See the next 12 hours as a weather timeline built for the wide XENEON Edge display.\n\n• Follow temperature, conditions, rain chance, a precise NOW marker, and day/night changes hour by hour.\n• See sunrise and sunset where they actually happen on the timeline.\n• Keep the last successful forecast visible with a clear stale state if a refresh fails.\n• Choose four themes and use tuned layouts for every XENEON Edge slot size and orientation.\n\nSetup: choose your location and preferences in iCUE. Units can follow iCUE automatically. Weather access uses iCUE when available; if your iCUE build does not provide it, you can add your own free WeatherAPI.com key as a local fallback.\n\nLite is free and keeps the complete 12-hour experience. Pro extends the view to 24 hours and adds deeper hour details, saved locations, more themes, and additional solar context.\n\nCompatibility: CORSAIR XENEON Edge.\n\nMade by PackRat.",
+  "release_notes": "Initial free release. 12 hour weather timeline, current conditions, hourly temperature and condition icons, precipitation probability, daily high and low, iCUE-aware units, selected location, sunrise and sunset markers, cached stale-data fallback, four themes, touch hour detail, and all eight XENEON Edge layouts."
 }
