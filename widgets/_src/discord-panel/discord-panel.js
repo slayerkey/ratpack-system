@@ -52,16 +52,30 @@ function installTestHooks() {
   };
 }
 
+function refreshIcueSettings() {
+  try {
+    if (typeof globalThis.__ratpackIcueSyncGlobals === "function") globalThis.__ratpackIcueSyncGlobals();
+    applySettings();
+  } catch (error) {
+    try { console.error("Discord Voice Panel iCUE settings refresh failed", error); } catch (ignored) { }
+  }
+}
+
+function installIcueLifecycle() {
+  var events = null;
+  try { events = globalThis.icueEvents; } catch (error) { events = null; }
+  if (!events || typeof events !== "object") events = {};
+  events.onICUEInitialized = refreshIcueSettings;
+  events.onDataUpdated = refreshIcueSettings;
+  globalThis.icueEvents = events;
+}
+
 function boot() {
   if (liveStarted) return;
   liveStarted = true;
-  try {
-    if (typeof icueEvents === "undefined") globalThis.icueEvents = function () {};
-  } catch (error) {
-    globalThis.icueEvents = function () {};
-  }
+  installIcueLifecycle();
   applySlot();
-  applySettings();
+  refreshIcueSettings();
   installTestHooks();
   loadTranslations();
 
@@ -85,7 +99,7 @@ window.addEventListener("click", function (event) {
 });
 
 setInterval(function () {
-  applySettings();
+  refreshIcueSettings();
   if (model.activity.length) renderActivity();
   if (!fixtureMode && (!rpcSocket || rpcSocket.readyState !== WebSocket.OPEN)) startLiveConnection();
 }, 1000);
