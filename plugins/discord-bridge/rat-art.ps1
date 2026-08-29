@@ -79,13 +79,11 @@ function Save-Canvas($canvas, [string]$name) {
     $g.Dispose(); $bmp.Dispose()
 }
 
-# Marketplace search icon: exact product icon centered on the PackRat dark field.
 $search = New-Canvas 512 512
 Draw-Icon $search[1] 48 48 416
 $search[0].Save((Join-Path $Destination "01_search_icon.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $search[1].Dispose(); $search[0].Dispose()
 
-# Cover
 $c = New-Canvas 1920 960
 Draw-Pill $c[1] "FREE STREAM DECK COMPANION" 110 92 420 $accent $bg
 Draw-Text $c[1] "PackRat Discord Bridge" 110 185 76 $white $true 1030
@@ -97,7 +95,6 @@ Draw-Pill $c[1] "DISCORD READY" 1325 655 340 $discord $white
 Draw-Footer $c[1]
 Save-Canvas $c "02_cover.png"
 
-# Gallery 1
 $c = New-Canvas 1920 960
 Draw-Text $c[1] "One bridge. One status key." 110 90 66 $white $true 1200
 Draw-Text $c[1] "The free companion tells you exactly what Discord needs." 112 180 34 $muted $false 1250
@@ -116,7 +113,6 @@ Draw-Icon $c[1] 1455 370 240
 Draw-Footer $c[1]
 Save-Canvas $c "03_gallery_01.png"
 
-# Gallery 2
 $c = New-Canvas 1920 960
 Draw-Text $c[1] "Discord stays local." 110 90 66 $white $true 1200
 Draw-Text $c[1] "The XENEON widget never receives your Discord access token." 112 180 34 $muted $false 1300
@@ -136,7 +132,6 @@ Draw-Pill $c[1] "NO CLOUD SYNC   •   NO USER TOKEN   •   MEMORY ONLY CREDENT
 Draw-Footer $c[1]
 Save-Canvas $c "04_gallery_02.png"
 
-# Gallery 3
 $c = New-Canvas 1920 960
 Draw-Text $c[1] "Everything the voice panel needs." 110 90 66 $white $true 1400
 Draw-Text $c[1] "The bridge handles Discord. XENEON stays focused on the interface." 112 180 34 $muted $false 1450
@@ -157,7 +152,6 @@ foreach ($feature in $features) {
 Draw-Footer $c[1]
 Save-Canvas $c "05_gallery_03.png"
 
-# Gallery 4
 $c = New-Canvas 1920 960
 Draw-Text $c[1] "Built for Discord Voice Panel." 110 90 66 $white $true 1400
 Draw-Text $c[1] "Install the free bridge once, then let XENEON follow the conversation." 112 180 34 $muted $false 1500
@@ -191,7 +185,7 @@ foreach ($file in $required) {
     try {
         $expected = if ($file -eq "01_search_icon.png") { @(512, 512) } else { @(1920, 960) }
         if ($image.Width -ne $expected[0] -or $image.Height -ne $expected[1]) {
-            throw "Discord Bridge Rat Art wrong dimensions for $file: $($image.Width)x$($image.Height)"
+            throw "Discord Bridge Rat Art wrong dimensions for ${file}: $($image.Width)x$($image.Height)"
         }
     } finally { $image.Dispose() }
 }
