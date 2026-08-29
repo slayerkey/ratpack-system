@@ -1,0 +1,132 @@
+name: XENEON Home Assistant Real iCUE Diagnostic
+
+on:
+  push:
+    branches:
+      - 'recovery/home-assistant-real-icue-diagnostic-*'
+    paths:
+      - 'tools/xeneon/home-assistant-diagnostic/**'
+      - 'tools/xeneon/home-assistant-diagnostic-smoke.mjs'
+      - 'docs/XENEON_HOME_ASSISTANT_RECOVERY_2026-08-28.md'
+      - '.github/workflows/xeneon-home-assistant-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    name: Home Assistant file-origin transport diagnostic
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate and package diagnostic widget
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/package | Out-Null
+          New-Item -ItemType Directory -Force -Path artifacts/extracted | Out-Null
+          npx --yes icuewidget-cli@0.4.47 validate tools/xeneon/home-assistant-diagnostic
+          if ($LASTEXITCODE -ne 0) { throw 'official validation failed' }
+          npx --yes icuewidget-cli@0.4.47 package tools/xeneon/home-assistant-diagnostic
+          if ($LASTEXITCODE -ne 0) { throw 'official package failed' }
+          $pkg = Get-ChildItem -Path . -Filter *.icuewidget -File -Recurse |
+            Where-Object { $_.FullName -notmatch '\\artifacts\\' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $pkg) { throw 'diagnostic package missing' }
+          Copy-Item $pkg.FullName artifacts/package/home-assistant-diagnostic.icuewidget
+          @'
+          import pathlib, zipfile
+          package = pathlib.Path('artifacts/package/home-assistant-diagnostic.icuewidget')
+          if not zipfile.is_zipfile(package):
+              raise SystemExit('package is not ZIP compatible')
+          with zipfile.ZipFile(package) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f'corrupt member: {bad}')
+              names = set(z.namelist())
+              for required in ('index.html','manifest.json'):
+                  if required not in names:
+                      raise SystemExit(f'missing root {required}')
+              z.extractall('artifacts/extracted')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'exact archive integrity failed' }
+
+      - name: Install browser test dependencies
+        shell: pwsh
+        run: |
+          npm install --no-save playwright@1.62.1 ws@8.18.0
+          npx playwright install chromium
+
+      - name: Prove REST CORS and WebSocket fallback from file origin
+        shell: pwsh
+        run: |
+          node tools/xeneon/home-assistant-diagnostic-smoke.mjs artifacts/extracted/index.html artifacts/browser
+          if ($LASTEXITCODE -ne 0) { throw 'Home Assistant file-origin diagnostic regression failed' }
+
+      - name: Clone Corsair Labs runner
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          if (Test-Path $runnerDir) { Remove-Item -Recurse -Force $runnerDir }
+          git clone --depth 1 https://github.com/Corsair-Labs/iCUE-widget-runner-windows.git $runnerDir
+          $target = Join-Path (Join-Path $runnerDir 'widgets') 'home-assistant-diagnostic'
+          if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+          Copy-Item -Recurse -Force artifacts/extracted $target
+          git -C $runnerDir rev-parse HEAD | Set-Content artifacts/corsair-runner-commit.txt
+
+      - name: Corsair Labs exact package host smoke
+        shell: pwsh
+        run: |
+          $runnerDir = Join-Path $env:RUNNER_TEMP 'icue-widget-runner-windows'
+          $stdout = Join-Path $env:RUNNER_TEMP 'corsair-ha-diag.out.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'corsair-ha-diag.err.log'
+          $process = Start-Process node -ArgumentList 'web-server.js' -WorkingDirectory $runnerDir -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $response = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/api/widgets -TimeoutSec 2
+                if ($response.StatusCode -eq 200) { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Corsair Labs runner did not become ready' }
+            node tools/xeneon/icue-runner-smoke.mjs http://127.0.0.1:8080/ home-assistant-diagnostic artifacts/icue-runner
+            if ($LASTEXITCODE -ne 0) { throw 'Corsair Labs diagnostic host smoke failed' }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $stdout) { Copy-Item $stdout artifacts/corsair-runner.stdout.log }
+            if (Test-Path $stderr) { Copy-Item $stderr artifacts/corsair-runner.stderr.log }
+          }
+
+      - name: Add tester handoff
+        shell: pwsh
+        run: |
+          Copy-Item tools/xeneon/home-assistant-diagnostic/TESTER-NOTE.txt artifacts/package/TESTER-NOTE.txt
+          Get-FileHash artifacts/package/home-assistant-diagnostic.icuewidget -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  home-assistant-diagnostic.icuewidget" } |
+            Set-Content -Encoding ASCII artifacts/package/SHA256SUMS.txt
+
+      - name: Upload physical diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-assistant-real-icue-diagnostic
+          path: artifacts/package/
+          retention-days: 30
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-assistant-real-icue-diagnostic-evidence
+          path: artifacts/
+          retention-days: 30
