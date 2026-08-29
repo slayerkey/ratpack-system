@@ -7,6 +7,7 @@ on:
     paths:
       - 'tools/xeneon/home-assistant-diagnostic/**'
       - 'tools/xeneon/home-assistant-diagnostic-smoke.mjs'
+      - 'tools/xeneon/home-assistant-real-core-smoke.mjs'
       - 'docs/XENEON_HOME_ASSISTANT_RECOVERY_2026-08-28.md'
       - '.github/workflows/xeneon-home-assistant-diagnostic.yml'
   workflow_dispatch:
@@ -129,4 +130,63 @@ jobs:
         with:
           name: home-assistant-real-icue-diagnostic-evidence
           path: artifacts/
+          retention-days: 30
+
+  real-home-assistant:
+    name: Real Home Assistant 2026.8 transport gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Start clean Home Assistant Core 2026.8.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/real-home-assistant ha-config
+          cat > ha-config/configuration.yaml <<'YAML'
+          default_config:
+          YAML
+          docker pull ghcr.io/home-assistant/home-assistant:2026.8.3
+          docker run -d \
+            --name ratpack-home-assistant \
+            -p 8123:8123 \
+            -e TZ=Etc/UTC \
+            -v "$PWD/ha-config:/config" \
+            ghcr.io/home-assistant/home-assistant:2026.8.3
+          docker inspect ratpack-home-assistant --format='{{.Config.Image}}' > artifacts/real-home-assistant/container-image.txt
+
+      - name: Install Chromium test dependency
+        shell: bash
+        run: |
+          npm install --no-save playwright@1.62.1
+          npx playwright install --with-deps chromium
+
+      - name: Prove file-origin WebSocket against real Home Assistant
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/xeneon/home-assistant-real-core-smoke.mjs \
+            tools/xeneon/home-assistant-diagnostic/index.html \
+            http://127.0.0.1:8123 \
+            artifacts/real-home-assistant
+
+      - name: Capture Home Assistant container logs
+        if: always()
+        shell: bash
+        run: |
+          docker logs ratpack-home-assistant > artifacts/real-home-assistant/home-assistant.log 2>&1 || true
+          docker inspect ratpack-home-assistant > artifacts/real-home-assistant/container-inspect.json 2>&1 || true
+
+      - name: Upload real Home Assistant evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-assistant-real-core-evidence
+          path: artifacts/real-home-assistant/
           retention-days: 30
