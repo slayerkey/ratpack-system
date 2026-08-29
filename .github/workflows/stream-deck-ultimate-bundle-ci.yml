@@ -1,0 +1,52 @@
+name: Stream Deck Ultimate Bundle CI
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/**'
+      - '.github/workflows/stream-deck-ultimate-bundle-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-and-pack:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Generate deterministic prototype assets and profile
+        working-directory: products/stream-deck-ultimate-bundle/prototype
+        run: |
+          python -m pip install -r requirements.txt
+          python tools/generate_prototype_assets.py com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: JavaScript syntax check
+        run: node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin.js
+
+      - name: Install current Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.9.0
+
+      - name: Validate plugin
+        run: streamdeck validate products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin --force-update-check
+
+      - name: Pack installable plugin
+        run: |
+          mkdir -p products/stream-deck-ultimate-bundle/prototype/dist
+          streamdeck pack products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin --output products/stream-deck-ultimate-bundle/prototype/dist --force --no-file-list
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-bundle-test
+          path: products/stream-deck-ultimate-bundle/prototype/dist/*.streamDeckPlugin
+          if-no-files-found: error
