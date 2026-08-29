@@ -3,8 +3,10 @@ import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
 const html = fs.readFileSync(path.join(here, "index.html"), "utf8");
-const js = ["core.js", "data.js", "ui.js"].map(name => fs.readFileSync(path.join(here, name), "utf8")).join("\n");
-const css = fs.readFileSync(path.join(here, "ultimate.css"), "utf8");
+const jsFiles = ["core-settings.js", "core-mode.js", "providers-sensors.js", "providers-live.js", "data-weather.js", "data-ics.js", "data-agenda.js", "data-network.js", "ui-context.js", "ui-graphs.js", "ui-drawers.js", "ui-runtime.js"];
+const cssFiles = ["ultimate-foundation.css","ultimate-screens.css","ultimate-responsive-a.css","ultimate-responsive-b.css"];
+const js = jsFiles.map(name => fs.readFileSync(path.join(here, name), "utf8")).join("\n");
+const css = cssFiles.map(name => fs.readFileSync(path.join(here, name), "utf8")).join("\n");
 const manifest = JSON.parse(fs.readFileSync(path.join(here, "..", "..", "xeneon-edge-ultimate", "manifest.json"), "utf8"));
 
 function must(condition, message) {
