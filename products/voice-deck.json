@@ -1,0 +1,24 @@
+{
+  "id": "voice-deck",
+  "name": "PackRat Voice Deck",
+  "type": "plugin",
+  "status": "testing",
+  "workflow_state": "BLOCKED_EXTERNAL_APPROVAL",
+  "price_usd": 9.99,
+  "version": "1.0.0.0",
+  "platform": "Elgato Stream Deck / Windows",
+  "source": "plugins/voice-deck",
+  "submission_metadata": "plugins/voice-deck/submission.json",
+  "release_gate": [
+    "locked dependency audit and automated voice-state tests",
+    "50-member speaking and render stress",
+    "deterministic MK.2, XL, Plus, and Neo profile generation",
+    "official Elgato Stream Deck SDK v2 / SDKVersion 3",
+    "official Stream Deck CLI validation",
+    "official .streamDeckPlugin packaging",
+    "deterministic Marketplace media",
+    "Rat Ship plugin kit preflight",
+    "real Windows Discord IPC and physical Stream Deck smoke"
+  ],
+  "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission, then real Windows Discord/Stream Deck packaged-plugin smoke, then authenticated Maker Console submission"
+}
