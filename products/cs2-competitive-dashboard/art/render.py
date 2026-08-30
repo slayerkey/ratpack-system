@@ -11,9 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from tools.art.rat_art import (  # noqa: E402
     ACCENT,
-    H,
     MUTED,
-    W,
     WHITE,
     fit_font,
     gradient_bg,
@@ -25,11 +23,9 @@ OUT = Path(__file__).resolve().parent / "out"
 OUT.mkdir(parents=True, exist_ok=True)
 
 PANEL = (16, 23, 19)
-PANEL_2 = (20, 30, 24)
 BORDER = (39, 51, 44)
 LABEL = (147, 163, 155)
 WARN = (242, 201, 76)
-DANGER = (255, 90, 103)
 
 
 def text(draw: ImageDraw.ImageDraw, xy, value, size, fill=WHITE, bold=True, anchor=None):
@@ -69,7 +65,7 @@ def deck(canvas, keys):
     draw = ImageDraw.Draw(canvas)
     box = (330, 284, 1590, 794)
     rounded(draw, box, radius=44, fill=(8, 11, 10), outline=(48, 61, 53), width=3)
-    text(draw, (375, 326), "CS2 LIVE DASHBOARD", 17, MUTED)
+    text(draw, (375, 326), "CS2 LIVE MATCH", 17, MUTED)
     text(draw, (1540, 326), "LOCAL GSI", 15, ACCENT, anchor="ra")
     size = 190
     gap_x = 37
@@ -83,18 +79,18 @@ def deck(canvas, keys):
 
 def hero():
     canvas = gradient_bg()
-    header(canvas, "CS2 Competitive Dashboard Pro", "Live match telemetry and session performance without leaving the game")
+    header(canvas, "CS2 Competitive Dashboard Pro", "The premium physical dashboard for serious CS2 players")
     deck(canvas, [
-        ("SCORE", "8–6", "LIVE", ACCENT),
+        ("SCORE", "8-6", "LIVE", ACCENT),
         ("HEALTH", "73", "HP", ACCENT),
         ("MONEY", "$4.9K", "CURRENT", ACCENT),
         ("MAP", "MIRAGE", "DE_MIRAGE", ACCENT),
         ("WEAPON", "AK-47", "24 / 90", ACCENT),
         ("K/D", "1.42", "SESSION", ACCENT),
         ("ADR", "86.7", "SESSION", ACCENT),
-        ("HS", "48%", "SESSION", ACCENT),
+        ("HS%", "48%", "SESSION", ACCENT),
         ("RECORD", "3W 1L", "SESSION", ACCENT),
-        ("STATUS", "LIVE", "CS2 CONNECTED", ACCENT),
+        ("STATUS", "LIVE", "CONNECTED", ACCENT),
     ])
     footer(canvas)
     return canvas
@@ -125,60 +121,64 @@ def feature_card(draw, x, title_value, body, tag, tone=ACCENT):
 
 def features():
     canvas = gradient_bg()
-    header(canvas, "One plugin. Four useful views.", "Built around what CS2 players actually want visible between rounds")
+    header(canvas, "One plugin. Four competitive views.", "Live match state, session performance, Valve ranks, and FACEIT in one system")
     draw = ImageDraw.Draw(canvas)
     feature_card(draw, 120, "Live CS2", "Score, player state, money, equipment, weapon, ammo, map and team from local GSI.", "01", ACCENT)
     feature_card(draw, 520, "Session", "Track K/D, ADR, headshot percentage, matches and your current session record.", "02", ACCENT)
     feature_card(draw, 920, "Competitive", "Premier rating, map ranks, recent results and competitive form through your Leetify key.", "03", WARN)
     feature_card(draw, 1320, "FACEIT", "Elo, level, K/D, headshot percentage, win rate and recent form through your FACEIT key.", "04", WARN)
+    rounded(draw, (520, 725, 1400, 780), radius=14, fill=(10, 15, 12), outline=BORDER, width=1)
+    text(draw, (960, 752), "ONLINE SOURCES: DATA PROVIDED BY LEETIFY  |  FACEIT DATA API", 16, MUTED, False, anchor="mm")
     footer(canvas)
     return canvas
 
 
 def setup():
     canvas = gradient_bg()
-    header(canvas, "Live setup is one click. Online stats use free keys.", "Direct provider links and short setup steps are built into the Property Inspector")
+    header(canvas, "Live CS2 setup is automatic.", "Install the plugin, launch CS2, and your local dashboard connects itself")
     draw = ImageDraw.Draw(canvas)
     rounded(draw, (150, 272, 970, 802), radius=30, fill=PANEL, outline=BORDER, width=2)
     text(draw, (195, 312), "PACKRAT", 14, ACCENT)
     text(draw, (195, 342), "CS2 Competitive Dashboard Pro", 28, WHITE)
 
     text(draw, (195, 400), "LIVE CS2 TRACKING", 15, LABEL)
-    rounded(draw, (195, 430, 925, 488), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
-    text(draw, (220, 449), "Auto detect Steam and CS2", 17, MUTED, False)
-    rounded(draw, (195, 506, 610, 568), radius=12, fill=ACCENT, outline=ACCENT, width=1)
-    text(draw, (402, 537), "ENABLE LIVE CS2 TRACKING", 16, (7, 16, 10), anchor="mm")
+    rounded(draw, (195, 430, 925, 505), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
+    text(draw, (220, 447), "AUTO CONFIGURED", 13, ACCENT)
+    text(draw, (220, 472), "Steam + CS2 detected • Local GSI listener ready", 17, MUTED, False)
+    text(draw, (195, 528), "NO ENABLE BUTTON. NO LIVE API KEY.", 15, ACCENT)
+    text(draw, (195, 558), "If CS2 was open during first install, relaunch it once.", 15, MUTED, False)
 
-    text(draw, (195, 602), "COMPETITIVE ACCOUNT", 15, LABEL)
-    rounded(draw, (195, 630, 925, 688), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
-    text(draw, (220, 649), "Steam profile URL or SteamID", 17, MUTED, False)
+    text(draw, (195, 612), "OPTIONAL COMPETITIVE ACCOUNT", 15, LABEL)
+    rounded(draw, (195, 642, 925, 700), radius=12, fill=(13, 19, 15), outline=(51, 66, 57), width=2)
+    text(draw, (220, 661), "Steam profile URL or SteamID", 17, MUTED, False)
 
-    rounded(draw, (195, 710, 542, 770), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
-    text(draw, (220, 727), "LEETIFY", 13, WARN)
-    text(draw, (220, 747), "FREE API KEY", 14, WHITE)
-    rounded(draw, (578, 710, 925, 770), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
-    text(draw, (603, 727), "FACEIT", 13, WARN)
-    text(draw, (603, 747), "FREE API KEY", 14, WHITE)
+    rounded(draw, (195, 720, 542, 775), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
+    text(draw, (220, 735), "LEETIFY", 13, WARN)
+    text(draw, (220, 754), "PREMIER + COMPETITIVE", 12, WHITE)
+    rounded(draw, (578, 720, 925, 775), radius=12, fill=(13, 19, 15), outline=(67, 59, 30), width=2)
+    text(draw, (603, 735), "FACEIT", 13, WARN)
+    text(draw, (603, 754), "ELO + PERFORMANCE", 12, WHITE)
 
     steps = [
-        ("1", "Enable live tracking", "One click installs the local CS2 GSI config."),
-        ("2", "Add your Steam profile", "One account field identifies your CS2 profile."),
-        ("3", "Connect online stats", "Built-in links walk you through both free API keys."),
+        ("1", "Install", "RatPack configures the local CS2 GSI path automatically."),
+        ("2", "Play", "Launch CS2 and the dashboard switches to live data."),
+        ("3", "Go deeper", "Add your own provider keys only for online competitive views."),
     ]
     for i, (n, title_value, body) in enumerate(steps):
         y = 322 + i * 154
         draw.ellipse((1055, y, 1105, y + 50), fill=(*ACCENT, 255))
         text(draw, (1080, y + 25), n, 18, (7, 16, 10), anchor="mm")
         text(draw, (1140, y - 2), title_value, 28, WHITE)
-        text(draw, (1140, y + 42), body, 19, MUTED, False)
-    text(draw, (1055, 746), "No shared PackRat provider key or quota.", 18, WARN, False)
+        body_font = fit_font(draw, body, 575, 19, 15)
+        draw.text((1140, y + 42), body, font=body_font, fill=(*MUTED, 255))
+    text(draw, (1055, 746), "Provider requests go directly from the plugin to each provider.", 17, WARN, False)
     footer(canvas)
     return canvas
 
 
 def architecture():
     canvas = gradient_bg()
-    header(canvas, "Live data stays local. Provider keys stay yours.", "CS2 telemetry stays on your PC while account lookups go straight to each provider")
+    header(canvas, "Live data stays local. Provider keys stay yours.", "CS2 telemetry stays on your PC while optional account lookups go straight to each provider")
     draw = ImageDraw.Draw(canvas)
     boxes = [
         (170, "CS2", "Game State Integration", ACCENT),
@@ -197,7 +197,7 @@ def architecture():
     draw.polygon([(1122, 465), (1140, 475), (1122, 485)], fill=(*WARN, 255))
     text(draw, (365, 652), "LOCALHOST ONLY", 16, ACCENT, anchor="mm")
     text(draw, (845, 652), "RAW GSI NEVER LEAVES YOUR PC", 16, ACCENT, anchor="mm")
-    text(draw, (1325, 652), "CUSTOMER-OWNED API KEYS", 16, WARN, anchor="mm")
+    text(draw, (1325, 652), "CUSTOMER OWNED API KEYS", 16, WARN, anchor="mm")
     text(draw, (960, 724), "No PackRat provider gateway. No shared provider quota.", 19, MUTED, False, anchor="mm")
     footer(canvas)
     return canvas
