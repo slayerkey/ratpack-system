@@ -117,9 +117,20 @@ export class ProviderClient {
     const body = await this.safeJson(response) as any;
     if (!body || typeof body !== "object") return this.sourceFailure("unavailable", "Leetify returned an invalid response", "leetify");
 
+    const profileUrl = `https://leetify.com/app/profile/${encodeURIComponent(steamId64)}`;
+    if (this.stringValue(body.privacy_mode)?.toLowerCase() === "private") {
+      return {
+        status: "private",
+        message: "Leetify profile is private",
+        profileUrl,
+        competitiveRanks: [],
+        recentMatches: []
+      };
+    }
+
     return {
       status: "ready",
-      profileUrl: `https://leetify.com/app/profile/${encodeURIComponent(steamId64)}`,
+      profileUrl,
       premier: this.finiteNumber(body.ranks?.premier),
       winRate: this.finiteNumber(body.winrate),
       totalMatches: this.finiteNumber(body.total_matches),
