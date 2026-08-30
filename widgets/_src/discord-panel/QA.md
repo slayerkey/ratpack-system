@@ -74,6 +74,22 @@ PASS: reduced-motion mode disables speaking motion as intended.
 
 PASS: iCUE text/accent/background settings and Recent Activity setting remain functional.
 
+## Exact packaged iCUE host proof
+
+The exact official `.icuewidget` from the current product head is exercised on a Windows GitHub runner through the Corsair Labs iCUE Widget Runner plus RatPack's separate lexical binding regression.
+
+PASS: `onICUEInitialized` is present.
+
+PASS: `onDataUpdated` is present.
+
+PASS: text, accent, and background bindings update through the canonical RatPack iCUE binding bridge.
+
+PASS: updated bindings propagate into the widget CSS/runtime state.
+
+PASS: no page errors and no console errors.
+
+This closes the old browser-only iCUE lifecycle concern; do not add another host gate unless the canonical lifecycle/binding implementation changes.
+
 ## Real companion bridge integration
 
 The packaged XENEON widget is tested against the actual `LocalBridgeServer` implementation checked out from `product/discord-bridge`, not just a generic WebSocket mock.
@@ -147,7 +163,11 @@ PASS: live speaking state.
 
 PASS: real mute/deafen state.
 
-The final companion has since migrated to the official Elgato SDK and memory-only credential handling without changing `LocalBridgeServer` or the Discord IPC/RPC model. A final real-Windows `1.0.0.0` regression smoke remains recommended.
+The final companion has since migrated to the official Elgato SDK and memory-only credential handling without changing `LocalBridgeServer` or the Discord IPC/RPC model.
+
+PASS, user-reported: the final `1.0.0.0` Bridge Status smoke on the user's real Windows Stream Deck/Discord installation looked good after those release-candidate changes.
+
+Do not repeat the whole transport investigation unless the production Discord identity/token path changes or a concrete regression appears.
 
 ## Physical XENEON boundary
 
