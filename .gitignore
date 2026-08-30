@@ -24,6 +24,12 @@ artifacts/
 out/
 *.log
 
+# Generated Stream Deck plugin output
+# Auto Queue builds its runtime bundle and bundled profiles into the sdPlugin
+# directory. These are release/dev artifacts, not canonical source files.
+plugins/claude-auto-queue/com.packrat.claude-auto-queue.sdPlugin/bin/
+plugins/claude-auto-queue/com.packrat.claude-auto-queue.sdPlugin/profiles/
+
 # Generated XENEON widget outputs
 # tools/xeneon/inline.py writes the flattened shipping entry point here.
 # The official CORSAIR packager writes transient packages into widgets/.
