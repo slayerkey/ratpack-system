@@ -1,4 +1,4 @@
-# Discord RPC approval for PackRat PackRat Voice Panel
+# Discord RPC approval for PackRat Voice Panel
 
 ## Why approval is needed
 
@@ -37,7 +37,7 @@ rpc.voice.write
 Product:
 
 ```text
-PackRat PackRat Voice Panel for CORSAIR XENEON Edge
+PackRat Voice Panel for CORSAIR XENEON Edge
 Free companion: PackRat Voice Bridge for Stream Deck
 ```
 
