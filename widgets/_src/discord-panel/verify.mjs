@@ -69,4 +69,20 @@ for (const stale of obsoletePrototypeSignatures) {
   assert.equal(translations.includes(stale), false, `obsolete Discord prototype copy remains in translations: ${stale}`);
 }
 
-console.log("DISCORD PANEL DEV QA PASS: syntax, hardened iCUE lifecycle, automatic loopback transport, mute/deafen mapping, no fixed-channel code, no delayed stale runtime calls, and no obsolete direct Discord OAuth/RPC prototype code");
+const manifestText = fs.readFileSync(path.join(repo, "widgets", "discord-panel", "manifest.json"), "utf8");
+const manifest = JSON.parse(manifestText);
+const submissionText = fs.readFileSync(path.join(source, "submission.json"), "utf8");
+const submission = JSON.parse(submissionText);
+const artText = fs.readFileSync(path.join(source, "rat-art.json"), "utf8");
+const publicCopy = [html, ui, translations, manifestText, submissionText, artText].join("\n");
+assert.equal(manifest.name, "PackRat Voice Panel");
+assert.equal(submission.name, "PackRat Voice Panel");
+assert.equal(submission.price_usd, 7.99);
+assert.equal(submission.marketplace_auto_publish, false);
+assert.match(submission.description, /independent third-party product/);
+assert.match(submission.description, /not affiliated with, endorsed by, or sponsored by Discord Inc\./);
+for (const forbidden of ["Discord Voice Panel", "PackRat Discord Bridge", "PackRat PackRat"]) {
+  assert.equal(publicCopy.includes(forbidden), false, `legacy marketplace product name remains: ${forbidden}`);
+}
+
+console.log("VOICE PANEL DEV QA PASS: syntax, hardened iCUE lifecycle, automatic loopback transport, mute/deafen mapping, trademark-safe marketplace naming, no fixed-channel code, no delayed stale runtime calls, and no obsolete direct Discord OAuth/RPC prototype code");
