@@ -207,9 +207,11 @@ async function runRoutine(name){
   return 0;
 }
 
-let setupServer=null,setupPort=0;
-function ensureSetupServer(){
-  if(setupServer)return setupPort;
+let setupServer=null,setupPort=0,setupStarting=null;
+async function ensureSetupServer(){
+  if(setupServer&&setupPort)return setupPort;
+  if(setupStarting)return setupStarting;
+  setupStarting=new Promise((resolve,reject)=>{
   setupServer=http.createServer(async(req,res)=>{
     const sendJson=(code,obj)=>{res.writeHead(code,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify(obj));};
     try{
@@ -220,9 +222,12 @@ function ensureSetupServer(){
       res.writeHead(404);res.end("Not found");
     }catch(e){sendJson(500,{error:e.message});}
   });
-  setupServer.listen(0,"127.0.0.1");setupPort=setupServer.address().port;return setupPort;
+  setupServer.once("error",e=>{setupStarting=null;reject(e)});
+  setupServer.listen(0,"127.0.0.1",()=>{setupPort=setupServer.address().port;resolve(setupPort)});
+  });
+  return setupStarting;
 }
-async function openSetup(){const p=ensureSetupServer();await refreshAudioState();if(process.env.PACKRAT_AUDIO_MOCK!=="1")await runPS(`Start-Process ${psQuote(`http://127.0.0.1:${p}/`)}`);return p;}
+async function openSetup(){const p=await ensureSetupServer();await refreshAudioState();if(process.env.PACKRAT_AUDIO_MOCK!=="1")await runPS(`Start-Process ${psQuote(`http://127.0.0.1:${p}/`)}`);return p;}
 
 async function execute(ctx,inst){
   const s=inst.settings||{};
