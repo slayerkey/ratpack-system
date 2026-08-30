@@ -82,6 +82,14 @@ Use local execution only for genuine host, hardware, or authenticated-browser bo
 
 Keep reusable tooling centralized in `ratpack-system` rather than duplicating it inside individual product branches.
 
+## Marketplace demand data
+
+The dated Marketplace search snapshot lives at `data/marketplace/streamdeck_search_popularity.json`. Its interpretation and usage rules live at `docs/STREAMDECK_MARKETPLACE_SEARCH_DATA.md`.
+
+Read these files when researching demand, choosing truthful product names or keywords, evaluating saturation, positioning a visual theme, or planning marketplace art copy.
+
+The `popularity` field is a rolling 30 day raw search value, not a normalized score out of 100. The `exact_product_hits` field measures strict result supply, not sales. Refresh dated data before making a major product decision.
+
 ## Product start workflow
 
 When the user gives a new Stream Deck idea:
