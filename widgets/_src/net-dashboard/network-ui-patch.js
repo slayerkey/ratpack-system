@@ -35,6 +35,7 @@
         case "probeInterval": return typeof probeInterval !== "undefined" ? probeInterval : undefined;
         case "warnAt": return typeof warnAt !== "undefined" ? warnAt : undefined;
         case "customHeader": return typeof customHeader !== "undefined" ? customHeader : undefined;
+        case "headerTitleSize": return typeof headerTitleSize !== "undefined" ? headerTitleSize : undefined;
         case "hostTextSize": return typeof hostTextSize !== "undefined" ? hostTextSize : undefined;
         case "textColor": return typeof textColor !== "undefined" ? textColor : undefined;
         case "accentColor": return typeof accentColor !== "undefined" ? accentColor : undefined;
@@ -86,12 +87,14 @@
   function applyNetworkUiSettings() {
     if (typeof document === "undefined") return;
     var root = document.documentElement;
+    var headerScale = clamp(directBinding("headerTitleSize"), 75, 180, 100) / 100;
     var size = clamp(directBinding("hostTextSize"), 12, 24, 15);
     var opacity = clamp(directBinding("transparency"), 0, 100, 100);
     var text = String(directBinding("textColor") || "#F4F6F8");
     var accent = String(directBinding("accentColor") || "#2BE86A");
     var background = String(directBinding("backgroundColor") || "#07090D");
 
+    root.style.setProperty("--net-header-scale", String(headerScale));
     root.style.setProperty("--net-user-host-size", size + "px");
     root.style.setProperty("--net-background-factor", String(opacity / 100));
     root.style.setProperty("--text", text);
@@ -102,7 +105,7 @@
 
   function settingSnapshot() {
     return [
-      "probeHosts", "probeInterval", "warnAt", "customHeader", "hostTextSize",
+      "probeHosts", "probeInterval", "warnAt", "customHeader", "headerTitleSize", "hostTextSize",
       "textColor", "accentColor", "backgroundColor", "transparency"
     ].map(function (name) {
       var value = directBinding(name);
