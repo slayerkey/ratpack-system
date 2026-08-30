@@ -11,7 +11,7 @@
     { "platform": "windows" }
   ],
   "supported_devices": [
-    { "type": "dashboard_lcd" }
+    { "type": "dashboard_lcd", "features": ["sensor-screen"] }
   ],
   "interactive": true,
   "required_plugins": [

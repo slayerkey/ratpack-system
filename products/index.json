@@ -95,9 +95,14 @@
     {"id":"rig-cost","name":"PC Power Cost Meter","type":"plugin","status":"rejected","price_usd":null,"version":null},
     {"id":"cloud-bill","name":"AWS & Cloud Cost Monitor","type":"plugin","status":"rejected","price_usd":null,"version":null},
     {"id":"grid-price","name":"Live Electricity Price","type":"plugin","status":"rejected","price_usd":null,"version":null},
+    {"id":"weather-timeline","name":"Weather Timeline Lite","type":"widget","status":"qa_passed","price_usd":0.0,"version":"1.0.0"},
+    {"id":"weather-timeline-pro","name":"Weather Timeline Pro","type":"widget","status":"qa_passed","price_usd":4.99,"version":"1.0.0"},
+    {"id":"pc-power-meter","name":"PC Power Meter Lite","type":"widget","status":"qa_passed","price_usd":0.0,"version":"1.0.0"},
     {"id":"work-session-tracker","name":"Work Session Tracker Lite","type":"widget","status":"qa_passed","price_usd":0.0,"version":"1.0.0"},
     {"id":"work-session-tracker-pro","name":"Work Session Tracker Pro","type":"widget","status":"qa_passed","price_usd":5.99,"version":"1.0.0"},
     {"id":"desk-notes","name":"Desk Notes Lite","type":"widget","status":"qa_passed","price_usd":0.0,"version":"1.0.0"},
-    {"id":"desk-notes-pro","name":"Desk Notes Pro","type":"widget","status":"qa_passed","price_usd":5.99,"version":"1.0.0"}
+    {"id":"desk-notes-pro","name":"Desk Notes Pro","type":"widget","status":"qa_passed","price_usd":5.99,"version":"1.0.0"},
+    {"id":"discord-bridge","name":"PackRat Discord Bridge","type":"plugin","status":"qa_passed","price_usd":0.0,"version":"1.0.0.0"},
+    {"id":"discord-panel","name":"Discord Voice Panel","type":"widget","status":"qa_passed","price_usd":7.99,"version":"1.0.0"}
   ]
 }

@@ -9,6 +9,12 @@ Require a clean automated QA report before preparing submission.
 
 Create the release candidate from canonical source and generated artifacts. Include package, listing art, description, tags or keywords, pricing evidence, compatibility, version, changelog or release notes, QA report, and gallery order where the marketplace needs it.
 
+## Marketplace rejection versioning
+
+Treat a rejected Marketplace submission as a correction to the same release, not as a new product update. When fixing a rejected submission for resubmission, preserve the exact version that was rejected unless the marketplace explicitly requires otherwise. Code changes made only to satisfy rejection feedback do not by themselves justify a version bump.
+
+Only increment the product version for a genuine new release or upgrade after the prior version has been accepted or published, or when the marketplace explicitly requires a higher version. Before Rat Ship packages a rejected resubmission, compare the candidate version against the rejected submission record and fail closed if they differ without an explicit override and reason.
+
 Validate that the ship helper has an explicit branch for the product type. Do not let widgets fall through to profile handling.
 
 ## XENEON marketplace media
