@@ -11,6 +11,9 @@ const { WebSocketServer } = WebSocket;
 const UUID = "com.packrat.stream-deck-ultimate-bundle";
 const messages = [];
 let child;
+let childStdout = "";
+let childStderr = "";
+const smokeAppData = path.join(pluginDir, ".smoke-state");
 
 const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl5xYkAAAAASUVORK5CYII=", "base64");
 for (const rel of [
@@ -26,7 +29,7 @@ function waitFor(pred, timeout = 8000, from = 0) {
     const timer = setInterval(() => {
       const value = messages.slice(from).find(pred);
       if (value) { clearInterval(timer); resolve(value); }
-      else if (Date.now() - start > timeout) { clearInterval(timer); reject(new Error("Timed out waiting for Stream Deck message. Seen: " + JSON.stringify(messages.slice(from)))); }
+      else if (Date.now() - start > timeout) { clearInterval(timer); reject(new Error("Timed out waiting for Stream Deck message. Seen since mark: " + JSON.stringify(messages.slice(from)) + " | all: " + JSON.stringify(messages))); }
     }, 40);
   });
 }
@@ -35,27 +38,42 @@ function cleanup() {
   try { if (child) child.kill(); } catch {}
   try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore", timeout: 3000 }); } catch {}
 }
+function dumpDiagnostics() {
+  console.error("child stdout:", childStdout || "<empty>");
+  console.error("child stderr:", childStderr || "<empty>");
+  const runtimeLog = path.join(smokeAppData, "PackRat", "StreamDeckUltimateBundle", "ultimate-bundle.log");
+  try { console.error("plugin runtime log:\n" + fs.readFileSync(runtimeLog, "utf8")); }
+  catch (e) { console.error("plugin runtime log unavailable:", e.message); }
+}
 
 (async () => {
+  fs.rmSync(smokeAppData, { recursive: true, force: true });
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
   await new Promise(resolve => server.once("listening", resolve));
   const port = server.address().port;
   const connection = new Promise(resolve => server.once("connection", socket => {
-    socket.on("message", raw => { try { messages.push(JSON.parse(raw.toString())); } catch {} });
+    console.log("fake Stream Deck host accepted socket");
+    socket.on("message", raw => {
+      const text = raw.toString();
+      console.log("host received:", text.slice(0, 240));
+      try { messages.push(JSON.parse(text)); } catch (e) { console.error("host JSON parse failed", e.message); }
+    });
     resolve(socket);
   }));
 
   child = spawn(process.execPath, [path.join(pluginDir, "bin", "plugin.cjs"), "-port", String(port), "-pluginUUID", UUID, "-registerEvent", "registerPlugin"], {
-    stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, APPDATA: path.join(pluginDir, ".smoke-state") }
+    stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, APPDATA: smokeAppData }
   });
+  child.stdout.on("data", d => { childStdout += d.toString(); });
+  child.stderr.on("data", d => { childStderr += d.toString(); });
+  child.on("exit", (code, signal) => console.log(`plugin child exit code=${code} signal=${signal}`));
 
-  let stderr = ""; child.stderr.on("data", d => { stderr += d.toString(); });
-  const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))]);
-  // Real Stream Deck waits for plugin registration before dispatching action events. Give the
-  // child process a brief settle window so this synthetic host does not send willAppear early.
-  await new Promise(resolve => setTimeout(resolve, 180));
+  const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + childStderr)), 5000))]);
+  await new Promise(resolve => setTimeout(resolve, 300));
+  console.log("messages after settle:", JSON.stringify(messages));
 
   let mark = messages.length;
+  console.log("sending media willAppear");
   ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".media", context: "ctx-media", device: "dev-1", payload: { settings: { mode: "mute" } } }));
   await waitFor(m => m.event === "setImage" && m.context === "ctx-media", 5000, mark);
 
@@ -100,6 +118,7 @@ function cleanup() {
   process.exit(0);
 })().catch(err => {
   console.error(err.stack || err);
+  dumpDiagnostics();
   cleanup();
   process.exit(1);
 });
