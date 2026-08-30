@@ -22,11 +22,10 @@ jobs:
           node-version: '20'
 
       - name: Install plugin runtime dependency
-        shell: pwsh
-        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund --prefix products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: Runtime WebSocket smoke test
-        shell: pwsh
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
   validate-and-pack:
@@ -52,7 +51,8 @@ jobs:
           node-version: '20'
 
       - name: Install plugin runtime dependency
-        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund --prefix products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: JavaScript syntax checks
         run: |
