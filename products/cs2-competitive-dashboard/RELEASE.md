@@ -1,16 +1,25 @@
 # CS2 Competitive Dashboard Release Candidate
 
-## Shipping order
+## Shipping decision
 
-Ship **CS2 Competitive Dashboard Pro** first.
+Ship **CS2 Competitive Dashboard Pro** as the next CS2 product.
 
-Keep **CS2 Competitive Dashboard Lite** packaged and ready, but do not submit Lite until the Pro Marketplace URL exists. Then change Lite's footer/upgrade URL from the PackRat creator page to the direct Pro listing and rebuild.
+**Launch price:** $14.99 one time.
+
+Do **not** submit CS2 Competitive Dashboard Lite with the initial launch. Keep the Lite build available internally for testing and future strategy, but hold Marketplace publication because PackRat already sells the simpler paid **CS2 Live Stats** product at $6.99. A free Lite dashboard with Score, Health, Money, and Map would overlap too heavily with that existing paid product.
+
+The intended customer ladder is:
+
+* **CS2 Live Stats — $6.99:** simple live in game Stream Deck stats.
+* **CS2 Competitive Dashboard Pro — $14.99:** the complete premium competitive system for serious CS2 players.
+
+Every launch decision should pass this test: an existing CS2 Live Stats customer should immediately understand why Competitive Dashboard Pro is a separate premium upgrade rather than a remake.
 
 ## Pro listing
 
 **Name:** CS2 Competitive Dashboard Pro
 
-**Target price:** $9.99
+**Price:** $14.99
 
 **Platform:** Stream Deck / Windows
 
@@ -18,20 +27,20 @@ Keep **CS2 Competitive Dashboard Lite** packaged and ready, but do not submit Li
 
 ### Short description
 
-Turn your Stream Deck into a live CS2 competitive dashboard with match telemetry, session performance, Premier and Competitive rank views, FACEIT stats, and ready-to-use profiles.
+Turn your Stream Deck into a complete CS2 competitive dashboard with live match telemetry, session performance, Premier and Competitive rank views, FACEIT stats, and ready to use profiles.
 
 ### Product description
 
 Keep the match information you actually care about on your Stream Deck while you play CS2.
 
-CS2 Competitive Dashboard Pro combines local Game State Integration with session tracking and optional competitive account data in one configurable plugin. It also includes purpose-built Stream Deck layouts so users do not have to configure every metric key by hand.
+CS2 Competitive Dashboard Pro combines local Valve Game State Integration, session tracking, Premier and Competitive data, FACEIT data, and purpose built Stream Deck layouts in one premium plugin. It is intentionally broader than the existing CS2 Live Stats product and is aimed at players who want a complete competitive command center rather than a handful of live counters.
 
-**Ready-to-use profiles**
+**Ready to use profiles**
 
 * Competitive profile for Premier, Competitive ranks, FACEIT, recent form, and session performance
-* Live Match profile for score, round state, K/D, health, money, weapon, ADR, HS%, bomb state, map, and connection status
+* Live Match profile for score, round state, K/D, health, armor, money, weapon, ammo, ADR, HS%, bomb state, map, and connection status
 * layouts for Stream Deck, Stream Deck Mini, Stream Deck XL, Stream Deck +, and Stream Deck Neo
-* profiles install with the plugin and remain fully editable
+* profiles remain fully editable
 * profiles do not automatically hijack the user's active Stream Deck profile after installation
 
 **Live CS2**
@@ -41,7 +50,7 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 * session ADR and headshot percentage
 * health, armor, money, and equipment value
 * current weapon and ammo
-* bomb state available to the normal player GSI feed
+* bomb state when available to the normal player GSI feed
 * current map and team
 
 **Session performance**
@@ -52,7 +61,7 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 * ADR
 * HS%
 
-**Competitive**
+**Competitive via Leetify**
 
 * Premier CS Rating
 * current map Competitive rank
@@ -72,110 +81,95 @@ CS2 Competitive Dashboard Pro combines local Game State Integration with session
 * recent record
 * recent match result
 
-### Setup copy
+## Customer setup
 
-1. Install the plugin and accept the included Stream Deck profiles for your device if prompted.
-2. Start with the included **Competitive** or **Live Match** profile, or add individual CS2 Competitive Dashboard Pro actions anywhere you want.
-3. Live CS2 tracking configures itself automatically when the plugin starts. There is no Enable button and no API key required for live tracking.
-4. If CS2 was already open during the first install, close and relaunch it once so CS2 loads the new Valve GSI config.
+1. Install the plugin.
+2. Start with the included **Competitive** or **Live Match** profile, or add individual actions anywhere you want.
+3. Live CS2 tracking configures itself automatically when the plugin starts. There is no Enable button and no API key is required for local live tracking.
+4. If CS2 was already open during first installation, close and relaunch it once so CS2 loads the new Valve GSI config.
 5. Enter a normal CS2 game mode. The Property Inspector changes to **Connected to CS2** after the first game state update arrives.
-6. Add your Steam profile URL or SteamID once for optional online competitive data.
-7. For Premier and Competitive account data, create a free Leetify developer API key using the direct link inside the Property Inspector and paste it into setup.
-8. For FACEIT account data, create a free FACEIT App/API key using the direct Developer Portal link inside the Property Inspector and paste it into setup.
+6. Add a Steam profile URL, SteamID64, or vanity name once for optional online competitive data.
+7. For Premier and Competitive account data, create a Leetify developer API key using the direct link inside the Property Inspector.
+8. For FACEIT account data, create a FACEIT App/API key using the direct Developer Portal link inside the Property Inspector.
 9. Select **Save Keys and Test Connection**.
 
-The local live and session features do not require either provider key. The Leetify key is required for Leetify-backed Competitive features and the FACEIT key is required for FACEIT features.
+Local live and session features require neither provider key. Leetify is required only for Leetify backed Competitive features. FACEIT is required only for FACEIT features.
 
-The Property Inspector includes the exact provider links and short step by step instructions so users do not need to find developer pages themselves.
+## Provider architecture
 
-Steam and CS2 are auto-detected for normal installations. The plugin automatically installs its localhost Valve GSI configuration. Advanced Diagnostics shows the detected CS2 path, cfg writeability, local listener, config path, CS2 process state, last GSI packet, and persistent log location.
-
-### Provider key disclosure
-
-Pro intentionally uses **customer-owned free provider keys** instead of a shared PackRat provider account.
+Pro intentionally uses customer owned provider keys rather than shared PackRat credentials.
 
 * Leetify key page: `https://leetify.com/app/developer`
 * FACEIT Developer Portal: `https://developers.faceit.com/`
 * FACEIT key guide: `https://docs.faceit.com/getting-started/authentication/api-keys/`
 
-Keys are saved in the plugin's local Stream Deck global settings on that PC. The plugin does not send provider keys to a PackRat server and does not operate a shared FACEIT or Leetify quota. Online requests are made directly from the Stream Deck plugin backend to the corresponding provider over HTTPS.
+Keys are saved in Stream Deck plugin settings on that PC. They are never sent to a PackRat service. Provider requests go directly from the plugin backend to the corresponding official provider over HTTPS.
 
-Each customer's provider usage is therefore isolated to their own key. Provider rate limits, revocation, and key replacement affect that customer rather than every PackRat user.
+## Trust and privacy
 
-### Trust / privacy copy
+Live CS2 Game State Integration is received on the user's own PC through a localhost only listener. Raw GSI gameplay data is not uploaded by PackRat.
 
-Live CS2 Game State Integration is received on your own PC through a localhost-only listener. Raw GSI gameplay data is not uploaded by PackRat.
+Online provider requests send the configured Steam identity and the customer's provider key directly to the selected provider. PackRat does not proxy those requests.
 
-For online account data, the plugin sends the configured Steam identity and that provider's customer-owned API key directly to the corresponding provider API. PackRat does not receive or proxy those requests.
+## Provider attribution and release rules
 
-### Provider attribution copy
+### Leetify
 
-Competitive values sourced from Leetify are **Data Provided by Leetify**. The required official Leetify attribution and `View on Leetify` link are shown wherever those provider-backed values are exposed. PackRat is not affiliated with or sponsored by Leetify.
+Current Leetify developer guidelines require all apps and websites that include Leetify data to display the official unmodified **Data Provided by Leetify** logo. The logo must link to `https://leetify.com/`. Wherever original Leetify data is shown, provide a legible **View on Leetify** link back to the source. Do not modify, animate, recolor, or repurpose the logo. Do not present Leetify more prominently than PackRat or imply sponsorship/endorsement.
 
-FACEIT values are retrieved through the user's own FACEIT developer application/API key. PackRat is not affiliated with or sponsored by FACEIT.
+Leetify metrics must be presented as supplied. Do not rename, rescale, recalculate, or add misleading units. Do not persist returned Leetify profile data beyond what is necessary for the live runtime.
 
-### Important accuracy copy
+The official logo package is linked from Leetify's developer guidelines. The release build must contain the official file, not a recreated PackRat version.
 
-The plugin only displays data available to a normal CS2 player or from the named online provider. It does not claim observer-only exact round or bomb timers.
+**Hard gate:** do not publish the paid product with Leetify backed functionality until commercial paid use has been confirmed or the feature has been adjusted to a clearly permitted release model.
 
-Premier and per-map Competitive rank data require a registered and visible Leetify profile plus the user's Leetify API key. FACEIT data requires a matching FACEIT CS2 profile plus the user's FACEIT API key.
+### FACEIT
 
-Provider setup requirements can change upstream. The Property Inspector links directly to the current official provider setup pages.
+FACEIT data is retrieved using the customer's own developer application/API key. FACEIT's current Data API documentation explicitly supports public player data and client side API keys for distributed apps/widgets. Do not imply that PackRat is an official FACEIT product or sponsored by FACEIT.
 
-### Suggested keywords
+For Marketplace artwork, it is acceptable to place a factual FACEIT data/source label near the Leetify attribution area, but do not present a homemade FACEIT endorsement badge as an official attribution requirement unless FACEIT documentation specifically requires it.
 
-CS2, Counter-Strike 2, Counter Strike, FACEIT, Premier, rank, stats, competitive, GSI, Game State Integration, Steam, dashboard, tracker, gaming, Stream Deck profile
+## Important accuracy copy
 
-### Version 0.1.0.0 release notes
+The plugin only displays data available to a normal CS2 player or from the named online provider. It does not claim observer only exact round or bomb timers.
+
+Premier and per map Competitive rank data require a registered and visible Leetify profile plus a Leetify API key. FACEIT data requires a matching FACEIT CS2 profile plus a FACEIT API key.
+
+Provider setup requirements can change upstream. The Property Inspector links directly to official provider setup pages.
+
+## Suggested keywords
+
+CS2, Counter Strike 2, Counter Strike, FACEIT, Premier, rank, stats, competitive, GSI, Game State Integration, Steam, dashboard, tracker, gaming, Stream Deck profile
+
+## Version 0.1.0.0 release notes
 
 Initial release of CS2 Competitive Dashboard Pro.
 
-* ready-to-use Competitive and Live Match profiles for supported Stream Deck models
+* ready to use Competitive and Live Match profiles for supported Stream Deck models
 * live CS2 Game State Integration
 * automatic Steam/CS2 and local GSI setup
-* session K/D, ADR, HS%, W/L and match tracking
+* session K/D, ADR, HS%, W/L, and match tracking
 * Premier and Competitive rank views
-* FACEIT Elo, level, performance and recent form views
-* guided setup for free customer-owned Leetify and FACEIT API keys
+* FACEIT Elo, level, performance, and recent form views
+* guided setup for customer owned Leetify and FACEIT API keys
 * direct provider links inside the Property Inspector
 * configurable dynamic key displays
 * persistent local host diagnostics for CS2 setup and GSI connectivity
-* explicit setup, invalid-key, offline, private-profile and rate-limit states
-* localhost-only authenticated GSI listener
-* no shared PackRat provider API keys or provider quota
-
-## Lite listing
-
-**Name:** CS2 Competitive Dashboard Lite
-
-**Price:** Free
-
-### Short description
-
-A simple live CS2 Stream Deck dashboard for Score, Health, Money, Map, and connection status, with a ready-to-use starter profile.
-
-### Lite product description
-
-Get the most useful live CS2 information on your Stream Deck without account integrations or provider API keys.
-
-Includes:
-
-* Live Score
-* Health
-* Money
-* Current Map
-* CS2 / GSI Status
-* automatic live tracking setup
-* built in local diagnostics for CS2 and GSI connectivity
-* one basic ready-to-use starter profile for supported Stream Deck models
-
-For session performance, Premier and Competitive ranks, FACEIT stats, weapons/ammo, the complete live metric set, and separate **Competitive + Live Match profiles**, use CS2 Competitive Dashboard Pro.
+* explicit setup, invalid key, offline, private profile, and rate limit states
+* localhost only authenticated GSI listener
+* no shared PackRat provider API keys or quota
 
 ## Listing truth gate
 
-Do not publish screenshots or copy showing production Leetify values until Leetify's commercial-use requirements are cleared and the official unmodified Leetify attribution asset is in the packaged Pro build.
+Do not publish screenshots or copy showing production Leetify values until:
 
-FACEIT screenshots should use a test/customer-owned development key and truthful provider data or clearly labeled deterministic fixture data.
+1. paid/commercial use is cleared,
+2. the official unmodified Leetify attribution asset is packaged,
+3. the asset links to Leetify,
+4. View on Leetify is available with provider backed values,
+5. metric presentation matches the upstream values.
+
+FACEIT screenshots should use truthful data from a customer owned development key or clearly labeled deterministic fixture data.
 
 Do not describe exact timer functionality.
 
@@ -183,15 +177,33 @@ Do not imply Leetify or FACEIT sponsorship, endorsement, or official affiliation
 
 ## Art direction
 
-Final marketplace art should be deterministic Rat Art, not generated imagery.
+Final Marketplace art should be deterministic Rat Art using truthful captured or deterministic fixture states.
 
 Recommended sequence:
 
-1. Hero: clean Stream Deck key grid showing the strongest live/session/competitive mix, with minimal copy.
-2. Feature breakdown: Live CS2 / Session / Competitive / FACEIT as the four value areas.
-3. Profiles: show the Competitive and Live Match layouts as an ease-of-setup and Pro-value feature.
-4. Setup: Property Inspector showing automatic GSI status and diagnostics, Steam profile, and the guided provider key cards.
-5. Live states: examples of Score, Health, Premier, FACEIT Elo, Session K/D.
-6. Lite vs Pro / ecosystem frame after Pro is published.
+1. Hero: clean Stream Deck key grid showing the strongest live, session, and competitive mix with minimal copy.
+2. Feature breakdown: Live CS2 / Session / Competitive / FACEIT.
+3. Profiles: Competitive and Live Match layouts as an ease of setup and premium value feature.
+4. Setup: Property Inspector showing automatic GSI status, diagnostics, Steam profile, and provider setup cards.
+5. Live states: Score, Health, Premier, FACEIT Elo, Session K/D, and HS%.
+6. Source/attribution frame where provider backed data appears, using the official Leetify asset and a factual FACEIT source label.
 
-The gallery should use truthful captured or deterministic fixture states and the official unmodified Leetify attribution asset anywhere Leetify data is shown.
+Do not include a Lite vs Pro comparison in the initial gallery. The comparison that matters commercially is **CS2 Live Stats $6.99** versus **CS2 Competitive Dashboard Pro $14.99**, and that should only be used if it can be presented without confusing buyers.
+
+## Final release gates
+
+Before Marketplace submission:
+
+1. Current branch passes all automated CS2 CI, RatPack Lightweight CI, Rat Art, official Elgato validation, and packaging checks.
+2. One final physical Windows host pass confirms the render queue no longer creates a timeout storm.
+3. Deathmatch Session HS% remains correct across multiple deaths and respawns.
+4. Open Log Folder launches Explorer successfully.
+5. Long weapon/map labels remain readable on physical keys.
+6. Stream Deck and CS2 restart/recovery works without repeating setup.
+7. One real customer owned Leetify key is tested.
+8. One real customer owned FACEIT key is tested.
+9. The official Leetify attribution asset is packaged and linked correctly.
+10. Paid/commercial Leetify use is cleared or Leetify backed launch functionality is removed/held.
+11. Final Marketplace artwork and copy are generated from the verified release candidate.
+
+After those gates pass, stop adding features and ship Pro.
