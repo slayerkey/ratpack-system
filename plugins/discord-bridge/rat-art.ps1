@@ -5,11 +5,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = (Resolve-Path (Join-Path $Root "..\..")).Path
 $PluginRoot = Join-Path $Root "com.packrat.discord-bridge.sdPlugin"
 $IconPath = Join-Path $PluginRoot "imgs\plugin\icon.png"
+$BrandIconPath = Join-Path $RepoRoot "tools\art\assets\ratpack-icon-transparent.png"
 
 Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+if (-not (Test-Path $BrandIconPath)) { throw "Canonical PackRat footer logo missing: $BrandIconPath" }
 
 $bg = [System.Drawing.Color]::FromArgb(9, 11, 16)
 $panel = [System.Drawing.Color]::FromArgb(18, 22, 30)
@@ -69,7 +72,14 @@ function Draw-Icon($g, [float]$x, [float]$y, [float]$size) {
 }
 
 function Draw-Footer($g) {
-    Draw-Text $g "PACKRAT" 846 892 23 $muted $true 230
+    $img = [System.Drawing.Image]::FromFile($BrandIconPath)
+    try {
+        $size = 48
+        $x = (1920 - $size) / 2
+        $g.DrawImage($img, $x, 884, $size, $size)
+    } finally {
+        $img.Dispose()
+    }
 }
 
 function Save-Canvas($canvas, [string]$name) {
@@ -85,7 +95,7 @@ $search[0].Save((Join-Path $Destination "01_search_icon.png"), [System.Drawing.I
 $search[1].Dispose(); $search[0].Dispose()
 
 $c = New-Canvas 1920 960
-Draw-Pill $c[1] "FREE STREAM DECK COMPANION" 110 92 420 $accent $bg
+Draw-Pill $c[1] "FREE STREAM DECK COMPANION" 110 92 620 $accent $bg
 Draw-Text $c[1] "PackRat Voice Bridge" 110 185 76 $white $true 1030
 Draw-Text $c[1] "Connect PackRat Voice Panel to your current Discord voice channel." 112 300 38 $muted $false 1030
 Draw-Text $c[1] "Local voice roster  •  speaking state  •  mute + deafen" 112 395 30 $white $false 1000
