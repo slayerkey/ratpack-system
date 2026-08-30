@@ -63,6 +63,30 @@ function Get-UnmergedProductDetails {
     return $null
 }
 
+function Assert-ProductReleaseState {
+    param(
+        [object]$Product,
+        [string]$ProductSlug,
+        [string]$RequestedAction
+    )
+
+    # Build/stage remain available so a blocked product can be prepared and reviewed,
+    # but public submission must fail closed while canonical product metadata says the
+    # release is blocked by an unresolved external/compliance dependency.
+    if ($RequestedAction -notin @("ship", "submit")) { return }
+
+    $state = if ($null -ne $Product.workflow_state) { ([string]$Product.workflow_state).Trim() } else { "" }
+    if (-not $state.StartsWith("BLOCKED_", [System.StringComparison]::OrdinalIgnoreCase)) { return }
+
+    $boundary = if ($null -ne $Product.final_boundary) { ([string]$Product.final_boundary).Trim() } else { "" }
+    $message = "Product '$ProductSlug' is marked '$state' on canonical main. Rat $RequestedAction will not publicly submit a product while that release blocker is active."
+    if ($boundary) {
+        $message += " Required boundary: $boundary."
+    }
+    $message += " Resolve the blocker and update products/$ProductSlug.json on main before shipping. You can still run 'rat kit $ProductSlug' or 'rat stage $ProductSlug' for non-public preparation."
+    throw $message
+}
+
 $queue = @(@($Slug) + @($AdditionalSlugs) | ForEach-Object { if ($_ -and $_.Trim()) { $_.Trim() } })
 if (-not $queue.Count) { throw "rat $Action needs at least one product slug." }
 
@@ -101,6 +125,7 @@ for ($i = 0; $i -lt $queue.Count; $i++) {
         }
 
         $product = Get-Content $productPath -Raw | ConvertFrom-Json
+        Assert-ProductReleaseState -Product $product -ProductSlug $item -RequestedAction $Action
         $isPlugin = $product.type -eq "plugin"
 
         if (-not $isPlugin) {
