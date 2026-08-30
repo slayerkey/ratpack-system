@@ -56,6 +56,7 @@ jobs:
           if ($submission.type -ne 'widget') { throw 'submission type mismatch' }
           if ([decimal]$submission.price_usd -ne [decimal]7.99) { throw 'submission price must be 7.99' }
           if ($submission.version -ne '1.0.0') { throw 'submission version must be 1.0.0' }
+          if ([bool]$submission.marketplace_auto_publish) { throw 'Discord Panel must remain draft-only until Discord production RPC approval is recorded' }
           Write-Host 'DISCORD PANEL MARKETPLACE KIT PASS'
 
       - name: Upload complete Maker Console kit
