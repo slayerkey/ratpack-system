@@ -21,9 +21,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install plugin runtime dependency
+      - name: Install locked plugin runtime dependency
         working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
-        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: Runtime WebSocket and Windows app smoke test
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
@@ -50,9 +50,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install plugin runtime dependency
+      - name: Install locked plugin runtime dependency
         working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
-        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: JavaScript syntax checks
         run: |
