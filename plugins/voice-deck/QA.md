@@ -4,17 +4,21 @@
 
 Status: PASS
 
-Candidate commit: `8d383d36bfaf7605a7db1f217f264cda40af2e6a`
+Final tested candidate commit: `6aaccc6506c1ea6dbfaee98ea560ae6d47d568bb`
 
-GitHub Actions run: `33328912926`
+Final tested tree: `a4482bdab140ada4074d1c61b6ce0159d73452c8`
 
-Release artifact digest: `sha256:5d820f9159a83a83ef7c8ca915e76a2070cb8f087970c09f436b9e62cf623310`
+Landed main commit with the same tested tree: `4c97e765afa9b1ead8746a596e33054be0f1634d`
 
-Packaged `.streamDeckPlugin` SHA256: `904690d87fe2ab5d09d92ced1e34627390732abf3a987383094af5174d6b6c2e`
+GitHub Actions release run: `33329108034`
 
-The clean Windows release job passed locked dependency installation, dependency audit, deterministic build and profile generation, the automated test suite, immutable distribution/security checks, official Elgato validation, official Elgato packaging, deterministic Marketplace media rendering, output verification, and release-evidence upload.
+Release artifact digest: `sha256:285b95f941b94c7f15b5af72c95c5b74055f4e937176b969077526873e546bec`
 
-The downloaded CI artifact was independently inspected after the workflow. It contained one packaged plugin, the expected Property Inspector and generated assets, four bundled profile archives, and six Marketplace images. The package contained no matches for client secret material, Discord bot authorization, user-token scraping, or localStorage credential persistence.
+Packaged `.streamDeckPlugin` SHA256: `54ac266a172e5622b29f1b30fe802f6b8ce3eb80734126822cbd5adb5664919f`
+
+The final clean Windows release job passed locked dependency installation, dependency audit, deterministic build and profile generation, the automated test suite, immutable distribution/security checks, official Elgato validation, official Elgato packaging, deterministic Marketplace media rendering, output verification, and release-evidence upload.
+
+The final CI artifact was independently downloaded and inspected after the workflow. It contained one packaged plugin, the expected Property Inspector and generated assets, four bundled profile archives, and six Marketplace images. The package contained no matches for client secret material, Discord bot authorization, user-token scraping, or localStorage credential persistence.
 
 ## Automated suite coverage
 
@@ -45,6 +49,6 @@ The repository test suite covers:
 
 ## Remaining real host boundary
 
-The automated release candidate is not a substitute for `REAL_WINDOWS_SMOKE.md`. Actual Discord Desktop authorization, live Discord voice behavior, Stream Deck software/hardware interaction, and packaged-plugin parity still need to be recorded against a final candidate before public submission.
+The automated release candidate is not a substitute for `REAL_WINDOWS_SMOKE.md`. Actual Discord Desktop authorization, live Discord voice behavior, Stream Deck software/hardware interaction, and packaged-plugin parity still need to be recorded against the final candidate before public submission.
 
 Discord commercial RPC approval or explicit written permission to use the StreamKit development identity remains a separate external release boundary. `BLOCKED_EXTERNAL_APPROVAL` must stay fail closed until that is resolved.

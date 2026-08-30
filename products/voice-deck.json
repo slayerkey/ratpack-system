@@ -21,10 +21,12 @@
     "real Windows Discord IPC and physical Stream Deck smoke"
   ],
   "automated_release_evidence": {
-    "candidate_commit": "8d383d36bfaf7605a7db1f217f264cda40af2e6a",
-    "github_actions_run": 33328912926,
-    "artifact_digest": "sha256:5d820f9159a83a83ef7c8ca915e76a2070cb8f087970c09f436b9e62cf623310",
-    "package_sha256": "904690d87fe2ab5d09d92ced1e34627390732abf3a987383094af5174d6b6c2e"
+    "candidate_commit": "6aaccc6506c1ea6dbfaee98ea560ae6d47d568bb",
+    "candidate_tree": "a4482bdab140ada4074d1c61b6ce0159d73452c8",
+    "landed_main_commit": "4c97e765afa9b1ead8746a596e33054be0f1634d",
+    "github_actions_run": 33329108034,
+    "artifact_digest": "sha256:285b95f941b94c7f15b5af72c95c5b74055f4e937176b969077526873e546bec",
+    "package_sha256": "54ac266a172e5622b29f1b30fe802f6b8ce3eb80734126822cbd5adb5664919f"
   },
   "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission plus real Windows Discord/Stream Deck packaged-plugin smoke, then authenticated Maker Console submission"
 }

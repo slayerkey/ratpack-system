@@ -1,14 +1,18 @@
 # Voice Deck Release Evidence
 
-Automated release candidate commit: `8d383d36bfaf7605a7db1f217f264cda40af2e6a`
+Final automated candidate commit: `6aaccc6506c1ea6dbfaee98ea560ae6d47d568bb`
 
-Windows GitHub Actions release run: `33328912926`
+Final tested tree: `a4482bdab140ada4074d1c61b6ce0159d73452c8`
+
+Landed main commit with the same tree: `4c97e765afa9b1ead8746a596e33054be0f1634d`
+
+Windows GitHub Actions release run: `33329108034`
 
 Result: PASS
 
-Release artifact digest: `sha256:5d820f9159a83a83ef7c8ca915e76a2070cb8f087970c09f436b9e62cf623310`
+Release artifact digest: `sha256:285b95f941b94c7f15b5af72c95c5b74055f4e937176b969077526873e546bec`
 
-Packaged plugin SHA256: `904690d87fe2ab5d09d92ced1e34627390732abf3a987383094af5174d6b6c2e`
+Packaged plugin SHA256: `54ac266a172e5622b29f1b30fe802f6b8ce3eb80734126822cbd5adb5664919f`
 
 Passed gates:
 
