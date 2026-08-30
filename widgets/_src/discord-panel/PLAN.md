@@ -1,4 +1,4 @@
-# Discord Voice Panel plan
+# PackRat Voice Panel plan
 
 Status: implementation approved by the owner's instruction to continue until a true manual boundary.
 
@@ -10,7 +10,7 @@ The active design automatically follows the user's current Discord voice channel
 
 ## Live architecture
 
-The XENEON widget talks only to the local PackRat Discord Bridge at `ws://127.0.0.1:17483`.
+The XENEON widget talks only to the local PackRat Voice Bridge at `ws://127.0.0.1:17483`.
 
 The Stream Deck companion owns Discord native IPC and the current StreamKit public RPC feasibility flow. It sends normalized channel, member, speaking, and self voice state to the widget and receives local authorize, refresh, mute, and deafen commands.
 
@@ -40,7 +40,7 @@ The widget sends the desired mute/deafen state to the companion. The companion p
 
 Authenticated but not in voice: keep the connected account visible and show a calm Not in a voice channel state with a Join any Discord voice channel hint.
 
-Discord desktop or local bridge unavailable: show PackRat Discord Bridge offline and reconnect automatically.
+Discord desktop or local bridge unavailable: show PackRat Voice Bridge offline and reconnect automatically.
 
 Authorization required: show a Connect Discord action. Tapping it asks the companion to begin authorization; the XENEON widget does not participate in OAuth or token exchange.
 

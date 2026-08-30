@@ -1,14 +1,14 @@
-# Discord Voice Panel needs
+# PackRat Voice Panel needs
 
 ## Release candidate state
 
-Discord Voice Panel `1.0.0` is strongly validated and priced at `$7.99` one time.
+PackRat Voice Panel `1.0.0` is strongly validated and priced at `$7.99` one time.
 
-Required PackRat Discord Bridge companion `1.0.0.0` is free.
+Required PackRat Voice Bridge companion `1.0.0.0` is free.
 
 Live path:
 
-Discord Desktop -> PackRat Discord Bridge -> `ws://127.0.0.1:17483` -> Discord Voice Panel.
+Discord Desktop -> PackRat Voice Bridge -> `ws://127.0.0.1:17483` -> PackRat Voice Panel.
 
 The XENEON widget performs no Discord OAuth and contains no Discord token, Client Secret, or application identity.
 

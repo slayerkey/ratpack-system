@@ -57,7 +57,7 @@ function refreshIcueSettings() {
     if (typeof globalThis.__ratpackIcueSyncGlobals === "function") globalThis.__ratpackIcueSyncGlobals();
     applySettings();
   } catch (error) {
-    try { console.error("Discord Voice Panel iCUE settings refresh failed", error); } catch (ignored) { }
+    try { console.error("PackRat Voice Panel iCUE settings refresh failed", error); } catch (ignored) { }
   }
 }
 

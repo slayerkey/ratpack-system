@@ -1,8 +1,8 @@
-# Discord Voice Panel QA
+# PackRat Voice Panel QA
 
 ## Build state
 
-Product: Discord Voice Panel
+Product: PackRat Voice Panel
 
 Slug: `discord-panel`
 
@@ -14,13 +14,13 @@ Version: `1.0.0`
 
 Price target: `$7.99` one time.
 
-Required companion: PackRat Discord Bridge `1.0.0.0`, free.
+Required companion: PackRat Voice Bridge `1.0.0.0`, free.
 
 Current state: XENEON release candidate. The widget and local companion transport are strongly validated without physical XENEON hardware. Public commercial release still depends on a compliant Discord RPC application identity/approval path.
 
 ## Canonical architecture
 
-Discord Desktop -> PackRat Discord Bridge on Stream Deck -> `ws://127.0.0.1:17483` -> Discord Voice Panel on XENEON Edge.
+Discord Desktop -> PackRat Voice Bridge on Stream Deck -> `ws://127.0.0.1:17483` -> PackRat Voice Panel on XENEON Edge.
 
 The widget never connects directly to Discord and never stores Discord credentials.
 

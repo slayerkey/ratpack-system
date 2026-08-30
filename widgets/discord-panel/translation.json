@@ -1,7 +1,7 @@
 {
   "en": {
     "translation": {
-      "Discord Voice Panel": "Discord Voice Panel",
+      "PackRat Voice Panel": "PackRat Voice Panel",
       "Voice": "Voice",
       "Show Recent Activity": "Show Recent Activity",
       "Recent speaking activity stays in memory only for this widget session.": "Recent speaking activity stays in memory only for this widget session.",
@@ -50,7 +50,7 @@
   },
   "de": {
     "translation": {
-      "Discord Voice Panel": "Discord Sprachpanel",
+      "PackRat Voice Panel": "PackRat Voice Panel",
       "Voice": "Sprache",
       "Show Recent Activity": "Letzte Aktivität anzeigen",
       "Recent speaking activity stays in memory only for this widget session.": "Die letzte Sprachaktivität bleibt nur für diese Widget-Sitzung im Speicher.",
@@ -99,7 +99,7 @@
   },
   "es": {
     "translation": {
-      "Discord Voice Panel": "Panel de voz de Discord",
+      "PackRat Voice Panel": "PackRat Voice Panel",
       "Voice": "Voz",
       "Show Recent Activity": "Mostrar actividad reciente",
       "Recent speaking activity stays in memory only for this widget session.": "La actividad de voz reciente permanece en memoria solo durante esta sesión del widget.",
@@ -148,7 +148,7 @@
   },
   "fr": {
     "translation": {
-      "Discord Voice Panel": "Panneau vocal Discord",
+      "PackRat Voice Panel": "PackRat Voice Panel",
       "Voice": "Voix",
       "Show Recent Activity": "Afficher l'activité récente",
       "Recent speaking activity stays in memory only for this widget session.": "L'activité vocale récente reste en mémoire uniquement pendant cette session du widget.",

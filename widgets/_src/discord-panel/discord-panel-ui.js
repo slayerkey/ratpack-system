@@ -1,6 +1,6 @@
-/* Discord Voice Panel UI and state layer for XENEON Edge.
+/* PackRat Voice Panel UI and state layer for XENEON Edge.
  * Live Discord transport is owned by discord-panel-rpc.js and talks only to
- * the local PackRat Discord Bridge on ws://127.0.0.1:17483.
+ * the local PackRat Voice Bridge on ws://127.0.0.1:17483.
  */
 
 var SPEAKER_HOLD_MS = 900;
@@ -73,7 +73,7 @@ async function t(key) {
 
 async function loadTranslations() {
   var keys = [
-    "Discord Voice Panel",
+    "PackRat Voice Panel",
     "VOICE CHANNEL",
     "Connecting to Discord",
     "The panel will update automatically.",
@@ -115,7 +115,7 @@ async function loadTranslations() {
   ];
   var values = await Promise.all(keys.map(function (key) { return t(key); }));
   for (var index = 0; index < keys.length; index += 1) copy[keys[index]] = values[index];
-  document.getElementById("stage").setAttribute("aria-label", copy["Discord Voice Panel"] || "Discord Voice Panel");
+  document.getElementById("stage").setAttribute("aria-label", copy["PackRat Voice Panel"] || "PackRat Voice Panel");
   document.getElementById("roster").setAttribute("aria-label", copy["Voice channel members"] || "Voice channel members");
   document.getElementById("activityPanel").setAttribute("aria-label", copy["Recent activity"] || "Recent activity");
   document.getElementById("accountChip").setAttribute("aria-label", copy["Account"] || "Account");
@@ -352,8 +352,8 @@ function renderControls() {
 }
 
 function stateCopy() {
-  if (model.state === "setup") return ["Starting Discord Panel", "The PackRat Discord Bridge will connect automatically.", true];
-  if (model.state === "disconnected") return ["PackRat Discord Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
+  if (model.state === "setup") return ["Starting Voice Panel", "The PackRat Voice Bridge will connect automatically.", true];
+  if (model.state === "disconnected") return ["PackRat Voice Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
   if (model.state === "authorization") return [copy["Discord authorization required"] || "Discord authorization required", "Tap Connect Discord once, then approve the Discord prompt.", true];
   if (model.state === "auth-failed") return [copy["Authorization failed"] || "Authorization failed", "Tap Connect Discord to retry. The bridge status page has the exact error.", true];
   return [copy["Not in a voice channel"] || "Not in a voice channel", "Join any Discord voice channel and the panel will follow automatically.", false];

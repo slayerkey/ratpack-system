@@ -1,6 +1,6 @@
 /* PackRat Discord Panel live transport.
  *
- * The XENEON widget talks only to the loopback PackRat Discord Bridge.
+ * The XENEON widget talks only to the loopback PackRat Voice Bridge.
  * The Stream Deck companion owns Discord IPC and Discord StreamKit RPC.
  * No Discord token or client secret enters the XENEON package.
  */
@@ -249,8 +249,8 @@ async function setSelfVoice(field, nextValue) {
 }
 
 stateCopy = function () {
-  if (model.state === "setup") return ["Starting Discord Panel", "The PackRat Discord Bridge will connect automatically.", true];
-  if (model.state === "disconnected") return ["PackRat Discord Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
+  if (model.state === "setup") return ["Starting Voice Panel", "The PackRat Voice Bridge will connect automatically.", true];
+  if (model.state === "disconnected") return ["PackRat Voice Bridge offline", "Start Stream Deck and Discord. The panel will reconnect automatically.", true];
   if (model.state === "authorization") return ["Discord authorization required", "Tap Connect Discord once, then approve the Discord prompt.", true];
   if (model.state === "auth-failed") return ["Discord authorization needs attention", "Tap Connect Discord to retry. The bridge status page has the exact error.", true];
   return ["Not in a voice channel", "Join any Discord voice channel and the panel will follow automatically.", false];
