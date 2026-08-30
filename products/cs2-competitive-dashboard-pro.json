@@ -4,7 +4,7 @@
   "type": "plugin",
   "status": "built",
   "workflow_state": "TESTING",
-  "price_usd": 9.99,
+  "price_usd": 14.99,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
   "source": "products/cs2-competitive-dashboard/plugin",
@@ -39,7 +39,7 @@
   },
   "provider_gates": [
     "Official unmodified Leetify Data Provided by Leetify attribution asset is required before paid Leetify-backed features ship",
-    "Current Leetify commercial-use, attribution, and no-storage requirements must be honored",
+    "Current Leetify commercial-use, attribution, metric-presentation, linkback, and no-storage requirements must be honored",
     "Customer-owned FACEIT and Leetify keys must never be sent to a PackRat service",
     "Steam profile and vanity resolution must remain keyless through Steam Community profile XML"
   ],
