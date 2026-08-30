@@ -1,4 +1,5 @@
 :root {
+  --net-header-scale: 1;
   --net-user-host-size: 15px;
   /* Existing control convention is 100 = opaque and 0 = transparent. */
   --net-background-factor: 1;
@@ -27,6 +28,7 @@ body {
 
 #networkTopbar {
   min-width: 0;
+  min-height: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -39,8 +41,8 @@ body {
   min-width: 0;
   overflow: hidden;
   color: var(--accent);
-  font-size: max(11px, var(--label-size));
-  line-height: 1;
+  font-size: max(11px, calc(var(--label-size) * var(--net-header-scale)));
+  line-height: 1.04;
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -100,10 +102,11 @@ body {
 }
 
 /* The product header is a real top row, matching Performance Grapher rather than
- * replacing LATENCY HISTORY inside the ribbon card. */
+ * replacing LATENCY HISTORY inside the ribbon card. Use an auto-sized first row so
+ * the 75–180% header control can grow without overlapping the metrics. */
 body[data-slot="s-h"] #stage {
   grid-template-columns: minmax(0, 1fr) 214px;
-  grid-template-rows: 18px 65px minmax(0, 1fr) 18px;
+  grid-template-rows: auto 65px minmax(0, 1fr) 18px;
 }
 body[data-slot="s-h"] #networkTopbar { grid-column: 1 / span 2; grid-row: 1; }
 body[data-slot="s-h"] #metrics { grid-column: 1; grid-row: 2; }
@@ -113,7 +116,7 @@ body[data-slot="s-h"] #statusStrip { grid-column: 1 / span 2; grid-row: 4; }
 body[data-slot="s-h"] #networkHeaderStatus { display: none; }
 
 body[data-slot="s-v"] #stage {
-  grid-template-rows: 18px 67px minmax(0, 1fr) 98px 18px;
+  grid-template-rows: auto 67px minmax(0, 1fr) 98px 18px;
 }
 body[data-slot="s-v"] #networkTopbar { grid-row: 1; }
 body[data-slot="s-v"] #metrics { grid-row: 2; }
@@ -124,7 +127,7 @@ body[data-slot="s-v"] #networkHeaderStatus { display: none; }
 
 body[data-slot="m-h"] #stage {
   grid-template-columns: minmax(0, 1fr) 260px;
-  grid-template-rows: 20px 105px minmax(0, 1fr) 22px;
+  grid-template-rows: auto 105px minmax(0, 1fr) 22px;
 }
 body[data-slot="m-h"] #networkTopbar { grid-column: 1 / span 2; grid-row: 1; }
 body[data-slot="m-h"] #metrics { grid-column: 1; grid-row: 2; }
@@ -133,7 +136,7 @@ body[data-slot="m-h"] #sideRail { grid-column: 2; grid-row: 2 / span 2; }
 body[data-slot="m-h"] #statusStrip { grid-column: 1 / span 2; grid-row: 4; }
 
 body[data-slot="m-v"] #stage {
-  grid-template-rows: 20px 105px minmax(0, 1fr) 190px 22px;
+  grid-template-rows: auto 105px minmax(0, 1fr) 190px 22px;
 }
 body[data-slot="m-v"] #networkTopbar { grid-row: 1; }
 body[data-slot="m-v"] #metrics { grid-row: 2; }
@@ -143,7 +146,7 @@ body[data-slot="m-v"] #statusStrip { grid-row: 5; }
 
 body[data-slot="l-h"] #stage {
   grid-template-columns: minmax(0, 1fr) 390px;
-  grid-template-rows: 22px 118px minmax(0, 1fr) 24px;
+  grid-template-rows: auto 118px minmax(0, 1fr) 24px;
 }
 body[data-slot="l-h"] #networkTopbar { grid-column: 1 / span 2; grid-row: 1; }
 body[data-slot="l-h"] #metrics { grid-column: 1; grid-row: 2; }
@@ -152,7 +155,7 @@ body[data-slot="l-h"] #sideRail { grid-column: 2; grid-row: 2 / span 2; }
 body[data-slot="l-h"] #statusStrip { grid-column: 1 / span 2; grid-row: 4; }
 
 body[data-slot="l-v"] #stage {
-  grid-template-rows: 22px 118px minmax(0, 1fr) 470px 24px;
+  grid-template-rows: auto 118px minmax(0, 1fr) 470px 24px;
 }
 body[data-slot="l-v"] #networkTopbar { grid-row: 1; }
 body[data-slot="l-v"] #metrics { grid-row: 2; }
@@ -162,7 +165,7 @@ body[data-slot="l-v"] #statusStrip { grid-row: 5; }
 
 body[data-slot="xl-h"] #stage {
   grid-template-columns: minmax(0, 3fr) minmax(440px, 1fr);
-  grid-template-rows: 24px 124px minmax(0, 1fr) 25px;
+  grid-template-rows: auto 124px minmax(0, 1fr) 25px;
 }
 body[data-slot="xl-h"] #networkTopbar { grid-column: 1 / span 2; grid-row: 1; }
 body[data-slot="xl-h"] #metrics { grid-column: 1; grid-row: 2; }
@@ -171,7 +174,7 @@ body[data-slot="xl-h"] #sideRail { grid-column: 2; grid-row: 2 / span 2; }
 body[data-slot="xl-h"] #statusStrip { grid-column: 1 / span 2; grid-row: 4; }
 
 body[data-slot="xl-v"] #stage {
-  grid-template-rows: 24px 126px minmax(0, 1fr) 760px 25px;
+  grid-template-rows: auto 126px minmax(0, 1fr) 760px 25px;
 }
 body[data-slot="xl-v"] #networkTopbar { grid-row: 1; }
 body[data-slot="xl-v"] #metrics { grid-row: 2; }
