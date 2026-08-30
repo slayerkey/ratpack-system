@@ -1,0 +1,59 @@
+name: One time Voice Bridge brand cleanup
+
+on:
+  push:
+    branches:
+      - product/discord-bridge
+    paths:
+      - '.github/workflows/voice-brand-cleanup-bridge.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: product/discord-bridge
+      - name: Replace legacy product names and branded art color
+        shell: pwsh
+        run: |
+          @'
+          import pathlib
+          root = pathlib.Path('.')
+          paths = [p for p in (root / 'plugins' / 'discord-bridge').rglob('*') if p.is_file()]
+          paths += [root / 'products' / 'discord-bridge.json']
+          replacements = {
+              'PackRat Discord Bridge': 'PackRat Voice Bridge',
+              'Discord Voice Panel': 'PackRat Voice Panel',
+          }
+          allowed = {'.md', '.json', '.js', '.mjs', '.ps1', '.txt'}
+          for path in paths:
+              if path.suffix.lower() not in allowed:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              updated = text
+              for old, new in replacements.items():
+                  updated = updated.replace(old, new)
+              if path.name == 'rat-art.ps1':
+                  updated = updated.replace('$discord = [System.Drawing.Color]::FromArgb(88, 101, 242)', '$voice = [System.Drawing.Color]::FromArgb(77, 163, 255)')
+                  updated = updated.replace('$discord', '$voice')
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+          '@ | python -
+      - name: Remove one time workflow and commit
+        shell: pwsh
+        run: |
+          Remove-Item .github/workflows/voice-brand-cleanup-bridge.yml
+          git config user.name "PackRat Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add plugins/discord-bridge products/discord-bridge.json .github/workflows/voice-brand-cleanup-bridge.yml
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          git commit -m "Finish trademark safe Voice Bridge naming"
+          git push origin HEAD:product/discord-bridge
