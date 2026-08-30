@@ -38,7 +38,10 @@ function cleanup() {
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
   await new Promise(resolve => server.once("listening", resolve));
   const port = server.address().port;
-  const connection = new Promise(resolve => server.once("connection", resolve));
+  const connection = new Promise(resolve => server.once("connection", socket => {
+    socket.on("message", raw => { try { messages.push(JSON.parse(raw.toString())); } catch {} });
+    resolve(socket);
+  }));
 
   child = spawn(process.execPath, [path.join(pluginDir, "bin", "plugin.cjs"), "-port", String(port), "-pluginUUID", UUID, "-registerEvent", "registerPlugin"], {
     stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, APPDATA: path.join(pluginDir, ".smoke-state") }
@@ -46,7 +49,6 @@ function cleanup() {
 
   let stderr = ""; child.stderr.on("data", d => { stderr += d.toString(); });
   const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))]);
-  ws.on("message", raw => { try { messages.push(JSON.parse(raw.toString())); } catch {} });
   await waitFor(m => m.event === "registerPlugin" && m.uuid === UUID);
 
   let mark = messages.length;
