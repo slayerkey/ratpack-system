@@ -8,36 +8,77 @@ PLUGIN="com.packrat.stream-deck-ultimate-bundle"
 
 def save(im,p): p.parent.mkdir(parents=True,exist_ok=True); im.save(p)
 
+
+def premium_key(symbol,label,size=144):
+    im=Image.new("RGBA",(size,size),BG)
+    icon_size=int(size*.53); icon=Image.new("RGBA",(icon_size,icon_size),(0,0,0,0)); d=ImageDraw.Draw(icon); k=icon_size/72.0
+    def S(v): return int(round(v*k))
+    def L(points,w=4,fill=FG): d.line(tuple(S(v) for v in points),fill=fill,width=max(1,S(w)),joint="curve")
+    def RR(box,r=4,fill=None,outline=FG,w=4): d.rounded_rectangle(tuple(S(v) for v in box),radius=max(1,S(r)),fill=fill,outline=outline,width=max(1,S(w)))
+    if symbol in ("mic","mic-muted"):
+        RR((27,10,45,42),9,outline=FG,w=4)
+        d.arc((S(19),S(25),S(53),S(54)),0,180,fill=FG,width=max(1,S(4)))
+        L((36,53,36,62),4); L((27,62,45,62),4)
+        if symbol=="mic-muted": L((17,14,56,57),5,fill=v4.RED)
+        else: d.ellipse((S(52),S(13),S(60),S(21)),fill=ACCENT)
+    elif symbol=="headphones":
+        d.arc((S(13),S(12),S(59),S(56)),180,360,fill=FG,width=max(1,S(5)))
+        RR((13,32,24,55),4,fill=FG,outline=FG,w=1); RR((48,32,59,55),4,fill=FG,outline=FG,w=1)
+    elif symbol=="input":
+        RR((27,11,45,40),8,outline=FG,w=4); d.arc((S(20),S(24),S(52),S(53)),0,180,fill=FG,width=max(1,S(4))); L((36,51,36,61),4)
+        d.polygon([(S(52),S(51)),(S(63),S(57)),(S(52),S(63))],fill=ACCENT)
+    elif symbol=="focus":
+        for r,w in ((24,4),(14,3)): d.ellipse((S(36-r),S(36-r),S(36+r),S(36+r)),outline=FG,width=max(1,S(w)))
+        d.ellipse((S(31),S(31),S(41),S(41)),fill=ACCENT)
+    elif symbol=="meeting":
+        RR((12,22,47,51),6,outline=FG,w=4); d.polygon([(S(49),S(29)),(S(63),S(21)),(S(63),S(52)),(S(49),S(44))],fill=FG)
+        d.ellipse((S(24),S(30),S(34),S(40)),fill=ACCENT)
+    elif symbol=="gaming":
+        RR((10,25,62,52),11,outline=FG,w=4); L((22,32,22,45),4); L((16,38,28,38),4)
+        d.ellipse((S(47),S(32),S(54),S(39)),fill=FG); d.ellipse((S(39),S(40),S(46),S(47)),fill=FG)
+    elif symbol=="setup":
+        for y,x in ((20,27),(36,47),(52,23)):
+            L((12,y,60,y),3); d.ellipse((S(x-5),S(y-5),S(x+5),S(y+5)),fill=BG,outline=FG,width=max(1,S(3)))
+    elif symbol=="audio":
+        d.polygon([(S(13),S(30)),(S(26),S(30)),(S(40),S(18)),(S(40),S(54)),(S(26),S(42)),(S(13),S(42))],fill=FG)
+        d.arc((S(39),S(24),S(58),S(48)),-55,55,fill=ACCENT,width=max(1,S(4))); d.arc((S(38),S(17),S(66),S(55)),-55,55,fill=FG,width=max(1,S(3)))
+    else:
+        return v4.render_key("workspace",label,"",size)
+    im.alpha_composite(icon,((size-icon_size)//2,int(size*.08)))
+    dd=ImageDraw.Draw(im); f=v4.fit_font(dd,label,size-20,19,11); b=dd.textbbox((0,0),label,font=f); tw=b[2]-b[0]; th=b[3]-b[1]
+    dd.text(((size-tw)/2,size-22-th/2),label,font=f,fill=FG)
+    return im
+
 def extra_icons(plugin):
     # Reuse v4's strong monochrome geometry, but give every premium system a distinct face.
     action_defaults={
-      "audio":("media","AUDIO","volume-up"),
-      "audio-preset":("workspace","MODE",""),
-      "routine":("workspace","ROUTINE",""),
-      "setup":("system","SETUP","settings"),
+      "audio":("media","AUDIO","volume-up","audio"),
+      "audio-preset":("workspace","MODE","","audio"),
+      "routine":("workspace","ROUTINE","","focus"),
+      "setup":("system","SETUP","settings","setup"),
     }
-    for name,(kind,label,variant) in action_defaults.items():
+    for name,(kind,label,variant,symbol) in action_defaults.items():
         out=plugin/"imgs"/"actions"/name; out.mkdir(parents=True,exist_ok=True)
         for size,sfx in ((20,""),(40,"@2x")): save(v4.render_action_icon(kind,variant,size),out/f"icon{sfx}.png")
-        for size,sfx in ((72,""),(144,"@2x")): save(v4.render_key(kind,label,variant,size),out/f"key{sfx}.png")
+        for size,sfx in ((72,""),(144,"@2x")): save(premium_key(symbol,label,size),out/f"key{sfx}.png")
 
     specs={
-      "audio":("media","AUDIO","volume-up"),
-      "output":("media","OUT","volume-up"),
-      "input":("media","IN","volume-down"),
-      "mic-live":("media","MIC","volume-up"),
-      "mic-muted":("media","MUTED","mute"),
-      "mode-work":("workspace","WORK",""),
-      "mode-focus":("workspace","FOCUS",""),
-      "mode-meeting":("workspace","MEET",""),
-      "mode-gaming":("workspace","GAME",""),
-      "focus":("workspace","FOCUS",""),
-      "meeting":("app","MEET",""),
-      "gaming":("app","GAME",""),
-      "setup":("system","SETUP","settings"),
+      "audio":("audio","AUDIO"),
+      "output":("headphones","OUT"),
+      "input":("input","IN"),
+      "mic-live":("mic","MIC"),
+      "mic-muted":("mic-muted","MUTED"),
+      "mode-work":("audio","WORK"),
+      "mode-focus":("focus","FOCUS"),
+      "mode-meeting":("meeting","MEET"),
+      "mode-gaming":("gaming","GAME"),
+      "focus":("focus","FOCUS"),
+      "meeting":("meeting","MEET"),
+      "gaming":("gaming","GAME"),
+      "setup":("setup","SETUP"),
     }
-    for name,(kind,label,variant) in specs.items():
-        for size,sfx in ((72,""),(144,"@2x")): save(v4.render_key(kind,label,variant,size),plugin/"imgs"/"keys"/f"{name}{sfx}.png")
+    for name,(symbol,label) in specs.items():
+        for size,sfx in ((72,""),(144,"@2x")): save(premium_key(symbol,label,size),plugin/"imgs"/"keys"/f"{name}{sfx}.png")
     for name,label in {"switched":"SWITCHED","applied":"APPLIED","started":"STARTED"}.items():
         for size,sfx in ((72,""),(144,"@2x")): save(v4.render_key("system",label,"settings",size),plugin/"imgs"/"status"/f"{name}{sfx}.png")
 
