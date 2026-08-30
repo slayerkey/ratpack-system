@@ -11,7 +11,7 @@
   "Author":"Packrat",
   "Category":"Stream Deck Ultimate Bundle",
   "CategoryIcon":"imgs/plugin/category",
-  "CodePath":"bin/plugin.js",
+  "CodePath":"bin/plugin.cjs",
   "Description":"A ready-to-use Windows control bundle for apps, workspaces, windows, clipboard, capture and media.",
   "Icon":"imgs/plugin/marketplace",
   "Name":"Stream Deck Ultimate Bundle",
@@ -22,5 +22,5 @@
   "SDKVersion":2,
   "Software":{"MinimumVersion":"6.6"},
   "UUID":"com.packrat.stream-deck-ultimate-bundle",
-  "Version":"0.1.0.0"
+  "Version":"0.2.0.0"
 }
