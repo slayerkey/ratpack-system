@@ -24,24 +24,11 @@ Completed:
 - official Elgato CLI validation
 - official Elgato `.streamDeckPlugin` packaging
 - XENEON deep QA through the real companion `LocalBridgeServer`
+- final user-reported Windows Bridge Status smoke after the SDK and memory-only credential changes
 
-## Remaining manual regression smoke
+No additional local engineering input is currently required for the release candidate. Do not repeat the entire Discord transport investigation unless the production Discord identity path changes or a concrete regression appears.
 
-Run the final `1.0.0.0` plugin on the user's Windows Stream Deck installation once and confirm:
-
-1. `/state` reports `buildVersion: 1.0.0.0`.
-2. Discord native IPC reaches `ready`.
-3. one normal Discord authorization prompt succeeds when required.
-4. `streamkit.stage` reaches `ready`.
-5. joining/switching a voice channel updates `channel` automatically.
-6. speaking state updates.
-7. mute and deafen state/control still work.
-8. a Discord reconnect works while the plugin process remains alive.
-9. a plugin process restart returns to authorization-required rather than restoring a stored access token.
-
-The last behavior is intentional: the current Discord access token is memory only and is never persisted through Stream Deck settings.
-
-This is the only meaningful local engineering regression test remaining for the companion.
+If Discord approval requires changing the application identity or token exchange path, rerun the real Windows authorization/channel/roster/speaking/mute/deafen smoke after that production change.
 
 ## Physical XENEON status
 
@@ -73,4 +60,4 @@ Before final Marketplace submission, review the current private Elgato Maker/Mar
 ## Release pairing
 
 - PackRat Voice Bridge: free
-- PackRat PackRat Voice Panel: $7.99 one time
+- PackRat Voice Panel: $7.99 one time
