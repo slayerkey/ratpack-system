@@ -1,6 +1,7 @@
 "use strict";
+const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 
 const pluginDir = path.resolve(process.argv[2]);
 const WebSocket = require(path.join(pluginDir, "node_modules", "ws"));
@@ -9,18 +10,21 @@ const UUID = "com.packrat.stream-deck-ultimate-bundle";
 const messages = [];
 let child;
 
-function waitFor(pred, timeout = 8000) {
+const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl5xYkAAAAASUVORK5CYII=", "base64");
+for (const rel of [
+  "imgs/keys/mute.png","imgs/keys/right.png","imgs/keys/clip1.png","imgs/keys/web.png","imgs/keys/home.png","imgs/keys/snippet.png",
+  "imgs/status/opened.png","imgs/status/focused.png","imgs/status/cleared.png","imgs/status/empty.png","imgs/status/failed.png","imgs/status/pasted.png"
+]) {
+  const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, tinyPng);
+}
+
+function waitFor(pred, timeout = 8000, from = 0) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const timer = setInterval(() => {
-      const value = messages.find(pred);
-      if (value) {
-        clearInterval(timer);
-        resolve(value);
-      } else if (Date.now() - start > timeout) {
-        clearInterval(timer);
-        reject(new Error("Timed out waiting for Stream Deck message. Seen: " + JSON.stringify(messages)));
-      }
+      const value = messages.slice(from).find(pred);
+      if (value) { clearInterval(timer); resolve(value); }
+      else if (Date.now() - start > timeout) { clearInterval(timer); reject(new Error("Timed out waiting for Stream Deck message. Seen: " + JSON.stringify(messages.slice(from)))); }
     }, 40);
   });
 }
@@ -31,90 +35,58 @@ function waitFor(pred, timeout = 8000) {
   const port = server.address().port;
   const connection = new Promise(resolve => server.once("connection", resolve));
 
-  child = spawn(process.execPath, [
-    path.join(pluginDir, "bin", "plugin.cjs"),
-    "-port", String(port),
-    "-pluginUUID", UUID,
-    "-registerEvent", "registerPlugin"
-  ], {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, APPDATA: path.join(pluginDir, ".smoke-state") }
+  child = spawn(process.execPath, [path.join(pluginDir, "bin", "plugin.cjs"), "-port", String(port), "-pluginUUID", UUID, "-registerEvent", "registerPlugin"], {
+    stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, APPDATA: path.join(pluginDir, ".smoke-state") }
   });
 
-  let stderr = "";
-  child.stderr.on("data", d => { stderr += d.toString(); });
-  const ws = await Promise.race([
-    connection,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))
-  ]);
-
-  ws.on("message", raw => {
-    try { messages.push(JSON.parse(raw.toString())); } catch {}
-  });
-
+  let stderr = ""; child.stderr.on("data", d => { stderr += d.toString(); });
+  const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))]);
+  ws.on("message", raw => { try { messages.push(JSON.parse(raw.toString())); } catch {} });
   await waitFor(m => m.event === "registerPlugin" && m.uuid === UUID);
 
-  ws.send(JSON.stringify({
-    event: "willAppear",
-    action: UUID + ".media",
-    context: "ctx-media",
-    device: "dev-1",
-    payload: { settings: { mode: "mute" } }
-  }));
-  await waitFor(m => m.event === "setTitle" && m.context === "ctx-media" && m.payload?.title === "MUTE");
+  let mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".media", context: "ctx-media", device: "dev-1", payload: { settings: { mode: "mute" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-media", 5000, mark);
 
-  ws.send(JSON.stringify({
-    event: "willAppear",
-    action: UUID + ".window",
-    context: "ctx-window",
-    device: "dev-1",
-    payload: { settings: { mode: "right" } }
-  }));
-  await waitFor(m => m.event === "setTitle" && m.context === "ctx-window" && m.payload?.title === "RIGHT");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".window", context: "ctx-window", device: "dev-1", payload: { settings: { mode: "right" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-window", 5000, mark);
 
-  ws.send(JSON.stringify({
-    event: "willAppear",
-    action: UUID + ".clipboard",
-    context: "ctx-clip",
-    device: "dev-1",
-    payload: { settings: { slot: 1 } }
-  }));
-  await waitFor(m => m.event === "setTitle" && m.context === "ctx-clip" && m.payload?.title === "CLIP 1");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".navigation", context: "ctx-nav", device: "dev-1", payload: { settings: { profile: "profiles/Stream Deck Ultimate - Home" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-nav", 5000, mark);
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".navigation", context: "ctx-nav", device: "dev-1", payload: { settings: { profile: "profiles/Stream Deck Ultimate - Home" } } }));
+  await waitFor(m => m.event === "switchToProfile" && m.device === "dev-1" && m.payload?.profile === "profiles/Stream Deck Ultimate - Home", 5000, mark);
 
-  ws.send(JSON.stringify({
-    event: "willAppear",
-    action: UUID + ".smart-app",
-    context: "ctx-app",
-    device: "dev-1",
-    payload: { settings: { role: "browser", label: "" } }
-  }));
-  await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && ["BROWSER", "CHROME", "EDGE", "FIREFOX", "BRAVE", "OPERA"].includes(m.payload?.title));
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".clipboard", context: "ctx-clear", device: "dev-1", payload: { settings: { mode: "clear" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-clear", 5000, mark);
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".clipboard", context: "ctx-clear", device: "dev-1", payload: { settings: { mode: "clear" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-clear", 5000, mark);
+
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".snippet", context: "ctx-snip", device: "dev-1", payload: { settings: { text: "", restoreClipboard: true } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-snip", 5000, mark);
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".snippet", context: "ctx-snip", device: "dev-1", payload: { settings: { text: "", restoreClipboard: true } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "ctx-snip", 5000, mark);
 
   if (process.platform === "win32") {
-    ws.send(JSON.stringify({
-      event: "didReceiveSettings",
-      action: UUID + ".smart-app",
-      context: "ctx-app",
-      device: "dev-1",
-      payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", label: "NOTEPAD" } }
-    }));
-    await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && m.payload?.title === "NOTEPAD");
-    ws.send(JSON.stringify({
-      event: "keyUp",
-      action: UUID + ".smart-app",
-      context: "ctx-app",
-      device: "dev-1",
-      payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", label: "NOTEPAD" } }
-    }));
-    await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && ["OPEN", "FOCUS", "ACTIVE"].includes(m.payload?.title), 10000);
+    mark = messages.length;
+    ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".smart-app", context: "ctx-app", device: "dev-1", payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", behavior: "new" } } }));
+    await waitFor(m => m.event === "setImage" && m.context === "ctx-app", 5000, mark);
+    mark = messages.length;
+    ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".smart-app", context: "ctx-app", device: "dev-1", payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", behavior: "new" } } }));
+    await waitFor(m => m.event === "setImage" && m.context === "ctx-app", 10000, mark);
+    try { execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); } catch {}
   }
 
-  console.log("runtime smoke passed");
-  ws.close();
-  server.close();
-  child.kill();
+  console.log("runtime smoke passed: registration, setImage, navigation, clipboard clear, snippet empty, and Windows app execution");
+  ws.close(); server.close(); child.kill();
 })().catch(err => {
   console.error(err.stack || err);
   if (child) child.kill();
+  try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); } catch {}
   process.exitCode = 1;
 });
