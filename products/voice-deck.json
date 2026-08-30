@@ -2,7 +2,7 @@
   "id": "voice-deck",
   "name": "PackRat Voice Deck",
   "type": "plugin",
-  "status": "testing",
+  "status": "qa_passed",
   "workflow_state": "BLOCKED_EXTERNAL_APPROVAL",
   "price_usd": 9.99,
   "version": "1.0.0.0",
@@ -20,5 +20,11 @@
     "Rat Ship plugin kit preflight",
     "real Windows Discord IPC and physical Stream Deck smoke"
   ],
-  "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission, then real Windows Discord/Stream Deck packaged-plugin smoke, then authenticated Maker Console submission"
+  "automated_release_evidence": {
+    "candidate_commit": "8d383d36bfaf7605a7db1f217f264cda40af2e6a",
+    "github_actions_run": 33328912926,
+    "artifact_digest": "sha256:5d820f9159a83a83ef7c8ca915e76a2070cb8f087970c09f436b9e62cf623310",
+    "package_sha256": "904690d87fe2ab5d09d92ced1e34627390732abf3a987383094af5174d6b6c2e"
+  },
+  "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission plus real Windows Discord/Stream Deck packaged-plugin smoke, then authenticated Maker Console submission"
 }
