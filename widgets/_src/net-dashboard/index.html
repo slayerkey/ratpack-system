@@ -11,6 +11,7 @@
 <meta name="x-icue-property" content="warnAt" data-label="tr('Latency Warning')" data-type="slider" data-default="100" data-min="25" data-max="500" data-step="5" data-unit-label="'ms'" />
 
 <meta name="x-icue-property" content="customHeader" data-label="'Custom Header'" data-type="textfield" data-default="''" />
+<meta name="x-icue-property" content="headerTitleSize" data-label="'Custom Header Size'" data-type="slider" data-default="100" data-min="75" data-max="180" data-step="5" data-unit-label="'%'" />
 <meta name="x-icue-property" content="hostTextSize" data-label="'Monitored Hosts Text Size'" data-type="slider" data-default="15" data-min="12" data-max="24" data-step="1" data-unit-label="'px'" />
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
@@ -26,8 +27,8 @@
   },
   {
     "title": "tr('Appearance')",
-    "properties": ["customHeader", "hostTextSize", "textColor", "accentColor", "backgroundColor", "transparency"],
-    "info": "'Custom Header changes the product title at the top of the widget. Leave it blank for NETWORK DASHBOARD. Background Transparency affects only the outer widget background; dashboard panels stay opaque and readable.'"
+    "properties": ["customHeader", "headerTitleSize", "hostTextSize", "textColor", "accentColor", "backgroundColor", "transparency"],
+    "info": "'Custom Header changes the product title at the top of the widget. Custom Header Size uses the same 75–180% range as Performance Grapher. Leave Custom Header blank for NETWORK DASHBOARD. Background Transparency affects only the outer widget background; dashboard panels stay opaque and readable.'"
   }
 ]
 </script>
