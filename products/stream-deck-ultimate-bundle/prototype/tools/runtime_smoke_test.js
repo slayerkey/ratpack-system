@@ -16,11 +16,15 @@ let childStderr = "";
 const smokeAppData = path.join(pluginDir, ".smoke-state");
 
 const tinyPng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl5xYkAAAAASUVORK5CYII=", "base64");
-for (const rel of [
-  "imgs/keys/mute.png","imgs/keys/right.png","imgs/keys/clip1.png","imgs/keys/web.png","imgs/keys/home.png","imgs/keys/snippet.png",
-  "imgs/status/opened.png","imgs/status/focused.png","imgs/status/cleared.png","imgs/status/empty.png","imgs/status/failed.png","imgs/status/pasted.png"
-]) {
-  const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, tinyPng);
+const smokeImages = [
+  "imgs/actions/smart-app/key@2x.png",
+  ...["web","discord","spotify","work","left","right","max","restore","center","top-left","top-right","bottom-left","bottom-right","screen","minimize","topmost","clip-clear","clip1","clip2","clip3","clip4","snippet","shot","shot-full","shot-window","shots-folder","mute","vol-down","vol-up","play","previous","next","desktop","task","settings","lock","explorer","utilities","windows","home"].map(name => `imgs/keys/${name}.png`),
+  ...["opened","focused","partial","ready","cleared","empty","failed","pasted"].map(name => `imgs/status/${name}.png`)
+];
+for (const rel of smokeImages) {
+  const p = path.join(pluginDir, rel);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  if (!fs.existsSync(p)) fs.writeFileSync(p, tinyPng);
 }
 
 function waitFor(pred, timeout = 8000, from = 0) {
