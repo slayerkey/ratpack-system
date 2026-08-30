@@ -1,6 +1,6 @@
 {
   "id": "discord-panel",
-  "name": "Discord Voice Panel",
+  "name": "PackRat Voice Panel",
   "type": "widget",
   "status": "qa_passed",
   "workflow_state": "BLOCKED_EXTERNAL_APPROVAL",
