@@ -2,6 +2,10 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+const PRO_FIRST_PORT = 32123;
+const PRO_LAST_PORT = 32146;
+const DIAGNOSTICS_PATH = "/packrat/diagnostics";
+
 function defaultLogPath() {
   const root = process.env.PACKRAT_CS2_DATA_DIR
     ? path.resolve(process.env.PACKRAT_CS2_DATA_DIR)
@@ -14,6 +18,44 @@ function defaultLogPath() {
 function argValue(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+async function fetchWithTimeout(url, timeoutMs = 350) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function discoverDiagnostics(session) {
+  const candidates = [];
+  const logged = [...session.matchAll(/listener bind succeeded[^\n]*"port":(\d+)/g)]
+    .map((match) => Number(match[1]))
+    .filter((port) => port >= PRO_FIRST_PORT && port <= PRO_LAST_PORT);
+
+  for (const port of logged.reverse()) {
+    if (!candidates.includes(port)) candidates.push(port);
+  }
+  for (let port = PRO_FIRST_PORT; port <= PRO_LAST_PORT; port += 1) {
+    if (!candidates.includes(port)) candidates.push(port);
+  }
+
+  for (const port of candidates) {
+    try {
+      const response = await fetchWithTimeout(`http://127.0.0.1:${port}${DIAGNOSTICS_PATH}`);
+      if (!response.ok) continue;
+      const body = await response.json();
+      if (body?.signature !== "packrat-cs2-competitive-dashboard") continue;
+      if (body?.state?.flavor && body.state.flavor !== "pro") continue;
+      return { port, state: body.state, summary: typeof body.summary === "string" ? body.summary : undefined };
+    } catch {
+      // Port is closed or belongs to something else. Continue within the Pro range.
+    }
+  }
+  return undefined;
 }
 
 const logPath = path.resolve(argValue("--log") ?? defaultLogPath());
@@ -29,6 +71,7 @@ const text = readFileSync(logPath, "utf8");
 const latestStart = text.lastIndexOf("plugin process started");
 const session = latestStart >= 0 ? text.slice(text.lastIndexOf("\n", latestStart) + 1) : text;
 const lines = session.split(/\r?\n/).filter(Boolean);
+const diagnostics = await discoverDiagnostics(session);
 
 const checks = [
   ["Stream Deck connected", "Stream Deck connection succeeded"],
@@ -93,6 +136,18 @@ console.log(`${failures.length === 0 ? "PASS" : "FAIL"}  No timeout / unhandled-
 console.log(`${openLogAttempted ? (openLogPass ? "PASS" : "FAIL") : "NOTE"}  Open Log Folder ${openLogAttempted ? (openLogPass ? "launched successfully" : "was attempted and failed") : "was not exercised in this process"}`);
 console.log(`INFO  Highest logged GSI packet checkpoint: ${highestPacketCount || "none"}`);
 
+if (diagnostics) {
+  console.log(`PASS  Redacted localhost diagnostics discovered on 127.0.0.1:${diagnostics.port}`);
+  if (diagnostics.summary) {
+    console.log("\nLOCALHOST DIAGNOSTIC SUMMARY");
+    console.log(diagnostics.summary.trim());
+  } else {
+    console.log("INFO  Diagnostic endpoint returned a valid PackRat state without summary text.");
+  }
+} else {
+  console.log("NOTE  Live localhost diagnostics were not reachable. This is expected if the plugin/Stream Deck was closed before running the audit.");
+}
+
 if (warningResults.length) {
   console.log("\nWarnings seen in latest process:");
   for (const warning of warningResults) console.log(`WARN  ${warning.label}: ${warning.count}`);
@@ -108,7 +163,7 @@ if (!pass) {
     console.log("Hard failure signatures:");
     for (const failure of failures) console.log(`  • ${failure.label}: ${failure.count}`);
   }
-  console.log("\nSend this audit output together with Copy Diagnostic Summary and the Pro log. That should be enough for one-pass debugging.");
+  console.log("\nSend this complete audit output and the Pro log. If the localhost service was still running, the redacted diagnostic summary is already included above, so a separate Copy Diagnostic Summary step is unnecessary.");
   process.exitCode = 1;
 } else {
   console.log("\nCS2 HOST AUDIT: PASS");
