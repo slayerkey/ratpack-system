@@ -29,6 +29,11 @@ function waitFor(pred, timeout = 8000, from = 0) {
   });
 }
 
+function cleanup() {
+  try { if (child) child.kill(); } catch {}
+  try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore", timeout: 3000 }); } catch {}
+}
+
 (async () => {
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
   await new Promise(resolve => server.once("listening", resolve));
@@ -79,14 +84,15 @@ function waitFor(pred, timeout = 8000, from = 0) {
     mark = messages.length;
     ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".smart-app", context: "ctx-app", device: "dev-1", payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", behavior: "new" } } }));
     await waitFor(m => m.event === "setImage" && m.context === "ctx-app", 10000, mark);
-    try { execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); } catch {}
   }
 
   console.log("runtime smoke passed: registration, setImage, navigation, clipboard clear, snippet empty, and Windows app execution");
-  ws.close(); server.close(); child.kill();
+  try { ws.terminate(); } catch {}
+  try { server.close(); } catch {}
+  cleanup();
+  process.exit(0);
 })().catch(err => {
   console.error(err.stack || err);
-  if (child) child.kill();
-  try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore" }); } catch {}
-  process.exitCode = 1;
+  cleanup();
+  process.exit(1);
 });
