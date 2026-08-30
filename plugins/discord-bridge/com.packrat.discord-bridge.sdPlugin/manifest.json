@@ -11,24 +11,24 @@
         {
           "Image": "imgs/actions/status/key",
           "ShowTitle": true,
-          "Title": "Discord\nBridge",
+          "Title": "Voice\nBridge",
           "TitleAlignment": "bottom",
           "TitleColor": "#FFFFFF"
         }
       ],
       "SupportedInMultiActions": false,
-      "Tooltip": "Shows PackRat Discord Panel bridge status. Press to authorize or refresh Discord voice.",
+      "Tooltip": "Shows PackRat Voice Panel bridge status. Press to authorize or refresh the local Discord voice connection.",
       "UserTitleEnabled": true,
       "UUID": "com.packrat.discord-bridge.status"
     }
   ],
   "Author": "PackRat 🐀",
-  "Category": "PackRat Discord Bridge",
+  "Category": "PackRat Voice Bridge",
   "CategoryIcon": "imgs/category/icon",
   "CodePath": "bin/plugin.js",
-  "Description": "Free local Discord voice companion for the PackRat Discord Voice Panel on XENEON Edge.",
+  "Description": "Free local voice companion for PackRat Voice Panel on XENEON Edge, connecting to Discord Desktop on Windows.",
   "Icon": "imgs/plugin/icon",
-  "Name": "PackRat Discord Bridge",
+  "Name": "PackRat Voice Bridge",
   "Nodejs": {
     "Version": "24"
   },
