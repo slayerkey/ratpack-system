@@ -73,8 +73,7 @@ While the current Pro process is still running:
 
 1. Press **Open Log Folder**.
 2. Confirm Windows Explorer actually opens the PackRat CS2 log directory.
-3. Press **Copy Diagnostic Summary**.
-4. Keep the copied summary available until the test is complete.
+3. **Copy Diagnostic Summary** is now optional. `npm run host:audit` automatically discovers the live Pro localhost diagnostic service and includes its redacted summary whenever Stream Deck/plugin is still running.
 
 ## Provider smoke test
 
@@ -125,9 +124,9 @@ A provider with no matching public profile/data should show a clear not-found/pr
 5. Confirm live values reconnect without re-running setup or rewriting anything manually.
 6. Restart Stream Deck once if practical and confirm the plugin returns to a working local listener/config state.
 
-## Automated log audit
+## Automated log and diagnostics audit
 
-After the real match and diagnostics test, from the plugin directory run:
+After the real match and diagnostics test, leave Stream Deck running and from the plugin directory run:
 
 ```powershell
 cd products\cs2-competitive-dashboard\plugin
@@ -148,7 +147,11 @@ A passing audit checks the latest plugin process segment for:
 * no `The request timed out` signature
 * no core GSI startup/listener/config/normalization failure signature
 
-It also reports whether Open Log Folder was exercised successfully in that process.
+It also:
+
+* reports whether Open Log Folder was exercised successfully in that process
+* discovers the active Pro diagnostics endpoint in the isolated Pro port range
+* prints the current redacted localhost Diagnostic Summary automatically
 
 ## Pass criteria
 
@@ -174,14 +177,15 @@ Collect this one evidence bundle:
 npm run host:audit
 ```
 
-2. Full **Copy Diagnostic Summary** output.
-3. The current Pro log:
+2. The current Pro log:
 
 ```text
 %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log
 ```
 
-4. One sentence describing the visible mismatch, for example `Session HS% showed 42% after 5 headshot kills out of 6 total kills` or `DESERT EAGLE is clipped on the right edge`.
+3. One sentence describing the visible mismatch, for example `Session HS% showed 42% after 5 headshot kills out of 6 total kills` or `DESERT EAGLE is clipped on the right edge`.
+
+If the plugin was still running when `host:audit` ran, its output already contains the redacted localhost Diagnostic Summary. Only use the Property Inspector's **Copy Diagnostic Summary** as a fallback if the audit says the live diagnostic endpoint was unreachable.
 
 That bundle should be treated as the source of truth for the next debugging pass.
 
