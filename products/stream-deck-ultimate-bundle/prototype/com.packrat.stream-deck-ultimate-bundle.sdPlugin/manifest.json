@@ -2,20 +2,24 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "Actions": [
     {"Controllers":["Keypad"],"Icon":"imgs/actions/smart-app/icon","Name":"Smart App","States":[{"Image":"imgs/actions/smart-app/key"}],"Tooltip":"Focus an existing app or launch it when it is not running.","UUID":"com.packrat.stream-deck-ultimate-bundle.smart-app"},
-    {"Controllers":["Keypad"],"Icon":"imgs/actions/workspace/icon","Name":"Workspace","States":[{"Image":"imgs/actions/workspace/key"}],"Tooltip":"Open a set of apps and optionally arrange only those app windows.","UUID":"com.packrat.stream-deck-ultimate-bundle.workspace"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/workspace/icon","Name":"Workspace","States":[{"Image":"imgs/actions/workspace/key"}],"Tooltip":"Open a workspace preset or custom set of apps and arrange only those windows.","UUID":"com.packrat.stream-deck-ultimate-bundle.workspace"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/window/icon","Name":"Window Control","States":[{"Image":"imgs/actions/window/key"}],"Tooltip":"Snap, center, restore, pin, minimize, maximize, or move the active window.","UUID":"com.packrat.stream-deck-ultimate-bundle.window"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/clipboard/icon","Name":"Clipboard","States":[{"Image":"imgs/actions/clipboard/key"}],"Tooltip":"Paste recent local clipboard text or clear PackRat clipboard history.","UUID":"com.packrat.stream-deck-ultimate-bundle.clipboard"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/snippet/icon","Name":"Text Snippet","States":[{"Image":"imgs/actions/snippet/key"}],"Tooltip":"Paste reusable text with optional local date, time, and clipboard tokens.","UUID":"com.packrat.stream-deck-ultimate-bundle.snippet"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/capture/icon","Name":"Capture","States":[{"Image":"imgs/actions/capture/key"}],"Tooltip":"Capture a region, full screen, active window, or open the screenshots folder.","UUID":"com.packrat.stream-deck-ultimate-bundle.capture"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/media/icon","Name":"Media Control","States":[{"Image":"imgs/actions/media/key"}],"Tooltip":"Mute, adjust volume, play or pause, and change tracks.","UUID":"com.packrat.stream-deck-ultimate-bundle.media"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/system/icon","Name":"System Control","States":[{"Image":"imgs/actions/system/key"}],"Tooltip":"Open common Windows surfaces, show desktop, or lock the PC.","UUID":"com.packrat.stream-deck-ultimate-bundle.system"},
-    {"Controllers":["Keypad"],"Icon":"imgs/actions/navigation/icon","Name":"Ultimate Navigation","States":[{"Image":"imgs/actions/navigation/key"}],"Tooltip":"Switch between the Home, Windows, and Utilities profiles bundled with Ultimate.","UUID":"com.packrat.stream-deck-ultimate-bundle.navigation"}
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/navigation/icon","Name":"Ultimate Navigation","States":[{"Image":"imgs/actions/navigation/key"}],"Tooltip":"Switch between profiles bundled with Ultimate.","UUID":"com.packrat.stream-deck-ultimate-bundle.navigation"},
+    {"Controllers":["Keypad","Encoder"],"Icon":"imgs/actions/audio/icon","Name":"Smart Audio","States":[{"Image":"imgs/actions/audio/key"}],"Tooltip":"Switch audio devices, control microphone state, or use Stream Deck+ audio dials.","Encoder":{"Icon":"imgs/actions/audio/key","layout":"$B1","TriggerDescription":{"Push":"Toggle microphone mute","Rotate":"Adjust or switch audio","Touch":"Audio control"}},"UUID":"com.packrat.stream-deck-ultimate-bundle.audio"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/audio-preset/icon","Name":"Audio Preset","States":[{"Image":"imgs/actions/audio-preset/key"}],"Tooltip":"Apply your Work, Focus, Meeting, or Gaming audio setup.","UUID":"com.packrat.stream-deck-ultimate-bundle.audio-preset"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/routine/icon","Name":"Routine","States":[{"Image":"imgs/actions/routine/key"}],"Tooltip":"Run a one-press Work, Focus, Meeting, or Gaming routine with workspace and audio together.","UUID":"com.packrat.stream-deck-ultimate-bundle.routine"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/setup/icon","Name":"Ultimate Setup","States":[{"Image":"imgs/actions/setup/key"}],"Tooltip":"Open the local Ultimate onboarding wizard for audio, presets, and workspaces.","UUID":"com.packrat.stream-deck-ultimate-bundle.setup"}
   ],
   "Author":"Packrat",
   "Category":"Stream Deck Ultimate Bundle",
   "CategoryIcon":"imgs/plugin/category",
-  "CodePath":"bin/plugin.cjs",
-  "Description":"A ready-to-use Windows control system for apps, workspaces, windows, clipboard, text, capture, media and everyday system controls.",
+  "CodePath":"bin/plugin-v05.cjs",
+  "Description":"A ready-to-use Windows control system for apps, workspaces, windows, clipboard, audio devices, microphone, routines, capture, media and everyday system controls.",
   "Icon":"imgs/plugin/marketplace",
   "Name":"Stream Deck Ultimate Bundle",
   "Nodejs":{"Version":"20"},
@@ -23,11 +27,15 @@
   "Profiles":[
     {"Name":"profiles/Stream Deck Ultimate - Home","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true},
     {"Name":"profiles/Stream Deck Ultimate - Windows","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":true,"AutoInstall":true},
-    {"Name":"profiles/Stream Deck Ultimate - Utilities","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":true,"AutoInstall":true}
+    {"Name":"profiles/Stream Deck Ultimate - Utilities","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":true,"AutoInstall":true},
+    {"Name":"profiles/Stream Deck Ultimate - Audio & Modes","DeviceType":0,"Readonly":false,"DontAutoSwitchWhenInstalled":true,"AutoInstall":true},
+    {"Name":"profiles/Stream Deck Ultimate - XL","DeviceType":2,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true},
+    {"Name":"profiles/Stream Deck Ultimate - Plus","DeviceType":7,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true},
+    {"Name":"profiles/Stream Deck Ultimate - Neo","DeviceType":9,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true}
   ],
-  "PropertyInspectorPath":"ui/property-inspector.html",
+  "PropertyInspectorPath":"ui/property-inspector-v05.html",
   "SDKVersion":2,
   "Software":{"MinimumVersion":"6.6"},
   "UUID":"com.packrat.stream-deck-ultimate-bundle",
-  "Version":"0.4.0.0"
+  "Version":"0.5.0.0"
 }
