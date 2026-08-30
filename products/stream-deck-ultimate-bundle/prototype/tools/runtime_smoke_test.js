@@ -51,6 +51,9 @@ function cleanup() {
 
   let stderr = ""; child.stderr.on("data", d => { stderr += d.toString(); });
   const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))]);
+  // Real Stream Deck waits for plugin registration before dispatching action events. Give the
+  // child process a brief settle window so this synthetic host does not send willAppear early.
+  await new Promise(resolve => setTimeout(resolve, 180));
 
   let mark = messages.length;
   ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".media", context: "ctx-media", device: "dev-1", payload: { settings: { mode: "mute" } } }));
