@@ -4,7 +4,7 @@
   "type": "plugin",
   "status": "release-candidate",
   "workflow_state": "TESTING",
-  "price_usd": null,
+  "price_usd": 5.99,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Claude Code",
   "source": "plugins/claude-auto-queue",
