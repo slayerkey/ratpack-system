@@ -68,6 +68,14 @@ PASS: official Elgato `streamdeck pack` producing a `.streamDeckPlugin` artifact
 
 The automated tests cover Discord IPC framing, loopback WebSocket framing/origin policy, command delivery, exact StreamKit RPC identity/scopes/token exchange, official SDK migration requirements, memory-only credential handling, and removal of obsolete fallbacks.
 
+## Final Windows regression smoke
+
+PASS, user-reported: the final `1.0.0.0` Bridge Status smoke on the user's real Windows Stream Deck/Discord installation looked good after the SDK and memory-only credential changes.
+
+This closes the previously requested final host-layer smoke. The deeper Discord transport behavior remains covered by the real Windows feasibility proof plus the current automated release suite; do not ask for the entire transport investigation to be repeated unless production identity code changes or a concrete regression appears.
+
+Because the token is intentionally memory only, restarting the plugin process may require authorization again. That is expected behavior for this release candidate.
+
 ## XENEON integration proof
 
 The Discord Panel deep QA tests the official packaged `.icuewidget` through the real `LocalBridgeServer` implementation from `product/discord-bridge`, not a generic mock server.
@@ -103,14 +111,6 @@ PASS: the companion source contains no Stream Deck global-settings token persist
 PASS: the release bundle is checked for `client_secret`.
 
 PASS: the XENEON package contains no Discord application identity or direct Discord authorization logic.
-
-## Remaining manual smoke test
-
-Run the final `1.0.0.0` companion on the user's Windows Stream Deck installation and confirm a normal Discord authorization reaches `streamkit.stage: ready`, current channel discovery, speaking, mute, and deafen after the SDK and credential-storage changes.
-
-Because the token is intentionally memory only, restarting the plugin process may require authorization again. That is expected behavior for this release candidate.
-
-This is a regression smoke test of the final Stream Deck host layer, not a new architecture feasibility test.
 
 ## Commercial release boundary
 
