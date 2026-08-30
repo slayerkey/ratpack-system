@@ -40,11 +40,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Generate premium icons and validated V2 profile
+      - name: Generate simple icons and corrected V2 profile
         working-directory: products/stream-deck-ultimate-bundle/prototype
         run: |
           python -m pip install -r requirements.txt
-          python tools/generate_prototype_assets_v2.py com.packrat.stream-deck-ultimate-bundle.sdPlugin
+          python tools/generate_prototype_assets_v3.py com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - uses: actions/setup-node@v4
         with:
@@ -76,6 +76,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stream-deck-ultimate-bundle-v0.2-test
+          name: stream-deck-ultimate-bundle-v0.3-test
           path: products/stream-deck-ultimate-bundle/prototype/dist/*.streamDeckPlugin
           if-no-files-found: error
