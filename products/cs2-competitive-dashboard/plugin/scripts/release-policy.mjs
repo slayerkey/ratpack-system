@@ -43,9 +43,20 @@ assert(proPi.includes("view-leetify"), "Pro must include View on Leetify link su
 const runtime = await readFile("src/runtime.ts", "utf8");
 const directClient = await readFile("src/providers/direct-client.ts", "utf8");
 const providerConfig = await readFile("src/providers/config.ts", "utf8");
+const providerTypes = await readFile("src/providers/types.ts", "utf8");
 assert(runtime.includes("faceitApiKey") && runtime.includes("leetifyApiKey"), "Pro runtime must support customer-owned provider keys");
 assert(directClient.includes("open.faceit.com/data/v4") && directClient.includes("api-public.cs-prod.leetify.com"), "Provider client must call the official provider origins directly");
 assert(!runtime.includes("GatewayClient") && !providerConfig.includes("PRO_GATEWAY_BASE_URL"), "PackRat shared provider gateway must remain disabled");
+
+// Leetify's Developer Guidelines ask integrations not to persist API response data.
+// Credentials/Steam identity may live in Stream Deck settings, but provider responses must remain runtime-only.
+const globalSettingsBlock = runtime.match(/type GlobalSettings\s*=\s*\{([\s\S]*?)\n\};/)?.[1] ?? "";
+assert(!/\bonline\s*\??\s*:|\bleetifyData\s*\??\s*:|\bproviderData\s*\??\s*:/i.test(globalSettingsBlock), "Provider response data must not be part of persisted GlobalSettings");
+assert(runtime.includes("this.publish({ online: result })"), "Provider responses must publish to the in-memory dashboard store");
+assert(!/this\.globals\.(?:online|leetifyData|providerData)/i.test(runtime), "Provider responses must not be copied into persisted globals");
+assert(!/from\s+["']node:fs|from\s+["']node:fs\/promises|localStorage|sessionStorage/i.test(directClient), "Direct provider client must not persist API response data");
+assert(!/writeFile\s*\([^\n]*(?:online|leetify|provider|profile|snapshot)/i.test(runtime), "Runtime must not write provider response snapshots to disk");
+assert(providerTypes.includes("OnlineProfileSnapshot"), "Provider response state must have an explicit runtime snapshot type");
 
 for (const dir of [proDir, liteDir]) {
   const files = await walk(dir);
@@ -57,7 +68,7 @@ for (const dir of [proDir, liteDir]) {
   }
 }
 
-console.log("Release policy OK: Pro/Lite feature gates, bundled profiles, and customer-owned provider key architecture passed.");
+console.log("Release policy OK: Pro/Lite feature gates, bundled profiles, customer-owned provider keys, and provider no-storage policy passed.");
 
 function validateProfileRegistrations(manifest, flavor) {
   const profiles = manifest.Profiles ?? [];
