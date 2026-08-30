@@ -3,7 +3,7 @@
   "name": "CS2 Competitive Dashboard Lite",
   "type": "plugin",
   "status": "built",
-  "workflow_state": "HOLD",
+  "workflow_state": "TESTING",
   "price_usd": 0,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
