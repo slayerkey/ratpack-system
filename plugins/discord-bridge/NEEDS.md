@@ -72,5 +72,5 @@ Before final Marketplace submission, review the current private Elgato Maker/Mar
 
 ## Release pairing
 
-- PackRat Discord Bridge: free
-- PackRat Discord Voice Panel: $7.99 one time
+- PackRat Voice Bridge: free
+- PackRat PackRat Voice Panel: $7.99 one time

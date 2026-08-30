@@ -17,7 +17,7 @@ $panel2 = [System.Drawing.Color]::FromArgb(25, 31, 42)
 $white = [System.Drawing.Color]::FromArgb(244, 246, 248)
 $muted = [System.Drawing.Color]::FromArgb(166, 176, 192)
 $accent = [System.Drawing.Color]::FromArgb(43, 232, 106)
-$discord = [System.Drawing.Color]::FromArgb(88, 101, 242)
+$voice = [System.Drawing.Color]::FromArgb(77, 163, 255)
 
 function New-Font([float]$size, [System.Drawing.FontStyle]$style = [System.Drawing.FontStyle]::Regular) {
     return New-Object System.Drawing.Font("Segoe UI", $size, $style, [System.Drawing.GraphicsUnit]::Pixel)
@@ -62,7 +62,7 @@ function Draw-Icon($g, [float]$x, [float]$y, [float]$size) {
         $g.DrawImage($img, $x, $y, $size, $size)
         $img.Dispose()
     } else {
-        $brush = New-Object System.Drawing.SolidBrush($discord)
+        $brush = New-Object System.Drawing.SolidBrush($voice)
         $g.FillEllipse($brush, $x, $y, $size, $size)
         $brush.Dispose()
     }
@@ -86,12 +86,12 @@ $search[1].Dispose(); $search[0].Dispose()
 
 $c = New-Canvas 1920 960
 Draw-Pill $c[1] "FREE STREAM DECK COMPANION" 110 92 420 $accent $bg
-Draw-Text $c[1] "PackRat Discord Bridge" 110 185 76 $white $true 1030
-Draw-Text $c[1] "Connect Discord Voice Panel to your current Discord voice channel." 112 300 38 $muted $false 1030
+Draw-Text $c[1] "PackRat Voice Bridge" 110 185 76 $white $true 1030
+Draw-Text $c[1] "Connect PackRat Voice Panel to your current Discord voice channel." 112 300 38 $muted $false 1030
 Draw-Text $c[1] "Local voice roster  •  speaking state  •  mute + deafen" 112 395 30 $white $false 1000
 Draw-Panel $c[1] 1260 160 470 470 $panel
 Draw-Icon $c[1] 1335 235 320
-Draw-Pill $c[1] "DISCORD READY" 1325 655 340 $discord $white
+Draw-Pill $c[1] "DISCORD READY" 1325 655 340 $voice $white
 Draw-Footer $c[1]
 Save-Canvas $c "02_cover.png"
 
@@ -100,7 +100,7 @@ Draw-Text $c[1] "One bridge. One status key." 110 90 66 $white $true 1200
 Draw-Text $c[1] "The free companion tells you exactly what Discord needs." 112 180 34 $muted $false 1250
 $states = @(
     @{y=320; title="OPEN DISCORD"; body="Start Discord Desktop and the bridge reconnects automatically."; color=$panel2},
-    @{y=475; title="PRESS TO AUTHORIZE"; body="Authorize Discord when the local RPC session needs permission."; color=$discord},
+    @{y=475; title="PRESS TO AUTHORIZE"; body="Authorize Discord when the local RPC session needs permission."; color=$voice},
     @{y=630; title="DISCORD READY"; body="Your current voice channel is available to the XENEON panel."; color=$accent}
 )
 foreach ($state in $states) {
@@ -117,7 +117,7 @@ $c = New-Canvas 1920 960
 Draw-Text $c[1] "Discord stays local." 110 90 66 $white $true 1200
 Draw-Text $c[1] "The XENEON widget never receives your Discord access token." 112 180 34 $muted $false 1300
 $items = @(
-    @{x=110; title="DISCORD DESKTOP"; sub="Native local IPC"; color=$discord},
+    @{x=110; title="DISCORD DESKTOP"; sub="Native local IPC"; color=$voice},
     @{x=660; title="PACKRAT BRIDGE"; sub="Normalizes voice state"; color=$accent},
     @{x=1210; title="XENEON PANEL"; sub="127.0.0.1 only"; color=$panel2}
 )
@@ -153,12 +153,12 @@ Draw-Footer $c[1]
 Save-Canvas $c "05_gallery_03.png"
 
 $c = New-Canvas 1920 960
-Draw-Text $c[1] "Built for Discord Voice Panel." 110 90 66 $white $true 1400
+Draw-Text $c[1] "Built for PackRat Voice Panel." 110 90 66 $white $true 1400
 Draw-Text $c[1] "Install the free bridge once, then let XENEON follow the conversation." 112 180 34 $muted $false 1500
 $steps = @(
-    @{n="1"; title="Install PackRat Discord Bridge"; body="Free from the Stream Deck Marketplace."},
+    @{n="1"; title="Install PackRat Voice Bridge"; body="Free from the Stream Deck Marketplace."},
     @{n="2"; title="Open Discord Desktop"; body="Use the Bridge Status action if authorization is requested."},
-    @{n="3"; title="Open Discord Voice Panel"; body="Join any voice channel. The XENEON panel follows automatically."}
+    @{n="3"; title="Open PackRat Voice Panel"; body="Join any voice channel. The XENEON panel follows automatically."}
 )
 $y = 330
 foreach ($step in $steps) {

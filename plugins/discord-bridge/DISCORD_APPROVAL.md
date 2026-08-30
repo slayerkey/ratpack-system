@@ -1,4 +1,4 @@
-# Discord RPC approval for PackRat Discord Voice Panel
+# Discord RPC approval for PackRat PackRat Voice Panel
 
 ## Why approval is needed
 
@@ -37,8 +37,8 @@ rpc.voice.write
 Product:
 
 ```text
-PackRat Discord Voice Panel for CORSAIR XENEON Edge
-Free companion: PackRat Discord Bridge for Stream Deck
+PackRat PackRat Voice Panel for CORSAIR XENEON Edge
+Free companion: PackRat Voice Bridge for Stream Deck
 ```
 
 Suggested request text:
@@ -46,7 +46,7 @@ Suggested request text:
 ```text
 Hello Discord Developer Support,
 
-I am building a Windows desktop companion called PackRat Discord Bridge for a CORSAIR XENEON Edge voice panel. The companion connects only to the user's local Discord Desktop client through Discord's documented native RPC/IPC interface.
+I am building a Windows desktop companion called PackRat Voice Bridge for a CORSAIR XENEON Edge voice panel. The companion connects only to the user's local Discord Desktop client through Discord's documented native RPC/IPC interface.
 
 The product needs these approved RPC scopes:
 

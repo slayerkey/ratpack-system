@@ -1,6 +1,6 @@
-# PackRat Discord Bridge
+# PackRat Voice Bridge
 
-Free Stream Deck companion for the PackRat Discord Voice Panel on XENEON Edge.
+Free Stream Deck companion for the PackRat PackRat Voice Panel on XENEON Edge.
 
 Current release candidate: `1.0.0.0`.
 
@@ -90,8 +90,8 @@ rat dev discord-panel
 
 ## Release pairing and price
 
-- PackRat Discord Bridge: **Free**
-- PackRat Discord Voice Panel for XENEON Edge: **$7.99 one time**
+- PackRat Voice Bridge: **Free**
+- PackRat PackRat Voice Panel for XENEON Edge: **$7.99 one time**
 
 The bridge is a companion dependency and discovery surface, not a separately paid product.
 
