@@ -2,7 +2,7 @@
   "slug": "claude-auto-queue",
   "name": "Auto Queue for Claude Code",
   "type": "plugin",
-  "price_usd": null,
+  "price_usd": 5.99,
   "pricing_status": "REQUIRES_EXPLICIT_APPROVAL_BEFORE_MAKER_CONSOLE_DRAFT",
   "version": "0.1.0.0",
   "marketplace_category": ["Productivity"],
