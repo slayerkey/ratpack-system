@@ -30,6 +30,8 @@ The XENEON widget performs no Discord OAuth and contains no Discord token, Clien
 - forced disconnect and reconnect
 - strict package/privacy audit
 - StreamSpell package verification at all eight presets
+- exact official package through the Corsair Labs Windows iCUE Widget Runner
+- lexical iCUE binding regression covering real-host-style variable updates
 
 ## Companion state
 
@@ -37,7 +39,9 @@ The free companion has been migrated to official `@elgato/streamdeck` `2.1.2`, `
 
 The same Discord transport was previously proven on the user's real Windows machine with native Discord IPC, authorization, current channel/roster, speaking state, and mute/deafen state.
 
-Remaining engineering smoke: run the final companion `1.0.0.0` on the user's Windows Stream Deck installation once after the SDK migration and confirm the existing Discord path still reaches ready state and recovers after restart.
+Completed user smoke: the final `1.0.0.0` Bridge Status check on the user's real Windows Stream Deck/Discord installation looked good after the SDK migration and memory-only credential changes.
+
+No additional local engineering smoke is currently required. If Discord approval changes the production application identity or token exchange path, rerun the full real Windows authorization/channel/roster/speaking/mute/deafen smoke after that change.
 
 ## Physical XENEON boundary
 
@@ -62,9 +66,9 @@ The companion repository includes `plugins/discord-bridge/DISCORD_APPROVAL.md` w
 
 Once the Discord production identity is compliant:
 
-1. rerun the real Windows companion smoke using the approved identity
+1. rerun the real Windows companion smoke if the identity/token path changed
 2. rerun Discord Bridge Release QA
 3. rerun Discord Panel Deep QA
 4. review the current private Elgato Maker/Marketplace agreement for companion disclosure requirements
-5. generate Rat Art from the final deterministic widget captures
-6. run Rat Ship and submit the free companion plus `$7.99` XENEON product
+5. run current Rat Ship so it regenerates the final deterministic Rat Art and ship kits from canonical `main`
+6. submit the free PackRat Voice Bridge plus the `$7.99` PackRat Voice Panel
