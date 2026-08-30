@@ -3,7 +3,7 @@
   "name": "CS2 Competitive Dashboard Lite",
   "type": "plugin",
   "status": "built",
-  "workflow_state": "TESTING",
+  "workflow_state": "HOLD",
   "price_usd": 0,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
@@ -18,7 +18,9 @@
   "release": "products/cs2-competitive-dashboard/RELEASE.md",
   "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
   "upgrade_url": "https://marketplace.elgato.com/%40packrat",
-  "upgrade_url_state": "creator-page-until-pro-listing-exists",
+  "upgrade_url_state": "internal-only-while-marketplace-launch-is-held",
+  "marketplace_launch": "held",
+  "marketplace_hold_reason": "PackRat already sells CS2 Live Stats as the simpler paid live-stat product. Do not publish this free Lite build unless the product ladder is revisited and cannibalization risk is intentionally accepted.",
   "bundled_profiles": {
     "value_proposition": "Lite includes one basic ready-to-use starter layout while Pro includes separate Competitive and Live Match layouts",
     "layouts": ["Starter"],
@@ -35,20 +37,14 @@
     "CS2 / GSI Status"
   ],
   "release_gate": [
-    "shared source builds Pro and Lite deterministically",
+    "internal build may continue to compile for shared-engine regression coverage",
+    "do not submit to Marketplace as part of the initial Pro launch",
     "Lite policy prevents Pro metrics from being selected",
     "bundled Lite starter profiles expose only Lite actions and metrics",
     "unit and fixture tests pass",
     "production dependency audit passes",
     "manifest validation",
     "official Elgato CLI validation",
-    "official .streamDeckPlugin packaging",
-    "property inspector setup/error-state QA",
-    "GSI installer custom-library fixtures",
-    "real bundled profile import smoke test on Stream Deck",
-    "real normal-player CS2 GSI payload smoke test",
-    "physical Stream Deck smoke test where required",
-    "final direct Pro upgrade URL after Pro listing exists",
-    "final deterministic Rat Art"
+    "official .streamDeckPlugin packaging"
   ]
 }
