@@ -12,6 +12,7 @@ on:
 jobs:
   windows-runtime-smoke:
     runs-on: windows-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -29,8 +30,8 @@ jobs:
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
   validate-and-pack:
-    needs: windows-runtime-smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     permissions:
       contents: read
     steps:
