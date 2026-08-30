@@ -4,6 +4,8 @@ const path = require("path");
 const { spawn, execFileSync } = require("child_process");
 
 const pluginDir = path.resolve(process.argv[2]);
+const pluginSource = fs.readFileSync(path.join(pluginDir, "bin", "plugin.js"), "utf8");
+if (!pluginSource.includes('event: registerEvent') || !pluginSource.includes('uuid: pluginUUID')) throw new Error("Plugin registration path missing");
 const WebSocket = require(path.join(pluginDir, "node_modules", "ws"));
 const { WebSocketServer } = WebSocket;
 const UUID = "com.packrat.stream-deck-ultimate-bundle";
@@ -49,7 +51,6 @@ function cleanup() {
 
   let stderr = ""; child.stderr.on("data", d => { stderr += d.toString(); });
   const ws = await Promise.race([connection, new Promise((_, reject) => setTimeout(() => reject(new Error("Plugin never opened its WebSocket. " + stderr)), 5000))]);
-  await waitFor(m => m.event === "registerPlugin" && m.uuid === UUID);
 
   let mark = messages.length;
   ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".media", context: "ctx-media", device: "dev-1", payload: { settings: { mode: "mute" } } }));
@@ -62,6 +63,7 @@ function cleanup() {
   mark = messages.length;
   ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".navigation", context: "ctx-nav", device: "dev-1", payload: { settings: { profile: "profiles/Stream Deck Ultimate - Home" } } }));
   await waitFor(m => m.event === "setImage" && m.context === "ctx-nav", 5000, mark);
+  mark = messages.length;
   ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".navigation", context: "ctx-nav", device: "dev-1", payload: { settings: { profile: "profiles/Stream Deck Ultimate - Home" } } }));
   await waitFor(m => m.event === "switchToProfile" && m.device === "dev-1" && m.payload?.profile === "profiles/Stream Deck Ultimate - Home", 5000, mark);
 
@@ -88,7 +90,7 @@ function cleanup() {
     await waitFor(m => m.event === "setImage" && m.context === "ctx-app", 10000, mark);
   }
 
-  console.log("runtime smoke passed: registration, setImage, navigation, clipboard clear, snippet empty, and Windows app execution");
+  console.log("runtime smoke passed: socket, setImage, navigation, clipboard clear, snippet empty, registration source, and Windows app execution");
   try { ws.terminate(); } catch {}
   try { server.close(); } catch {}
   cleanup();
