@@ -23,6 +23,14 @@ out\ship\<slug>
 
 If one product fails, Rat Ship records the failure, continues the remaining queue, and prints a failure summary at the end.
 
+### Release-state guard
+
+Canonical product metadata can intentionally block public submission with a `workflow_state` beginning with `BLOCKED_`, for example `BLOCKED_EXTERNAL_APPROVAL`.
+
+`rat ship` and `rat submit` fail closed while that state is active and print the product's `final_boundary` when present. This prevents a technically ready product from being publicly submitted before an external legal, platform, approval, licensing, or compliance dependency is cleared.
+
+`rat kit` and `rat stage` remain available for non-public preparation and review. After the external blocker is actually resolved, update `products/<slug>.json` on canonical `main` before running `rat ship`.
+
 ### Stream Deck plugin release path
 
 For a registered Stream Deck plugin, Rat Ship:
