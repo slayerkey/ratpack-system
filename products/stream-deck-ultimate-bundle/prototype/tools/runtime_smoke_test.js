@@ -72,6 +72,43 @@ function waitFor(pred, timeout = 8000) {
   }));
   await waitFor(m => m.event === "setTitle" && m.context === "ctx-window" && m.payload?.title === "RIGHT");
 
+  ws.send(JSON.stringify({
+    event: "willAppear",
+    action: UUID + ".clipboard",
+    context: "ctx-clip",
+    device: "dev-1",
+    payload: { settings: { slot: 1 } }
+  }));
+  await waitFor(m => m.event === "setTitle" && m.context === "ctx-clip" && m.payload?.title === "CLIP 1");
+
+  ws.send(JSON.stringify({
+    event: "willAppear",
+    action: UUID + ".smart-app",
+    context: "ctx-app",
+    device: "dev-1",
+    payload: { settings: { role: "browser", label: "" } }
+  }));
+  await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && ["BROWSER", "CHROME", "EDGE", "FIREFOX", "BRAVE", "OPERA"].includes(m.payload?.title));
+
+  if (process.platform === "win32") {
+    ws.send(JSON.stringify({
+      event: "didReceiveSettings",
+      action: UUID + ".smart-app",
+      context: "ctx-app",
+      device: "dev-1",
+      payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", label: "NOTEPAD" } }
+    }));
+    await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && m.payload?.title === "NOTEPAD");
+    ws.send(JSON.stringify({
+      event: "keyUp",
+      action: UUID + ".smart-app",
+      context: "ctx-app",
+      device: "dev-1",
+      payload: { settings: { role: "custom", path: "C:\\Windows\\System32\\notepad.exe", label: "NOTEPAD" } }
+    }));
+    await waitFor(m => m.event === "setTitle" && m.context === "ctx-app" && ["OPEN", "FOCUS", "ACTIVE"].includes(m.payload?.title), 10000);
+  }
+
   console.log("runtime smoke passed");
   ws.close();
   server.close();
