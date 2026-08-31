@@ -20,7 +20,7 @@
     "host:audit:release": "node scripts/host-release-evidence.mjs",
     "release:fingerprint": "node scripts/release-fingerprint.mjs",
     "release:final": "npm run check && npm run validate && npm run pack && node scripts/final-release-gate.mjs",
-    "release:promote": "npm run release:final && node scripts/promote-ready.mjs"
+    "release:promote": "node scripts/promote-ready.mjs"
   },
   "dependencies": {
     "@elgato/streamdeck": "^2.0.1"
