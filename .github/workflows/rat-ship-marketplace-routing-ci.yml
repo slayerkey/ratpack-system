@@ -169,6 +169,15 @@ jobs:
               throw "$($file.Name) is BLOCKED but has no blocker field."
             }
           }
+
+          $routerRaw = Get-Content $scriptPath -Raw
+          if ($routerRaw -match 'throw\s+"Rat \$Action finished with') {
+            throw 'Rat Marketplace still converts an expected queue stop into an unhandled exception stack trace.'
+          }
+          if ($routerRaw -notmatch 'Rat \$Action stopped for blocked product' -or $routerRaw -notmatch '(?m)^\s*exit 1\s*$') {
+            throw 'Rat Marketplace blocked-release UX must report a blocked stop and return nonzero without an exception stack trace.'
+          }
+
           Write-Host 'RELEASE STATE GUARD PASS'
 
       - name: Exercise pinned external Stream Deck release artifact
