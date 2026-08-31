@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { highestPacketCheckpoint, latestProcessSegment, logLines, providersReadyTogether } from "./release-evidence-parse.mjs";
+import { highestPacketCheckpoint, latestProcessSegment, logLines, processRuntimeFingerprint, providersReadyTogether } from "./release-evidence-parse.mjs";
 import { releaseRuntimeFingerprint } from "./release-fingerprint.mjs";
 
 const MIN_SUSTAINED_PACKET_CHECKPOINT = 300;
@@ -50,6 +50,9 @@ const session = latestProcessSegment(text);
 const lines = logLines(session);
 const highestPacketCount = highestPacketCheckpoint(session);
 const bothProvidersReady = providersReadyTogether(session);
+const runningRuntimeFingerprint = processRuntimeFingerprint(session);
+const sourceRuntimeFingerprint = releaseRuntimeFingerprint();
+const runtimeFingerprintMatched = Boolean(runningRuntimeFingerprint) && runningRuntimeFingerprint === sourceRuntimeFingerprint;
 const openLogPass = session.includes("open log folder launched");
 const diagnosticsReachable = coreAudit.includes("PASS  Redacted localhost diagnostics discovered");
 const sustainedLivePass = highestPacketCount >= MIN_SUSTAINED_PACKET_CHECKPOINT;
@@ -68,10 +71,20 @@ const automated = {
   diagnosticsReachable,
   leetifyReady: bothProvidersReady,
   faceitReady: bothProvidersReady,
-  bothProvidersReady
+  bothProvidersReady,
+  runningRuntimeFingerprint,
+  sourceRuntimeFingerprint,
+  runtimeFingerprintMatched
 };
 
 const failures = [];
+if (!automated.runtimeFingerprintMatched) {
+  if (!automated.runningRuntimeFingerprint) {
+    failures.push("latest running plugin process did not report a runtime fingerprint; rerun rat dev cs2-competitive-dashboard before the physical release pass");
+  } else {
+    failures.push(`running plugin fingerprint ${automated.runningRuntimeFingerprint} does not match current source fingerprint ${automated.sourceRuntimeFingerprint}; rerun Rat Dev and repeat the final host pass on the current candidate`);
+  }
+}
 if (!automated.sustainedLivePass) failures.push(`sustained GSI evidence needs checkpoint >= ${MIN_SUSTAINED_PACKET_CHECKPOINT}; saw ${highestPacketCount}`);
 if (!automated.openLogPass) failures.push("Open Log Folder was not successfully exercised in the latest plugin process");
 if (!automated.diagnosticsReachable) failures.push("run this release audit while Stream Deck / the plugin is still running so localhost diagnostics can be verified");
@@ -81,6 +94,9 @@ if (!human.longLabelsReadable) failures.push("missing human attestation --labels
 if (!human.restartRecoveryPassed) failures.push("missing human attestation --restart-ok");
 
 console.log("\nCS2 PHYSICAL RELEASE EVIDENCE");
+console.log(`${automated.runtimeFingerprintMatched ? "PASS" : "FAIL"}  Running Stream Deck runtime matches current release source`);
+if (automated.runningRuntimeFingerprint) console.log(`INFO  Running fingerprint: ${automated.runningRuntimeFingerprint}`);
+console.log(`INFO  Source fingerprint:  ${automated.sourceRuntimeFingerprint}`);
 console.log(`${automated.sustainedLivePass ? "PASS" : "FAIL"}  Sustained live GSI (${highestPacketCount} packet checkpoint)`);
 console.log(`${automated.openLogPass ? "PASS" : "FAIL"}  Open Log Folder`);
 console.log(`${automated.diagnosticsReachable ? "PASS" : "FAIL"}  Live localhost diagnostics reachable`);
@@ -92,7 +108,7 @@ console.log(`${human.restartRecoveryPassed ? "PASS" : "FAIL"}  Human check: CS2 
 if (failures.length) {
   console.log("\nCS2 RELEASE EVIDENCE: BLOCKED");
   for (const failure of failures) console.log(`  • ${failure}`);
-  console.log("\nAfter both providers are ready together and all three visual/restart checks are true, run:");
+  console.log("\nAfter the running fingerprint matches, both providers are ready together, and all three visual/restart checks are true, run:");
   console.log("npm run host:audit:release -- --hs-ok --labels-ok --restart-ok");
   process.exit(1);
 }
@@ -101,11 +117,11 @@ const evidenceDir = path.resolve(".release-evidence");
 const evidencePath = path.join(evidenceDir, "host-pass.json");
 mkdirSync(evidenceDir, { recursive: true });
 const evidence = {
-  schema: 1,
+  schema: 2,
   product: "cs2-competitive-dashboard-pro",
   version: "0.1.0.0",
   passedAt: new Date().toISOString(),
-  runtimeFingerprint: releaseRuntimeFingerprint(),
+  runtimeFingerprint: sourceRuntimeFingerprint,
   log: {
     path: logPath,
     bytes: statSync(logPath).size,
@@ -116,4 +132,4 @@ const evidence = {
 };
 writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
 console.log(`\nCS2 RELEASE EVIDENCE: PASS\nEvidence written: ${evidencePath}`);
-console.log("This file is local and gitignored. npm run release:final will require this exact runtime fingerprint.");
+console.log("The running Stream Deck process and current release source fingerprint matched. This file is local and gitignored; release:final requires this exact fingerprint.");
