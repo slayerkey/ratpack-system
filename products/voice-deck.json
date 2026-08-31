@@ -1,6 +1,6 @@
 {
   "id": "voice-deck",
-  "name": "PackRat Discord Voice Deck",
+  "name": "PackRat Voice Deck",
   "type": "plugin",
   "status": "qa_passed",
   "workflow_state": "BLOCKED",
