@@ -76,6 +76,146 @@ function Invoke-RatArtUtf8Safe {
     }
 }
 
+function Resolve-ProductPath {
+    param([string]$RelativePath)
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) { return $null }
+    $normalized = $RelativePath -replace '/', '\'
+    return Join-Path $RepoRoot $normalized
+}
+
+function Copy-SubmissionFiles {
+    param(
+        [object]$Submission,
+        [string]$SubmissionPath,
+        [string]$Target
+    )
+
+    Copy-Item $SubmissionPath (Join-Path $Target "submission.json") -Force
+    Set-Content -Path (Join-Path $Target "PASTE_description.txt") -Value ([string]$Submission.description).Trim() -Encoding UTF8
+    Set-Content -Path (Join-Path $Target "PASTE_release_notes.txt") -Value ([string]$Submission.release_notes).Trim() -Encoding UTF8
+}
+
+function Copy-ValidatedArtifactMedia {
+    param(
+        [object]$Artifact,
+        [string]$ArtifactRoot,
+        [string]$Target
+    )
+
+    if ($null -eq $Artifact.media) {
+        throw "Validated external artifact metadata is missing the media mapping."
+    }
+
+    $mapping = @(
+        [PSCustomObject]@{ Source = [string]$Artifact.media.search_icon; Target = "01_search_icon.png" },
+        [PSCustomObject]@{ Source = [string]$Artifact.media.cover; Target = "02_cover.png" }
+    )
+
+    $gallery = @($Artifact.media.gallery)
+    if ($gallery.Count -ne 4) {
+        throw "Validated external artifact must declare exactly four Marketplace gallery images; found $($gallery.Count)."
+    }
+    for ($i = 0; $i -lt 4; $i++) {
+        $mapping += [PSCustomObject]@{
+            Source = [string]$gallery[$i]
+            Target = ("{0:D2}_gallery_{1:D2}.png" -f ($i + 3), ($i + 1))
+        }
+    }
+
+    foreach ($item in $mapping) {
+        if ([string]::IsNullOrWhiteSpace($item.Source)) {
+            throw "Validated external artifact media mapping contains an empty source for $($item.Target)."
+        }
+        $source = Join-Path $ArtifactRoot ($item.Source -replace '/', '\')
+        if (-not (Test-Path $source -PathType Leaf)) {
+            throw "Validated external artifact is missing Marketplace media '$($item.Source)'."
+        }
+        Copy-Item $source (Join-Path $Target $item.Target) -Force
+    }
+}
+
+function Build-FromValidatedExternalArtifact {
+    param(
+        [object]$Product,
+        [object]$Submission,
+        [string]$SubmissionPath,
+        [string]$Target
+    )
+
+    $artifact = $Product.release_artifact
+    if ($null -eq $artifact) { throw "External artifact configuration missing." }
+
+    foreach ($field in @("repository", "run_id", "name", "commit", "package_path", "package_sha256")) {
+        if ($null -eq $artifact.$field -or [string]::IsNullOrWhiteSpace([string]$artifact.$field)) {
+            throw "Validated external artifact metadata is missing '$field'."
+        }
+    }
+
+    Require-Command "git" "Install Git for Windows."
+    Require-Command "gh" "Install GitHub CLI and authenticate it once with 'gh auth login'."
+
+    if ($Product.source_repository -and $Product.source_ref) {
+        Write-Host "Local Rat Ship plugin: verify external source ref..." -ForegroundColor DarkGray
+        $remoteLines = @(& git ls-remote ([string]$Product.source_repository) ([string]$Product.source_ref) 2>$null)
+        if ($LASTEXITCODE -ne 0 -or -not $remoteLines.Count) {
+            throw "Could not resolve external source ref '$($Product.source_ref)' from '$($Product.source_repository)'."
+        }
+        $remoteCommit = (($remoteLines | Select-Object -First 1) -split '\s+')[0].Trim()
+        if ($remoteCommit -ne [string]$artifact.commit) {
+            throw "External source ref moved after validation. Expected $($artifact.commit), current ref resolves to $remoteCommit. Refuse to ship an unvalidated commit."
+        }
+    }
+
+    if (Test-Path $Target) { Remove-Item $Target -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $Target | Out-Null
+
+    $artifactRoot = Join-Path $RepoRoot ("out\ship-artifacts\{0}-{1}" -f $PluginSlug, $PID)
+    if (Test-Path $artifactRoot) { Remove-Item $artifactRoot -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
+
+    try {
+        Write-Host "Local Rat Ship plugin: download exact validated GitHub Actions artifact..." -ForegroundColor DarkGray
+        & gh run download ([string]$artifact.run_id) --repo ([string]$artifact.repository) --name ([string]$artifact.name) --dir $artifactRoot | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not download validated artifact '$($artifact.name)' from run $($artifact.run_id)."
+        }
+
+        $packageSource = Join-Path $artifactRoot (([string]$artifact.package_path) -replace '/', '\')
+        if (-not (Test-Path $packageSource -PathType Leaf)) {
+            throw "Validated artifact is missing package '$($artifact.package_path)'."
+        }
+
+        $actualHash = (Get-FileHash -Algorithm SHA256 -Path $packageSource).Hash.ToLowerInvariant()
+        $expectedHash = ([string]$artifact.package_sha256).ToLowerInvariant()
+        if ($actualHash -ne $expectedHash) {
+            throw "Validated package SHA256 mismatch. Expected $expectedHash, got $actualHash."
+        }
+
+        Copy-Item $packageSource (Join-Path $Target "$PluginSlug.streamDeckPlugin") -Force
+        Copy-SubmissionFiles -Submission $Submission -SubmissionPath $SubmissionPath -Target $Target
+        Copy-ValidatedArtifactMedia -Artifact $artifact -ArtifactRoot $artifactRoot -Target $Target
+
+        $requiredMedia = @("01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png", "06_gallery_04.png")
+        $missingMedia = @($requiredMedia | Where-Object { -not (Test-Path (Join-Path $Target $_) -PathType Leaf) })
+        if ($missingMedia.Count) {
+            throw "Validated artifact kit media is incomplete: $($missingMedia -join ', ')"
+        }
+
+        Write-Host "Validated external release artifact verified." -ForegroundColor Green
+        Write-Host "  repository: $($artifact.repository)" -ForegroundColor DarkGray
+        Write-Host "  commit:     $($artifact.commit)" -ForegroundColor DarkGray
+        Write-Host "  run:        $($artifact.run_id)" -ForegroundColor DarkGray
+        Write-Host "  package:    $expectedHash" -ForegroundColor DarkGray
+    }
+    finally {
+        if (Test-Path $artifactRoot) {
+            Remove-Item $artifactRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host "Stream Deck plugin ship kit ready at:`n$Target" -ForegroundColor Green
+}
+
 if ($PluginSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
     throw "Invalid Stream Deck plugin slug: $PluginSlug"
 }
@@ -88,33 +228,60 @@ $product = Get-Content $productPath -Raw | ConvertFrom-Json
 if ($product.type -ne "plugin") {
     throw "Product '$PluginSlug' is '$($product.type)', not a Stream Deck plugin."
 }
-if (-not $product.source) {
-    throw "Product '$PluginSlug' does not declare a canonical source path."
-}
 
-$sourceRelative = ([string]$product.source -replace '/', '\')
-$sourceDir = Join-Path $RepoRoot $sourceRelative
-$submissionPath = Join-Path $sourceDir "submission.json"
-$packageJson = Join-Path $sourceDir "package.json"
-$packageLock = Join-Path $sourceDir "package-lock.json"
-if (-not (Test-Path $sourceDir) -or -not (Test-Path $submissionPath) -or -not (Test-Path $packageJson)) {
-    throw "Stream Deck Rat Ship cannot find source, package.json, and submission.json for '$PluginSlug' in the isolated candidate."
+$submissionPath = $null
+if ($product.submission_metadata) {
+    $submissionPath = Resolve-ProductPath ([string]$product.submission_metadata)
 }
-
+elseif ($product.source) {
+    $sourceForSubmission = Resolve-ProductPath ([string]$product.source)
+    $submissionPath = Join-Path $sourceForSubmission "submission.json"
+}
+if (-not $submissionPath -or -not (Test-Path $submissionPath -PathType Leaf)) {
+    throw "Stream Deck Rat Ship cannot find submission metadata for '$PluginSlug'."
+}
 $submission = Get-Content $submissionPath -Raw | ConvertFrom-Json
 if ($submission.type -ne "plugin" -or $submission.slug -ne $PluginSlug) {
     throw "submission.json does not match Stream Deck plugin '$PluginSlug'."
+}
+
+# Some external plugins are released from an exact already-validated GitHub Actions
+# artifact rather than copied into RatPack. This preserves repository isolation and
+# guarantees Maker Console receives the same package/media that passed the release gate.
+if ($null -ne $product.release_artifact) {
+    Build-FromValidatedExternalArtifact -Product $product -Submission $submission -SubmissionPath $submissionPath -Target $Destination
+    return
+}
+
+if (-not $product.source) {
+    throw "Product '$PluginSlug' does not declare a canonical source path."
+}
+$sourceRelative = ([string]$product.source -replace '/', '\')
+$sourceDir = Join-Path $RepoRoot $sourceRelative
+$packageJson = Join-Path $sourceDir "package.json"
+$packageLock = Join-Path $sourceDir "package-lock.json"
+if (-not (Test-Path $sourceDir) -or -not (Test-Path $packageJson)) {
+    throw "Stream Deck Rat Ship cannot find source and package.json for '$PluginSlug' in the isolated candidate."
 }
 
 Require-Command "node" "Install Node.js 24 or newer."
 Require-Command "npm" "Install Node.js 24 or newer."
 Require-Command "npx" "Install Node.js 24 or newer."
 
-$manifestDirs = @(Get-ChildItem -Path $sourceDir -Directory -Filter *.sdPlugin)
-if ($manifestDirs.Count -ne 1) {
-    throw "Expected exactly one *.sdPlugin directory under $sourceDir; found $($manifestDirs.Count)."
+$pluginDir = $null
+if ($product.plugin_dir) {
+    $pluginDir = Join-Path $sourceDir (([string]$product.plugin_dir) -replace '/', '\')
+    if (-not (Test-Path $pluginDir -PathType Container)) {
+        throw "Declared plugin_dir does not exist: $pluginDir"
+    }
 }
-$pluginDir = $manifestDirs[0].FullName
+else {
+    $manifestDirs = @(Get-ChildItem -Path $sourceDir -Directory -Filter *.sdPlugin)
+    if ($manifestDirs.Count -ne 1) {
+        throw "Expected exactly one *.sdPlugin directory under $sourceDir; found $($manifestDirs.Count)."
+    }
+    $pluginDir = $manifestDirs[0].FullName
+}
 
 if (Test-Path $Destination) { Remove-Item $Destination -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -146,9 +313,7 @@ $canonicalPackage = Join-Path $Destination "$PluginSlug.streamDeckPlugin"
 Copy-Item $pluginPackages[0].FullName $canonicalPackage -Force
 Remove-Item $packageOut -Recurse -Force
 
-Copy-Item $submissionPath (Join-Path $Destination "submission.json") -Force
-Set-Content -Path (Join-Path $Destination "PASTE_description.txt") -Value ([string]$submission.description).Trim() -Encoding UTF8
-Set-Content -Path (Join-Path $Destination "PASTE_release_notes.txt") -Value ([string]$submission.release_notes).Trim() -Encoding UTF8
+Copy-SubmissionFiles -Submission $submission -SubmissionPath $submissionPath -Target $Destination
 
 $artScript = Join-Path $sourceDir "rat-art.ps1"
 if (Test-Path $artScript) {
