@@ -113,7 +113,7 @@ Runs the same clean hosted XENEON build and downloads the kit only.
 
 ## Automatic CI
 
-Normal pushes and pull requests use lightweight CI plus any product or shared tooling gate whose path matches the changes. Lightweight CI validates canonical context, JSON, local PowerShell syntax, Rat Dev dependency behavior and the external Rat Dev lifecycle contract.
+Normal pushes and pull requests use lightweight CI plus any product or shared tooling gate whose path matches the changes. Lightweight CI validates canonical context, JSON, local PowerShell syntax, Rat Dev dependency behavior, the external Rat Dev lifecycle contract, and the Rat Audit lifecycle contract.
 
 Expensive rendering, packaging, host smoke tests and Maker Console work happen in product release gates, locally during normal shipping, or through an explicit cloud workflow when requested.
 
@@ -192,6 +192,35 @@ Rat Dev prints stage markers so the failed layer is obvious. A failed external c
 Normal iteration should not use Downloads, hand copied ZIP folders or manually installed development source folders. Product specific local state stays inside the host application or ignored RatPack `out` directories.
 
 The first Stream Deck development run may install the official `@elgato/cli` once. Current Stream Deck local development requires Node.js 24 or newer. XENEON development uses the pinned official iCUE Widget CLI.
+
+## `rat audit <slug> [--probe]`
+
+This is the real host diagnostic companion to Rat Dev.
+
+```text
+rat dev voice-deck
+rat audit voice-deck
+rat audit voice-deck --probe
+```
+
+`rat audit <slug>` does not rebuild or reinstall the product. It resolves the exact development candidate that Rat Dev made active, prints its source identity and product root, then runs that product's `scripts/host-audit.ps1`.
+
+For internal RatPack products, Rat Audit resolves the active product under the internal Rat Dev worktree. For registered external Stream Deck plugins, it reads `out\dev\state\<slug>.json` and audits the isolated validated build that is actually linked to Stream Deck. It does not substitute the controller checkout for that active build.
+
+The optional `--probe` mode always runs the normal host audit first. If the product exposes an npm `host:probe` script and the audit succeeds, Rat Audit then runs the deeper transport or integration probe.
+
+Rat Audit fails closed if the active build cannot be resolved, the product has no unambiguous host audit script, the normal audit fails, an unknown option is supplied, or `--probe` is requested for a product that does not expose a probe. Failures preserve the active build and its logs rather than reinstalling or switching source.
+
+For Voice Deck, the normal physical workflow is simply:
+
+```text
+rat dev voice-deck
+rat audit voice-deck
+```
+
+Use `rat audit voice-deck --probe` only when the Discord transport layer needs deeper isolation. The physical release checklist remains `plugins/voice-deck/REAL_WINDOWS_SMOKE.md`.
+
+See `docs/RAT-AUDIT.md` for the full host audit contract and failure behavior.
 
 ## `rat status`
 
