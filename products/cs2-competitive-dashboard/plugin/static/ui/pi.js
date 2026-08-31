@@ -1,5 +1,5 @@
 (() => {
-  const build = window.PACKRAT_BUILD || { flavor: "lite", name: "CS2 Competitive Dashboard", footerLabel: "Explore PackRat", footerUrl: "https://marketplace.elgato.com/%40packrat", liveMetrics: [] };
+  const build = window.PACKRAT_BUILD || { flavor: "lite", name: "CS2 Competitive Dashboard", footerLabel: "Explore PackRat", footerUrl: "https://marketplace.elgato.com/maker/packrat", liveMetrics: [] };
   const FACEIT_DEVELOPER_PORTAL = "https://developers.faceit.com/";
   const FACEIT_KEY_GUIDE = "https://docs.faceit.com/getting-started/authentication/api-keys/";
   const LEETIFY_DEVELOPER_PAGE = "https://leetify.com/app/developer";
@@ -370,111 +370,82 @@
       dot.classList.add("warn");
       const stage = status.setupStage && status.setupStage !== "idle" ? status.setupStage : "starting";
       $("status-text").textContent = "Automatic setup in progress";
-      $("gsi-feedback").textContent = `PackRat is configuring live tracking in the background. Current stage: ${stage}.`;
+      $("gsi-feedback").textContent = `PackRat is preparing local CS2 tracking (${stage}). No setup button is required.`;
     }
 
-    $("port-pill").textContent = status.listenerPort ? `LOCAL :${status.listenerPort}` : "LOCAL ONLY";
-    $("setup-error").hidden = !error;
-    $("setup-error").textContent = error;
-    $("session-value").textContent = `${session.wins || 0}W ${session.losses || 0}L`;
+    $("session-value").textContent = `${session.wins || 0}W ${session.losses || 0}L · ${session.matches || 0} matches`;
+    $("steam-profile").value = globalSettings.steamProfile || "";
 
-    if (build.flavor === "pro") {
-      if (document.activeElement !== $("steam-profile")) {
-        $("steam-profile").value = typeof globalSettings.steamProfile === "string" ? globalSettings.steamProfile : "";
-      }
+    const providerMeta = globalSettings.providerMeta || {};
+    setProvider("faceit", online.faceit, providerMeta.faceitConfigured);
+    setProvider("leetify", online.leetify, providerMeta.leetifyConfigured);
 
-      const faceitConfigured = Boolean(globalSettings.faceitApiKey);
-      const leetifyConfigured = Boolean(globalSettings.leetifyApiKey);
-      renderKeyState("faceit-key-state", faceitConfigured, online.faceit);
-      renderKeyState("leetify-key-state", leetifyConfigured, online.leetify);
-      $("faceit-state").textContent = sourceText(online.faceit, faceitConfigured ? "Waiting for Steam profile" : "FACEIT key required");
-      $("leetify-state").textContent = sourceText(online.leetify, leetifyConfigured ? "Waiting for Steam profile" : "Leetify key required");
-      $("view-faceit").hidden = !online.faceit?.profileUrl;
-      $("view-leetify").hidden = !online.leetify?.profileUrl;
-      $("leetify-attribution").hidden = online.leetify?.status !== "ready";
-      $("clear-faceit-key").hidden = !faceitConfigured;
-      $("clear-leetify-key").hidden = !leetifyConfigured;
-
-      if (typeof globalSettings.steamProfile === "string" && globalSettings.steamProfile.trim()) {
-        if (!$("steam-feedback").textContent.includes("Refresh requested")) {
-          $("steam-feedback").textContent = "Steam profile saved. Provider stats refresh automatically when keys are configured.";
-        }
-      } else {
-        $("steam-feedback").textContent = "Save your Steam profile once before loading Leetify or FACEIT stats.";
-      }
-    }
-
-    renderMetricHint();
+    const install = latestState.install || {};
+    $("gsi-path").textContent = install.file || status.configPath || "Automatic setup pending";
+    $("restart-warning").hidden = !status.gsiRestartRequired;
+    $("profile-feedback").textContent = build.flavor === "pro"
+      ? "Competitive and Live Match profiles are bundled for supported Stream Deck models. Rat Dev profile imports are a one-time development fallback."
+      : "The Starter profile is bundled for supported Stream Deck models.";
   }
 
-  function renderKeyState(id, configured, source) {
-    const element = $(id);
-    element.className = "provider-state";
-    if (!configured) {
-      element.textContent = "API key required";
-      element.classList.add("warn");
-      return;
-    }
-    if (source?.status === "ready") {
-      element.textContent = "Key saved · Connected";
-      element.classList.add("ready");
-      return;
-    }
-    if (source?.status === "unavailable" && /key/i.test(source.message || "")) {
-      element.textContent = "Key rejected · replace it";
-      element.classList.add("warn");
-      return;
-    }
-    element.textContent = "Key saved";
-    element.classList.add("ready");
+  function setProvider(name, providerState, configured) {
+    const el = $(`${name}-status`);
+    if (!el) return;
+    el.className = "pill";
+
+    const status = providerState?.status || (configured ? "loading" : "needs-key");
+    const text = providerState?.message || friendlyProviderText(name, status);
+    if (status === "ready") el.classList.add("good");
+    else if (status === "loading" || status === "rate-limited" || status === "private") el.classList.add("warn");
+    else if (status === "error" || status === "rejected") el.classList.add("bad");
+    el.textContent = text;
   }
 
-  function sourceText(source, fallback) {
-    if (!source) return fallback;
-    const states = {
-      ready: "Connected",
-      loading: "Loading…",
-      not_found: "Profile not found",
-      private: "Profile private",
-      rate_limited: "Your key is rate limited",
-      commercial_gate: "Provider unavailable",
-      offline: "API offline",
-      unavailable: source.message || "Unavailable",
-      not_configured: fallback
-    };
-    return states[source.status] || fallback;
+  function friendlyProviderText(name, status) {
+    if (status === "needs-key") return `${providerLabel(name)} key required`;
+    if (status === "loading") return "Checking…";
+    if (status === "ready") return "Connected";
+    if (status === "private") return "Profile is private";
+    if (status === "not-found") return "No matching profile/data";
+    if (status === "rejected") return "Key rejected";
+    if (status === "rate-limited") return "Rate limited · retrying";
+    return "Provider unavailable";
   }
 
-  async function copyDiagnostics() {
-    const report = $("diagnostic-output")?.value || "";
-    if (!report) return;
-    try {
-      await navigator.clipboard.writeText(report);
-    } catch {
-      // Diagnostics are developer-only now; no setup path depends on clipboard access.
+  function providerLabel(name) {
+    return name === "faceit" ? "FACEIT" : "Leetify";
+  }
+
+  function copyDiagnostics() {
+    const summary = latestState.diagnostics?.summary || "Diagnostics are still loading. Keep Stream Deck running and try again.";
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(summary)
+        .then(() => { $("diagnostic-feedback").textContent = "Diagnostic summary copied."; })
+        .catch(() => { $("diagnostic-feedback").textContent = summary; });
+    } else {
+      $("diagnostic-feedback").textContent = summary;
     }
-  }
-
-  function setTransport(state, text) {
-    if (!domReady || !$("transport-dot")) return;
-    const dot = $("transport-dot");
-    dot.className = "status-dot";
-    if (state === "good") dot.classList.add("good");
-    else if (state === "warn" || state === "connecting") dot.classList.add("warn");
-    else if (state === "bad") dot.classList.add("bad");
-    $("transport-text").textContent = text;
-    $("transport-strip").classList.toggle("transport-bad", state === "bad");
   }
 
   function setInteractiveState(enabled) {
-    if (!domReady) return;
-    document.querySelectorAll("button, select, input").forEach((element) => {
-      if (element.closest("[hidden]")) return;
+    for (const element of document.querySelectorAll("input, select, button")) {
+      if (element.id === "marketplace-link") continue;
       element.disabled = !enabled;
-    });
+    }
+  }
+
+  function setTransport(kind, message) {
+    if (!domReady || !$("transport-state")) return;
+    $("transport-state").className = `transport ${kind}`;
+    $("transport-state").textContent = message;
   }
 
   function escapeHtml(value) {
-    return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 })();
