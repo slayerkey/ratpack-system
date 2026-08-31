@@ -9,13 +9,15 @@ properties RatPack depends on instead of trusting historical CI alone:
 * the factory's reviewed structural-reuse report
 * exact expected product counts
 * zero-warning/zero-failure QA
+* Marketplace product-name propagation
+* pinned staged license payload
 * package icon provenance
-* Marketplace search icon provenance
+* review-kit product-mark provenance
 
 The finalizer writes FACTORY-RELEASE-AUDIT.json into the Rat kit and replaces the
-Marketplace search icon with a deterministic 288px raster of the staged product
-icon.svg, matching current Elgato Marketplace product-image requirements. The
-staged SVG remains the source of truth.
+review-kit product mark with a deterministic 288px raster of the staged product
+icon.svg. The staged SVG remains the source of truth. The authenticated Maker
+Console Icons wizard remains the authority for its icon-preview upload fields.
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -30,6 +33,7 @@ from typing import Any
 from PIL import Image
 
 MARKETPLACE_APP_ICON_SIZE = 288
+MIN_MARKETPLACE_DESCRIPTION_CHARS = 250
 
 
 def fail(message: str) -> None:
@@ -110,6 +114,13 @@ def expected_int(product: dict[str, Any], key: str) -> int:
     return value
 
 
+def expected_sha256(product: dict[str, Any], key: str) -> str:
+    value = str(product.get(key) or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", value):
+        fail(f"RatPack product spec requires lowercase SHA-256 {key}")
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--factory-root", required=True)
@@ -125,10 +136,19 @@ def main() -> None:
 
     product = read_json(product_spec_path)
     slug = str(product.get("id") or "").strip()
+    product_name = str(product.get("name") or "").strip()
+    description = str(product.get("description") or "").strip()
     factory_meta = product.get("icon_factory") or {}
     factory_product = str(factory_meta.get("product") or "").strip()
-    if product.get("type") != "icon_pack" or not slug or not factory_product:
+    if product.get("type") != "icon_pack" or not slug or not factory_product or not product_name:
         fail("product spec is not a complete icon_pack registration")
+    if product_name.casefold().startswith("packrat "):
+        fail("Marketplace product name must not include the PackRat Maker prefix")
+    if len(description) < MIN_MARKETPLACE_DESCRIPTION_CHARS:
+        fail(
+            f"Marketplace description is too short: {len(description)} < "
+            f"{MIN_MARKETPLACE_DESCRIPTION_CHARS} characters"
+        )
 
     expected_static = expected_int(product, "expected_static_icons")
     expected_animated = expected_int(product, "expected_animated_icons")
@@ -136,6 +156,7 @@ def main() -> None:
     expected_unique = expected_int(product, "expected_unique_glyphs")
     expected_reuse = expected_int(product, "expected_reuse_groups")
     expected_visual_dupes = expected_int(product, "expected_exact_visual_duplicate_groups")
+    expected_license_sha = expected_sha256(product, "expected_license_sha256")
 
     qa = read_json(factory_out / "qa" / "qa-report.json")
     qa_summary = qa.get("summary") or {}
@@ -171,7 +192,28 @@ def main() -> None:
     handoff = read_json(factory_out / "marketing" / "rat-art-icons.json")
     static_count = int(handoff.get("actual_icon_count", -1))
     animated_count = int(handoff.get("animated_icon_count", -1))
-    staged_entries = read_json(factory_out / "package-staging" / "icons.json")
+    handoff_name = str(handoff.get("name") or "").strip()
+    if handoff_name != product_name:
+        fail(f"Rat Art handoff name mismatch: expected {product_name!r}, got {handoff_name!r}")
+
+    staging = factory_out / "package-staging"
+    package_manifest = read_json(staging / "manifest.json")
+    staged_name = str(package_manifest.get("Name") or "").strip()
+    if staged_name != product_name:
+        fail(f"staged manifest name mismatch: expected {product_name!r}, got {staged_name!r}")
+
+    license_path = staging / "license.txt"
+    if not license_path.is_file():
+        fail("package staging license.txt is missing")
+    license_bytes = license_path.read_bytes()
+    staged_license_sha = sha256_bytes(license_bytes)
+    if staged_license_sha != expected_license_sha:
+        fail(
+            "staged license payload drift: "
+            f"expected {expected_license_sha}, got {staged_license_sha}"
+        )
+
+    staged_entries = read_json(staging / "icons.json")
     if not isinstance(staged_entries, list):
         fail("package-staging/icons.json must contain a list")
     if static_count != expected_static:
@@ -187,7 +229,7 @@ def main() -> None:
         fail("package staging contains duplicate picker names or paths")
 
     source_icon = factory_root / "icon-products" / factory_product / "icon.svg"
-    staged_icon = factory_out / "package-staging" / "icon.svg"
+    staged_icon = staging / "icon.svg"
     if not source_icon.is_file() or not staged_icon.is_file():
         fail("product source icon.svg or staged icon.svg is missing")
     source_icon_bytes = source_icon.read_bytes()
@@ -198,10 +240,16 @@ def main() -> None:
     search_icon = rasterize_product_icon(staged_icon, kit / "01_search_icon.png")
 
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "ratpack_product": slug,
         "factory_product": factory_product,
+        "product_name": product_name,
         "pass": True,
+        "marketplace_metadata": {
+            "name": staged_name,
+            "description_characters": len(description),
+            "maker_prefix_absent": True,
+        },
         "counts": {
             "static_icons": static_count,
             "animated_icons": animated_count,
@@ -221,6 +269,12 @@ def main() -> None:
             "groups": len(duplicate_groups),
             "ids": duplicate_groups,
         },
+        "license": {
+            "source": "package-staging/license.txt",
+            "expected_sha256": expected_license_sha,
+            "staged_sha256": staged_license_sha,
+            "provenance_match": True,
+        },
         "package_icon": {
             "source": f"icon-products/{factory_product}/icon.svg",
             "source_sha256": sha256_bytes(source_icon_bytes),
@@ -233,10 +287,12 @@ def main() -> None:
     output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(
         "Icon-pack release audit PASS:",
+        f"{product_name};",
         f"{static_count} static + {animated_count} animated = {len(staged_entries)} picker entries;",
         f"{unique_glyphs} distinct glyphs; {reuse_groups} reviewed reuse groups;",
         f"{unexpected_groups} unexpected structural groups; {len(duplicate_groups)} exact RGBA duplicate groups;",
-        f"Marketplace app icon {MARKETPLACE_APP_ICON_SIZE}x{MARKETPLACE_APP_ICON_SIZE}",
+        f"license {staged_license_sha[:12]}...;",
+        f"review product mark {MARKETPLACE_APP_ICON_SIZE}x{MARKETPLACE_APP_ICON_SIZE}",
     )
 
 
