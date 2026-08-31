@@ -15,7 +15,7 @@ def mini_key(draw: ImageDraw.ImageDraw, x: int, y: int, w: int, h: int, label: s
 
 
 def profile_panel(draw: ImageDraw.ImageDraw, x: int, title_value: str, subtitle: str, keys, tone=ACCENT):
-    y, w, h = 300, 785, 500
+    y, w, h = 284, 785, 540
     rounded(draw, (x, y, x + w, y + h), radius=34, fill=PANEL, outline=BORDER, width=2)
     text(draw, (x + 38, y + 34), title_value, 27, WHITE)
     text(draw, (x + 38, y + 75), subtitle, 16, MUTED, False)
@@ -23,7 +23,7 @@ def profile_panel(draw: ImageDraw.ImageDraw, x: int, title_value: str, subtitle:
 
     key_w, key_h = 128, 108
     gap_x, gap_y = 14, 14
-    start_x, start_y = x + 38, y + 124
+    start_x, start_y = x + 38, y + 118
     for index, (label, value, key_tone) in enumerate(keys):
         row, col = divmod(index, 5)
         mini_key(
@@ -37,7 +37,7 @@ def profile_panel(draw: ImageDraw.ImageDraw, x: int, title_value: str, subtitle:
             key_tone,
         )
 
-    text(draw, (x + 38, y + h - 42), "Editable • Auto installed • Does not hijack your active profile", 13, MUTED, False)
+    text(draw, (x + 38, y + h - 31), "Editable • Auto installed • Does not hijack your active profile", 12, MUTED, False)
 
 
 def profiles():
