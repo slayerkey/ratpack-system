@@ -10,6 +10,8 @@
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F4F6F8'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
 <meta name="x-icue-property" content="backgroundColor" data-label="tr('Background Color')" data-type="color" data-default="'#090B10'" />
+<meta name="x-icue-property" content="panelOpacity" data-label="tr('Panel Opacity')" data-type="slider" data-min="0" data-max="100" data-step="5" data-unit-label="'%'" data-default="100" />
+<meta name="x-icue-property" content="fontFamily" data-label="tr('Font')" data-type="combobox" data-values='[{"key":"default","value":"Default"},{"key":"segoe","value":"Segoe UI"},{"key":"bahnschrift","value":"Bahnschrift"},{"key":"arial","value":"Arial"},{"key":"consolas","value":"Consolas"},{"key":"georgia","value":"Georgia"}]' data-default="'default'" />
 
 <script type="application/json" id="x-icue-groups">
 [
@@ -20,12 +22,13 @@
   },
   {
     "title": "tr('Appearance')",
-    "properties": ["textColor", "accentColor", "backgroundColor"]
+    "properties": ["textColor", "accentColor", "backgroundColor", "panelOpacity", "fontFamily"]
   }
 ]
 </script>
 
 <link rel="stylesheet" href="discord-panel.css" />
+<link rel="stylesheet" href="discord-panel-fixes.css" />
 </head>
 <body data-slot="s-h" data-state="setup">
 <main id="stage" aria-label="PackRat Voice Panel">
@@ -95,6 +98,7 @@
   </section>
 </main>
 <script src="discord-panel-ui.js"></script>
+<script src="discord-panel-appearance.js"></script>
 <script src="discord-panel-rpc.js"></script>
 <script src="discord-panel.js"></script>
 </body>
