@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Script = Join-Path $Here "scripts\rat-art.py"
+$Script = Join-Path $Here "scripts\rat-art-release.py"
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python is required for Voice Deck Rat Art."
 }
