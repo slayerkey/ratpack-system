@@ -12,32 +12,28 @@ Exact packaged `.streamDeckPlugin` SHA256 from that release run:
 
 `54ac266a172e5622b29f1b30fe802f6b8ce3eb80734126822cbd5adb5664919f`
 
-The later host-audit tooling lives outside the packaged `.sdPlugin` runtime. The real smoke must record the exact Rat Dev commit it actually activates.
+The host diagnostic tooling lives outside the packaged `.sdPlugin` runtime. The real smoke must record the exact Rat Dev commit it actually activates.
 
 ## One-pass preferred test
 
-Start Discord Desktop and Stream Deck, join a real Discord voice channel with at least one other participant if available, then run:
+Start Discord Desktop and Stream Deck, join a real Discord voice channel with at least one other participant if available, then run exactly:
 
 ```text
 rat dev voice-deck
+rat audit voice-deck
 ```
 
-After Rat Dev succeeds:
+`rat dev` fetches the canonical product source, installs locked dependencies when needed, builds, tests, runs official Elgato validation, links the validated development plugin, and restarts it.
+
+`rat audit` then resolves the exact active Rat Dev source, checks the local Voice Deck build, manifest, profiles, Discord Desktop process, Discord IPC named pipes, Stream Deck process, plugin logs, and Stream Deck host logs. It saves `HOST_AUDIT_LATEST.txt` inside the Voice Deck product root. Keep that file if anything is wrong. Do not uninstall first because uninstalling a Stream Deck plugin also removes its plugin logs.
+
+If Discord authorization or live voice state is the unclear layer, run:
 
 ```text
-cd out\dev\worktrees\voice-deck\plugins\voice-deck
-npm run host:audit
+rat audit voice-deck --probe
 ```
 
-The audit saves `HOST_AUDIT_LATEST.txt`. Keep that file if anything is wrong. Do not uninstall first because uninstalling a Stream Deck plugin also removes its plugin logs.
-
-If Discord authorization or voice state is the unclear layer, run this diagnostic without changing mute/deafen automatically:
-
-```text
-npm run host:probe
-```
-
-`host:probe` uses the same development Discord transport path as Voice Deck, prints only redacted state, keeps credentials memory-only, and never prints token values. It isolates Discord IPC/auth/channel/roster behavior from Stream Deck rendering.
+The deep probe first runs the normal host audit, then uses the same development Discord transport path as Voice Deck. It prints only redacted state, keeps credentials memory-only, never prints token values, and never toggles mute or deafen automatically. It isolates Discord IPC, authorization, channel, roster, and speaking-event behavior from Stream Deck rendering.
 
 ## Required physical checks
 
@@ -60,7 +56,7 @@ npm run host:probe
 If anything fails, do not start a long reinstall/retry loop. Send only:
 
 1. `HOST_AUDIT_LATEST.txt`
-2. the full output of `npm run host:probe` if the Discord layer is involved
+2. the full output of `rat audit voice-deck --probe` if the Discord layer is involved
 3. one sentence describing the visible mismatch
 4. one screenshot only if the problem is visual
 
@@ -82,6 +78,6 @@ When complete, replace `Status: NOT RUN` with `Status: PASS` and record:
 * packaged plugin SHA256
 * date tested
 * any device/profile not physically available
-* whether `host:audit` finished PASS or WARN and why
+* whether `rat audit voice-deck` finished PASS or WARN and why
 
-Do not mark this file passed based only on mocks, CI, screenshots, `host:probe`, or `streamdeck validate`.
+Do not mark this file passed based only on mocks, CI, screenshots, `rat audit voice-deck --probe`, or `streamdeck validate`.
