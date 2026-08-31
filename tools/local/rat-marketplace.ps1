@@ -91,7 +91,13 @@ function Assert-ProductReleaseState {
     elseif ($boundary) {
         $message += " Required boundary: $boundary."
     }
-    $message += " Resolve the blocker and move products/$ProductSlug.json to READY_TO_SHIP before shipping. You can still run 'rat kit $ProductSlug' or 'rat stage $ProductSlug' for non-public preparation."
+    $message += " Resolve the blocker and move products/$ProductSlug.json to READY_TO_SHIP before shipping."
+    if ($Product.type -eq "icon_pack") {
+        $message += " You can still run 'rat kit $ProductSlug' for non-public review preparation."
+    }
+    else {
+        $message += " You can still run 'rat kit $ProductSlug' or 'rat stage $ProductSlug' for non-public preparation."
+    }
     throw $message
 }
 
