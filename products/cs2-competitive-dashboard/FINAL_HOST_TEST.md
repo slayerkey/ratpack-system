@@ -131,14 +131,18 @@ A provider with no matching public profile/data should show a clear not-found/pr
 
 ## Restart and recovery pass
 
+The final evidence parser deliberately uses only the **latest Stream Deck plugin process** so an older good process cannot hide a restart regression. Because restarting Stream Deck creates a new process segment, regenerate the automated evidence after that restart rather than relying on the earlier Deathmatch segment.
+
 1. Close CS2 completely.
 2. Confirm the dashboard eventually stops claiming a live packet connection.
-3. Relaunch CS2.
-4. Re-enter a normal game mode.
-5. Confirm live values reconnect without re-running setup or rewriting anything manually.
-6. Restart Stream Deck once and confirm the plugin returns to a working local listener/config state.
-7. After the Stream Deck restart, keep Stream Deck/plugin running for the final evidence command.
-8. Allow the configured online refresh to complete again, or press **Refresh Stats**, so the **latest plugin process** contains one Leetify + FACEIT both-ready event.
+3. Relaunch CS2 and re-enter a normal game mode.
+4. Confirm live values reconnect without re-running setup or rewriting anything manually.
+5. Restart Stream Deck once and confirm the plugin returns to a working local listener/config state.
+6. With the restarted Stream Deck process running, launch/re-enter CS2 again if needed and keep the Live Match profile active for **at least three minutes** so the latest process can reach the required 300-packet checkpoint.
+7. Confirm live values are still responsive after the Stream Deck restart.
+8. Press **Open Log Folder again after the Stream Deck restart** and confirm Explorer opens. The final evidence requires this event in the latest process segment.
+9. Allow the configured online refresh to complete again, or press **Refresh Stats**, so the latest process contains one Leetify + FACEIT both-ready event.
+10. Keep Stream Deck/plugin running for the final evidence command.
 
 ## One-command final physical release audit
 
@@ -169,10 +173,10 @@ The command first runs the normal core host audit, then requires and records:
 * no `unhandled rejection` signature
 * no `The request timed out` signature
 * no core GSI startup/listener/config/normalization failure signature
-* sustained live traffic reaching at least the 300-packet logged checkpoint
+* sustained live traffic reaching at least the 300-packet logged checkpoint in the latest process
 * **Open Log Folder** successfully exercised in the latest plugin process
 * live redacted localhost diagnostics reachable
-* one real provider refresh with **both Leetify and FACEIT `ready`**
+* one real provider refresh with **both Leetify and FACEIT `ready`** in the latest process
 * your explicit HS%, long-label, and restart/recovery attestations
 
 If all of that passes, it writes the local gitignored evidence file inside the Rat Dev worktree:
