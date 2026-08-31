@@ -38,6 +38,26 @@ The profile generator is deterministic and produces current V2 `.streamDeckProfi
 
 Voice Deck follows voice channel changes automatically.
 
+## Real host diagnostics
+
+After `rat dev voice-deck`, run these from the Voice Deck source directory when validating a real Windows host:
+
+```text
+npm run host:audit
+```
+
+This writes one shareable `HOST_AUDIT_LATEST.txt` covering the active source identity, manifest, profiles, Discord Desktop, Discord IPC named pipes, Stream Deck, plugin logs, and Stream Deck host logs.
+
+If the Discord transport itself is unclear, run:
+
+```text
+npm run host:probe
+```
+
+The probe exercises the same development Discord IPC/auth/channel/roster path as Voice Deck, prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
+
+Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. Neither diagnostic replaces the physical Stream Deck smoke.
+
 ## Release boundary
 
 Development uses the same proven Discord StreamKit RPC feasibility path as PackRat Voice Bridge. Public commercial release remains fail-closed until Discord grants the PackRat production application the required RPC scopes or explicitly permits the StreamKit production path. See `DISCORD_APPROVAL.md`.

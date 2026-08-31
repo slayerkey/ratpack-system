@@ -53,6 +53,12 @@ jobs:
         shell: pwsh
         run: npm test
 
+      - name: Validate host diagnostics
+        shell: pwsh
+        run: |
+          node --check scripts\discord-probe.mjs
+          .\scripts\host-audit.ps1 -StaticOnly
+
       - name: Verify immutable distribution and security boundary
         shell: pwsh
         run: |

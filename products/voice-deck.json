@@ -4,7 +4,7 @@
   "type": "plugin",
   "status": "qa_passed",
   "workflow_state": "BLOCKED",
-  "blocker": "Discord commercial RPC approval or explicit StreamKit reuse permission, plus real Windows Discord/Stream Deck packaged-plugin smoke",
+  "blocker": "Discord production RPC approval or explicit StreamKit commercial permission, plus REAL_WINDOWS_SMOKE.md Status: PASS",
   "price_usd": 9.99,
   "version": "1.0.0.0",
   "platform": "Elgato Stream Deck / Windows",
