@@ -1,8 +1,8 @@
-# PackRat Discord Voice Deck
+# PackRat Voice Deck
 
-PackRat Discord Voice Deck is the paid Stream Deck-native Discord voice dashboard and control plugin.
+PackRat Voice Deck is the paid Stream Deck-native Discord voice dashboard and control plugin.
 
-It is intentionally independent from PackRat Voice Bridge and PackRat Voice Panel. Discord Voice Deck owns one local Discord Desktop RPC session itself, normalizes that state once, and fans it out to every visible Stream Deck action.
+It is intentionally independent from PackRat Voice Bridge and PackRat Voice Panel. Voice Deck owns one local Discord Desktop RPC session itself, normalizes that state once, and fans it out to every visible Stream Deck action.
 
 ## Actions
 
@@ -32,11 +32,11 @@ The profile generator is deterministic and produces current V2 `.streamDeckProfi
 
 1. Install the plugin or run `rat dev voice-deck`.
 2. Keep Discord Desktop open on Windows.
-3. Add Discord Voice Deck actions or use an included profile.
+3. Add Voice Deck actions or use an included profile.
 4. Press Discord Connection if authorization is required.
 5. Join a Discord voice channel.
 
-Discord Voice Deck follows voice channel changes automatically.
+Voice Deck follows voice channel changes automatically.
 
 ## Real host diagnostics
 
@@ -54,7 +54,7 @@ If the Discord transport itself is unclear, run:
 rat audit voice-deck --probe
 ```
 
-The probe first runs the normal audit, then exercises the same development Discord IPC/auth/channel/roster path as Discord Voice Deck. It prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
+The probe first runs the normal audit, then exercises the same development Discord IPC/auth/channel/roster path as Voice Deck. It prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
 
 Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. Neither diagnostic replaces the physical Stream Deck smoke.
 
