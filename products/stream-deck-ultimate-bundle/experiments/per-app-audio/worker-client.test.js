@@ -11,14 +11,20 @@ const { AppAudioWorkerClient } = require("./worker-client.js");
     const workerPid = c.pid;
     assert(Number.isInteger(workerPid) && workerPid > 0);
 
+    // Foreground resolution shares the same persistent worker and has a stable structured contract.
+    const foreground = await c.foreground();
+    assert.deepEqual(foreground, { pid: 202, process: "Spotify" });
+    assert.equal(c.pid, workerPid);
+
     // Concurrent commands must remain correctly correlated over one persistent stdout stream.
-    const [all, discord, fuzzy, spotify] = await Promise.all([
-      c.list(), c.findExact("Discord.exe"), c.findExact("disc"), c.findExact("C:\\Apps\\Spotify.exe")
+    const [all, discord, fuzzy, spotify, foregroundAgain] = await Promise.all([
+      c.list(), c.findExact("Discord.exe"), c.findExact("disc"), c.findExact("C:\\Apps\\Spotify.exe"), c.foreground()
     ]);
     assert.equal(all.length, 3);
     assert.equal(discord.length, 2);
     assert.equal(fuzzy.length, 0);
     assert.equal(spotify.length, 1);
+    assert.equal(foregroundAgain.pid, 202);
     assert.equal(c.pid, workerPid);
 
     // Exact app write changes both Discord sessions but not Spotify.
@@ -56,7 +62,7 @@ const { AppAudioWorkerClient } = require("./worker-client.js");
     assert.equal(c.pid, workerPid);
     assert.equal((await c.list()).length, 3);
 
-    console.log("persistent app-audio worker passed: JSON framing, concurrency, exact targeting, repeated dial writes, graceful missing session, request-level error recovery");
+    console.log("persistent app-audio worker passed: JSON framing, foreground resolution, concurrency, exact targeting, repeated dial writes, graceful missing session, request-level error recovery");
   } finally {
     await c.close();
   }
