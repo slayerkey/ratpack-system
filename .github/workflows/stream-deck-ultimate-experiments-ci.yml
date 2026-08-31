@@ -34,6 +34,9 @@ jobs:
       - name: Stream Deck app-audio lifecycle controller
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
 
+      - name: Composed persistent Current App runtime
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
+
       - name: JavaScript syntax checks
         run: |
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
@@ -44,6 +47,8 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
@@ -68,10 +73,10 @@ jobs:
       - name: Persistent mock worker protocol and behavior
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
 
-      - name: Persistent native worker source fallback loads real Core Audio interop
+      - name: Persistent native worker source fallback loads Core Audio and foreground interop
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
 
-      - name: Build precompiled Core Audio helper assembly
+      - name: Build precompiled Core Audio and foreground helper assembly
         shell: powershell
         run: |
           $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1'
@@ -80,6 +85,7 @@ jobs:
           if (-not $build.ok) { throw 'Precompiled helper build did not report ok' }
           if (-not (Test-Path -LiteralPath $build.path)) { throw "Precompiled helper missing: $($build.path)" }
           if ($build.type -ne 'PackRatAppAudio.Core') { throw "Unexpected helper type: $($build.type)" }
+          if ($build.foregroundType -ne 'PackRatAppAudio.Foreground') { throw "Unexpected foreground helper type: $($build.foregroundType)" }
           if ([string]::IsNullOrWhiteSpace([string]$build.sha256)) { throw 'Precompiled helper missing SHA256' }
           "PACKRAT_APP_AUDIO_DLL=$($build.path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "precompiled helper built: $($build.sizeBytes) bytes sha256=$($build.sha256)"
@@ -129,7 +135,8 @@ jobs:
           $report = $json | ConvertFrom-Json
           if ($report.schema -ne 1) { throw 'Packaged host report schema mismatch' }
           if ([string]::IsNullOrWhiteSpace([string]$report.status)) { throw 'Packaged host report missing status' }
-          if (Test-Path (Join-Path $env:PACKRAT_HOST_BUNDLE 'PackRatAppAudio.cs')) { throw 'Packaged host unexpectedly contains source' }
+          if (Test-Path (Join-Path $env:PACKRAT_HOST_BUNDLE 'PackRatAppAudio.cs')) { throw 'Packaged host unexpectedly contains Core Audio source' }
+          if (Test-Path (Join-Path $env:PACKRAT_HOST_BUNDLE 'PackRatForeground.cs')) { throw 'Packaged host unexpectedly contains foreground source' }
           Write-Host "source-free host bundle boot passed; status=$($report.status) endpointAvailable=$($report.endpointAvailable)"
 
       - name: Probe session enumeration when Windows runner exposes an audio endpoint
