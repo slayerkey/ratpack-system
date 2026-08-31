@@ -12,7 +12,7 @@ on:
 jobs:
   windows-per-app-audio:
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     permissions:
       contents: read
     steps:
@@ -28,22 +28,28 @@ jobs:
       - name: Shared cached/coalesced app-audio service
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.test.js
 
+      - name: Stream Deck Current App / named app surface semantics
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
+
       - name: JavaScript syntax checks
         run: |
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
 
-      - name: Parse experimental PowerShell wrappers
+      - name: Parse experimental PowerShell wrappers and real-host harness
         shell: powershell
         run: |
           foreach ($file in @(
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1',
-            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1'
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/real-host-smoke.ps1'
           )) {
             $errors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors)
@@ -64,6 +70,17 @@ jobs:
           Write-Host $result
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ($result -notmatch '"ok":true') { throw 'Compile probe did not return ok' }
+
+      - name: Real-host harness emits structured read-only audit without requiring CI audio hardware
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/real-host-smoke.ps1'
+          if ($LASTEXITCODE -ne 0) { throw "Read-only real-host harness exited $LASTEXITCODE" }
+          $report = $json | ConvertFrom-Json
+          if ($report.schema -ne 1) { throw 'Unexpected real-host report schema' }
+          if ($null -eq $report.endpointAvailable) { throw 'Missing endpointAvailable field' }
+          if ([string]::IsNullOrWhiteSpace([string]$report.status)) { throw 'Missing report status' }
+          Write-Host "real-host audit structure passed; hosted runner status=$($report.status) endpointAvailable=$($report.endpointAvailable)"
 
       - name: Probe session enumeration when Windows runner exposes an audio endpoint
         shell: powershell
