@@ -15,11 +15,14 @@ if (-not $Mock) {
     Add-Type -Path $AssemblyPath
     $backend = "assembly"
   } else {
-    $source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
-    Add-Type -Path $source
+    $coreSource = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
+    $foregroundSource = Join-Path $PSScriptRoot "PackRatForeground.cs"
+    Add-Type -Path $coreSource
+    Add-Type -Path $foregroundSource
     $backend = "source"
   }
   if (-not ("PackRatAppAudio.Core" -as [type])) { throw "PackRatAppAudio.Core failed to load" }
+  if (-not ("PackRatAppAudio.Foreground" -as [type])) { throw "PackRatAppAudio.Foreground failed to load" }
 }
 
 $mockSessions = @(
@@ -44,6 +47,12 @@ function Normalize-Process([string]$value) {
 function Get-Sessions {
   if ($Mock) { return @($mockSessions) }
   return @([PackRatAppAudio.Core]::List())
+}
+
+function Get-Foreground {
+  if ($Mock) { return [pscustomobject]@{ pid = 202; process = "Spotify" } }
+  $f = [PackRatAppAudio.Foreground]::Get()
+  return [pscustomobject]@{ pid = [int]$f.pid; process = [string]$f.process }
 }
 
 function Resolve-Exact([string]$match) {
@@ -107,6 +116,8 @@ while ($true) {
       break
     } elseif ($action -eq 'Ping') {
       Write-Response $id $true ([pscustomobject]@{ ready = $true; mock = [bool]$Mock; type = if ($Mock) { 'mock' } else { 'PackRatAppAudio.Core' }; backend = $backend })
+    } elseif ($action -eq 'Foreground') {
+      Write-Response $id $true (Get-Foreground)
     } elseif ($action -eq 'List') {
       Write-Response $id $true @(Get-Sessions)
     } elseif ($action -eq 'FindExact') {
