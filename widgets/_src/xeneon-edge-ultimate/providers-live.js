@@ -126,10 +126,33 @@ async function pollMedia() {
   renderContext();
 }
 
-function mediaAction(method) {
+function mediaAction(method, button) {
   var p = plugin("Mediadataprovider");
-  if (p && typeof p[method] === "function") {
-    try { p[method](); } catch (e) {}
+  if (!p || typeof p[method] !== "function") {
+    if (button) {
+      button.setAttribute("data-fired", "unavailable");
+      setTimeout(function(){ button.removeAttribute("data-fired"); }, 450);
+    }
+    pollMedia();
+    return false;
+  }
+  try {
+    p[method].call(p);
+    state.media.lastAction = method;
+    state.media.lastActionAt = Date.now();
+    if (button) {
+      button.setAttribute("data-fired", "true");
+      setTimeout(function(){ button.removeAttribute("data-fired"); }, 220);
+    }
+    setTimeout(pollMedia, 120);
+    setTimeout(pollMedia, 650);
+    return true;
+  } catch (e) {
+    if (button) {
+      button.setAttribute("data-fired", "error");
+      setTimeout(function(){ button.removeAttribute("data-fired"); }, 450);
+    }
+    return false;
   }
 }
 
