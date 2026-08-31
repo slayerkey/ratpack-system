@@ -10,7 +10,7 @@ properties RatPack depends on instead of trusting historical CI alone:
 * exact expected product counts
 * zero-warning/zero-failure QA
 * Marketplace product-name propagation
-* pinned staged license payload
+* pinned staged license content (newline-normalized across operating systems)
 * package icon provenance
 * review-kit product-mark provenance
 
@@ -51,6 +51,15 @@ def read_json(path: Path) -> Any:
 
 def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def canonical_text_bytes(value: bytes) -> bytes:
+    """Return UTF-8 text with BOM removed and all line endings normalized to LF."""
+    try:
+        text = value.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        fail(f"expected UTF-8 text payload: {exc}")
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
 
 
 def exact_visual_duplicate_groups(static_dir: Path) -> list[list[str]]:
@@ -206,11 +215,13 @@ def main() -> None:
     if not license_path.is_file():
         fail("package staging license.txt is missing")
     license_bytes = license_path.read_bytes()
-    staged_license_sha = sha256_bytes(license_bytes)
+    staged_license_raw_sha = sha256_bytes(license_bytes)
+    staged_license_sha = sha256_bytes(canonical_text_bytes(license_bytes))
     if staged_license_sha != expected_license_sha:
         fail(
-            "staged license payload drift: "
-            f"expected {expected_license_sha}, got {staged_license_sha}"
+            "staged license content drift: "
+            f"expected canonical {expected_license_sha}, got {staged_license_sha} "
+            f"(raw file SHA-256 {staged_license_raw_sha})"
         )
 
     staged_entries = read_json(staging / "icons.json")
@@ -271,8 +282,10 @@ def main() -> None:
         },
         "license": {
             "source": "package-staging/license.txt",
-            "expected_sha256": expected_license_sha,
-            "staged_sha256": staged_license_sha,
+            "expected_canonical_sha256": expected_license_sha,
+            "canonical_sha256": staged_license_sha,
+            "raw_file_sha256": staged_license_raw_sha,
+            "newline_normalized": True,
             "provenance_match": True,
         },
         "package_icon": {
@@ -291,7 +304,7 @@ def main() -> None:
         f"{static_count} static + {animated_count} animated = {len(staged_entries)} picker entries;",
         f"{unique_glyphs} distinct glyphs; {reuse_groups} reviewed reuse groups;",
         f"{unexpected_groups} unexpected structural groups; {len(duplicate_groups)} exact RGBA duplicate groups;",
-        f"license {staged_license_sha[:12]}...;",
+        f"license canonical {staged_license_sha[:12]}...;",
         f"review product mark {MARKETPLACE_APP_ICON_SIZE}x{MARKETPLACE_APP_ICON_SIZE}",
     )
 
