@@ -25,6 +25,35 @@ function Invoke-Step {
     }
 }
 
+function Resolve-PluginDirectory {
+    param(
+        [object]$Product,
+        [string]$SourceDir
+    )
+
+    # Most plugins keep exactly one checked-in *.sdPlugin folder at the source root.
+    # Multi-flavor products may instead build several bundles deterministically into
+    # out/. Those products declare ship_plugin_dir in products/<slug>.json so Rat
+    # Ship can select the exact shipping flavor without guessing.
+    if ($null -ne $Product.ship_plugin_dir -and ([string]$Product.ship_plugin_dir).Trim()) {
+        $relative = ([string]$Product.ship_plugin_dir).Trim() -replace '/', '\'
+        $candidate = Join-Path $SourceDir $relative
+        if (-not (Test-Path $candidate -PathType Container)) {
+            throw "Configured ship_plugin_dir for '$PluginSlug' does not exist after build: $candidate"
+        }
+        if ([System.IO.Path]::GetFileName($candidate) -notlike '*.sdPlugin') {
+            throw "Configured ship_plugin_dir for '$PluginSlug' must resolve to a *.sdPlugin directory: $candidate"
+        }
+        return (Resolve-Path $candidate).Path
+    }
+
+    $manifestDirs = @(Get-ChildItem -Path $SourceDir -Directory -Filter *.sdPlugin)
+    if ($manifestDirs.Count -ne 1) {
+        throw "Expected exactly one top-level *.sdPlugin directory under $SourceDir; found $($manifestDirs.Count). Multi-flavor products must declare ship_plugin_dir in products/$PluginSlug.json."
+    }
+    return $manifestDirs[0].FullName
+}
+
 if ($PluginSlug -notmatch '^[a-z0-9]+(?:-[a-z0-9]+)*$') {
     throw "Invalid Stream Deck plugin slug: $PluginSlug"
 }
@@ -53,16 +82,16 @@ $submission = Get-Content $submissionPath -Raw | ConvertFrom-Json
 if ($submission.type -ne "plugin" -or $submission.slug -ne $PluginSlug) {
     throw "submission.json does not match Stream Deck plugin '$PluginSlug'."
 }
+if ($null -ne $product.price_usd -and $null -ne $submission.price_usd -and [decimal]$submission.price_usd -ne [decimal]$product.price_usd) {
+    throw "submission.json price_usd ($($submission.price_usd)) does not match products/$PluginSlug.json ($($product.price_usd))."
+}
+if ($product.version -and $submission.version -and ([string]$submission.version) -ne ([string]$product.version)) {
+    throw "submission.json version ($($submission.version)) does not match products/$PluginSlug.json ($($product.version))."
+}
 
 Require-Command "node" "Install Node.js 24 or newer."
 Require-Command "npm" "Install Node.js 24 or newer."
 Require-Command "npx" "Install Node.js 24 or newer."
-
-$manifestDirs = @(Get-ChildItem -Path $sourceDir -Directory -Filter *.sdPlugin)
-if ($manifestDirs.Count -ne 1) {
-    throw "Expected exactly one *.sdPlugin directory under $sourceDir; found $($manifestDirs.Count)."
-}
-$pluginDir = $manifestDirs[0].FullName
 
 if (Test-Path $Destination) { Remove-Item $Destination -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -79,6 +108,9 @@ try {
     }
     Invoke-Step "build plugin and bundled assets" { & npm run build }
     Invoke-Step "run plugin tests" { & npm test }
+
+    $pluginDir = Resolve-PluginDirectory -Product $product -SourceDir $sourceDir
+    Write-Host "Local Rat Ship plugin: selected bundle $pluginDir" -ForegroundColor DarkGray
     Invoke-Step "official Elgato validation" { & npx streamdeck validate $pluginDir --no-update-check }
     Invoke-Step "official Elgato package" { & npx streamdeck pack $pluginDir --output $packageOut --force --no-update-check --no-file-list }
 }
