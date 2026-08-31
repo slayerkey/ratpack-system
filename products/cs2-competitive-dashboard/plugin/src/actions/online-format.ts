@@ -28,6 +28,12 @@ function fixed(value: number | undefined, digits = 2): string {
   return value === undefined || !Number.isFinite(value) ? "--" : value.toFixed(digits);
 }
 
+function leetifyRating(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return "--";
+  const rounded = value.toFixed(2);
+  return value < 0 ? rounded : `+${rounded}`;
+}
+
 function percent(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) return "--";
   const normalized = value <= 1 ? value * 100 : value;
@@ -108,7 +114,7 @@ export function competitiveDisplay(metric: CompetitiveMetric, online: OnlineProf
         : source.recentMatches[0];
       return match?.rating === undefined
         ? { label: "LEETIFY RATING", value: "--", subtitle: currentMap ? cleanMap(currentMap) : "NO MATCHES", tone: "muted" }
-        : { label: "LEETIFY RATING", value: fixed(match.rating, 2), subtitle: cleanMap(match.mapName) };
+        : { label: "LEETIFY RATING", value: leetifyRating(match.rating), subtitle: cleanMap(match.mapName) };
     }
   }
 }
