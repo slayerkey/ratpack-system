@@ -54,14 +54,21 @@ function baseDir(): string {
 }
 
 function readRuntimeFingerprint(): string | undefined {
-  try {
-    const file = path.join(process.cwd(), "build-info.json");
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as { runtimeFingerprint?: unknown };
-    const value = typeof parsed.runtimeFingerprint === "string" ? parsed.runtimeFingerprint.trim().toLowerCase() : "";
-    return /^[a-f0-9]{64}$/.test(value) ? value : undefined;
-  } catch {
-    return undefined;
+  const candidates = [path.join(process.cwd(), "build-info.json")];
+  if (process.argv[1]) {
+    candidates.push(path.resolve(path.dirname(process.argv[1]), "..", "build-info.json"));
   }
+
+  for (const file of [...new Set(candidates)]) {
+    try {
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as { runtimeFingerprint?: unknown };
+      const value = typeof parsed.runtimeFingerprint === "string" ? parsed.runtimeFingerprint.trim().toLowerCase() : "";
+      if (/^[a-f0-9]{64}$/.test(value)) return value;
+    } catch {
+      // Try the next launch-layout candidate. Missing build-info is reported by release evidence.
+    }
+  }
+  return undefined;
 }
 
 function safeDetail(value: unknown): unknown {
