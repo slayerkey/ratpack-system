@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -12,6 +12,7 @@ export interface HostDiagnosticSnapshot {
   product: "CS2 Competitive Dashboard";
   flavor: ProductFlavor;
   version: string;
+  runtimeFingerprint?: string;
   pid: number;
   pluginDir: string;
   logPath: string;
@@ -42,7 +43,7 @@ export interface HostDiagnosticSnapshot {
   lastEvent?: string;
 }
 
-type DiagnosticPatch = Partial<Omit<HostDiagnosticSnapshot, "product" | "flavor" | "version" | "pid" | "pluginDir" | "logPath" | "processStartedAt">>;
+type DiagnosticPatch = Partial<Omit<HostDiagnosticSnapshot, "product" | "flavor" | "version" | "runtimeFingerprint" | "pid" | "pluginDir" | "logPath" | "processStartedAt">>;
 
 function baseDir(): string {
   if (process.env.PACKRAT_CS2_DATA_DIR) return path.resolve(process.env.PACKRAT_CS2_DATA_DIR);
@@ -50,6 +51,17 @@ function baseDir(): string {
     return path.join(process.env.APPDATA, "PackRat", PRODUCT_DIR);
   }
   return path.join(os.homedir(), ".packrat", PRODUCT_DIR);
+}
+
+function readRuntimeFingerprint(): string | undefined {
+  try {
+    const file = path.join(process.cwd(), "build-info.json");
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { runtimeFingerprint?: unknown };
+    const value = typeof parsed.runtimeFingerprint === "string" ? parsed.runtimeFingerprint.trim().toLowerCase() : "";
+    return /^[a-f0-9]{64}$/.test(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function safeDetail(value: unknown): unknown {
@@ -86,6 +98,7 @@ export class HostDiagnostics {
     product: "CS2 Competitive Dashboard",
     flavor: this.flavor,
     version: "0.1.0.0",
+    runtimeFingerprint: readRuntimeFingerprint(),
     pid: process.pid,
     pluginDir: process.cwd(),
     logPath: this.logPath,
@@ -107,6 +120,7 @@ export class HostDiagnostics {
     this.event("plugin process started", {
       flavor: this.flavor,
       version: this.state.version,
+      runtimeFingerprint: this.state.runtimeFingerprint,
       pid: process.pid,
       pluginDir: process.cwd(),
       node: process.version,
@@ -185,6 +199,7 @@ export class HostDiagnostics {
     return [
       `PackRat CS2 Competitive Dashboard ${s.flavor.toUpperCase()} diagnostics`,
       `Process: running (PID ${s.pid})`,
+      `Runtime fingerprint: ${s.runtimeFingerprint ?? "missing"}`,
       `Stream Deck connected: ${s.streamDeckConnected ? "yes" : "no"}`,
       `Settings channel: ${s.settingsChannel}`,
       `Setup stage: ${s.setupStage}`,
