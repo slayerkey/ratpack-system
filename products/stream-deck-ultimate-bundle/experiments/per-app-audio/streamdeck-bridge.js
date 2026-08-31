@@ -1,5 +1,6 @@
 "use strict";
 const { ACTION_UUID } = require("./action-spec.js");
+const { activeAppOptions } = require("./settings-model.js");
 
 function compactKeyTitle(visual = {}) {
   const status = String(visual.status || "");
@@ -32,14 +33,36 @@ class AppAudioActionBridge {
     if (!options.runtime) throw new Error("AppAudioActionBridge requires runtime");
     this.runtime = options.runtime;
     this.actionUUID = options.actionUUID || ACTION_UUID;
+    this.send = options.send || (() => {});
   }
 
   accepts(message = {}) {
     return String(message.action || "") === this.actionUUID;
   }
 
+  async _handlePropertyInspector(message) {
+    const payload = message.payload || {};
+    const command = String(payload.command || payload.type || "");
+    if (command !== "list-apps") return { handled: true, result: { ignored: true } };
+    await this.runtime.service.refresh(true);
+    const apps = this.runtime.service.lastError ? [] : activeAppOptions(this.runtime.service.sessions);
+    const response = {
+      event: "sendToPropertyInspector",
+      action: this.actionUUID,
+      context: String(message.context || ""),
+      payload: {
+        type: "app-options",
+        apps,
+        unavailable: !!this.runtime.service.lastError
+      }
+    };
+    this.send(response);
+    return { handled: true, result: response.payload };
+  }
+
   async handle(message = {}) {
     if (!this.accepts(message)) return { handled: false, result: null };
+    if (String(message.event || "") === "sendToPlugin") return this._handlePropertyInspector(message);
     return { handled: true, result: await this.runtime.handle(message) };
   }
 }
