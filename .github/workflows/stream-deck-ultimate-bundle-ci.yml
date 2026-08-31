@@ -6,6 +6,7 @@ on:
       - product/stream-deck-ultimate-bundle
     paths:
       - 'products/stream-deck-ultimate-bundle/**'
+      - '!products/stream-deck-ultimate-bundle/experiments/**'
       - '.github/workflows/stream-deck-ultimate-bundle-ci.yml'
   workflow_dispatch:
 
