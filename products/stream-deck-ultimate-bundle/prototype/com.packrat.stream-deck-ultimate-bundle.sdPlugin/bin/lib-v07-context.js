@@ -20,7 +20,7 @@ function imageData(rel) {
     return imageCache.get(rel);
   } catch { return ""; }
 }
-function send(ws, obj) { if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); }
+function send(ws, obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function setImage(ws, ctx, rel) {
   const image = imageData(rel);
   if (image) send(ws, { event: "setImage", context: ctx, payload: { image, target: 0 } });
