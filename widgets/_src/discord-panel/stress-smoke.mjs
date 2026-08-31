@@ -44,7 +44,7 @@ function member(index) {
       username: `crowded${index}`,
       discriminator: "0",
       global_name: null,
-      avatar: null,
+      avatar: index === 1 ? "fixture-avatar" : null,
       bot: false,
       flags: 0,
       premium_type: 0,
@@ -82,10 +82,20 @@ try {
       globalThis.textColor = "#ABCDEF";
       globalThis.accentColor = "#123456";
       globalThis.backgroundColor = "#010203";
+      globalThis.panelOpacity = 55;
+      globalThis.fontFamily = "consolas";
       globalThis.__PACKRAT_XSS__ = false;
     }, { fixture });
 
     const page = await context.newPage();
+    await page.route("https://cdn.discordapp.com/avatars/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" fill="#5865F2"/><circle cx="64" cy="50" r="24" fill="#fff"/><rect x="30" y="82" width="68" height="28" rx="14" fill="#fff"/></svg>',
+      });
+    });
+
     const pageErrors = [];
     const consoleErrors = [];
     page.on("pageerror", (error) => pageErrors.push(String(error?.stack || error)));
@@ -95,6 +105,10 @@ try {
 
     await page.goto(pathToFileURL(entry).href, { waitUntil: "load" });
     await page.waitForFunction(() => Boolean(globalThis.__PACKRAT_DISCORD_TEST__));
+    await page.waitForFunction(() => {
+      const image = document.querySelector(".avatar-wrap img");
+      return Boolean(image && image.complete && image.naturalWidth > 0);
+    });
     await page.waitForTimeout(1250);
 
     const metrics = await page.evaluate(() => {
@@ -102,6 +116,14 @@ try {
       const channel = document.getElementById("channelName");
       const root = getComputedStyle(document.documentElement);
       const speakerBefore = getComputedStyle(document.querySelector(".member-row.speaking .avatar-wrap"), "::before");
+      const avatarImage = document.querySelector(".avatar-wrap img");
+      const avatarWrap = avatarImage && avatarImage.closest(".avatar-wrap");
+      const avatarRow = avatarImage && avatarImage.closest(".member-row");
+      const avatarName = avatarRow && avatarRow.querySelector(".member-name");
+      const imageRect = avatarImage && avatarImage.getBoundingClientRect();
+      const wrapRect = avatarWrap && avatarWrap.getBoundingClientRect();
+      const nameRect = avatarName && avatarName.getBoundingClientRect();
+      const epsilon = 0.75;
       return {
         state: globalThis.__PACKRAT_DISCORD_TEST__.getState(),
         rowCount: document.querySelectorAll(".member-row").length,
@@ -118,7 +140,23 @@ try {
         textVar: root.getPropertyValue("--text").trim().toUpperCase(),
         accentVar: root.getPropertyValue("--accent").trim().toUpperCase(),
         bgVar: root.getPropertyValue("--bg").trim().toUpperCase(),
+        panelOpacityVar: Number.parseFloat(root.getPropertyValue("--panel-opacity")),
+        panelTopAlphaVar: Number.parseFloat(root.getPropertyValue("--panel-top-alpha")),
+        fontUiVar: root.getPropertyValue("--font-ui").trim(),
+        fontDisplayVar: root.getPropertyValue("--font-display").trim(),
+        stageBackground: getComputedStyle(document.getElementById("stage")).backgroundColor,
         speakerAnimation: speakerBefore.animationName,
+        avatarLoaded: Boolean(avatarImage && avatarImage.complete && avatarImage.naturalWidth > 0),
+        avatarImageWidth: imageRect ? imageRect.width : 0,
+        avatarImageHeight: imageRect ? imageRect.height : 0,
+        avatarWrapWidth: wrapRect ? wrapRect.width : 0,
+        avatarWrapHeight: wrapRect ? wrapRect.height : 0,
+        avatarContained: Boolean(imageRect && wrapRect &&
+          imageRect.left >= wrapRect.left - epsilon &&
+          imageRect.top >= wrapRect.top - epsilon &&
+          imageRect.right <= wrapRect.right + epsilon &&
+          imageRect.bottom <= wrapRect.bottom + epsilon),
+        avatarNameGap: imageRect && nameRect ? nameRect.left - imageRect.right : -999,
         xssFlag: Boolean(globalThis.__PACKRAT_XSS__),
         injectedElement: Boolean(document.getElementById("packrat-xss")),
         maliciousTextPresent: Array.from(document.querySelectorAll(".member-name")).some((node) => node.textContent.includes("<img id=\"packrat-xss\"")),
@@ -138,7 +176,15 @@ try {
     assert.equal(metrics.textVar, "#ABCDEF", `${slot.id}: iCUE text color did not apply`);
     assert.equal(metrics.accentVar, "#123456", `${slot.id}: iCUE accent color did not apply`);
     assert.equal(metrics.bgVar, "#010203", `${slot.id}: iCUE background color did not apply`);
+    assert.ok(Math.abs(metrics.panelOpacityVar - 0.55) < 0.0001, `${slot.id}: panel opacity setting did not apply`);
+    assert.ok(Math.abs(metrics.panelTopAlphaVar - (0.82 * 0.55)) < 0.0001, `${slot.id}: panel surface alpha did not follow opacity`);
+    assert.match(metrics.fontUiVar, /Consolas/i, `${slot.id}: UI font setting did not apply`);
+    assert.match(metrics.fontDisplayVar, /Consolas/i, `${slot.id}: display font setting did not apply`);
+    assert.equal(metrics.stageBackground, "rgba(0, 0, 0, 0)", `${slot.id}: stage did not remain transparent`);
     assert.equal(metrics.speakerAnimation, "none", `${slot.id}: prefers-reduced-motion did not disable speaking animation`);
+    assert.equal(metrics.avatarLoaded, true, `${slot.id}: real-image avatar fixture did not load`);
+    assert.equal(metrics.avatarContained, true, `${slot.id}: loaded avatar escaped its avatar wrapper (${metrics.avatarImageWidth}x${metrics.avatarImageHeight} in ${metrics.avatarWrapWidth}x${metrics.avatarWrapHeight})`);
+    assert.ok(metrics.avatarNameGap >= 4, `${slot.id}: loaded avatar overlaps member name (${metrics.avatarNameGap}px gap)`);
     assert.equal(metrics.xssFlag, false, `${slot.id}: member name executed injected script`);
     assert.equal(metrics.injectedElement, false, `${slot.id}: member name was parsed as HTML`);
     assert.equal(metrics.maliciousTextPresent, true, `${slot.id}: malicious-looking name was not rendered safely as text`);
@@ -175,4 +221,4 @@ try {
 }
 
 await fs.writeFile(path.join(artifactDir, "results.json"), JSON.stringify({ entry, results }, null, 2));
-console.log("DISCORD PANEL STRESS QA PASS: 50-member rosters across all eight XENEON sizes, member reachability, long Unicode text, HTML-injection safety, iCUE appearance settings, and reduced-motion behavior");
+console.log("DISCORD PANEL STRESS QA PASS: 50-member rosters across all eight XENEON sizes, real-image avatar containment/name separation, member reachability, long Unicode text, HTML-injection safety, iCUE color/opacity/font settings, transparency, and reduced-motion behavior");
