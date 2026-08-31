@@ -6,13 +6,15 @@ on:
       - product/stream-deck-ultimate-bundle
     paths:
       - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/**'
+      - 'products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js'
+      - 'products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js'
       - '.github/workflows/stream-deck-ultimate-v08-candidate-ci.yml'
   workflow_dispatch:
 
 jobs:
   windows-v08-prepromotion:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 14
     permissions:
       contents: read
     steps:
@@ -21,10 +23,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
 
       - name: v0.8 integration source syntax
         run: |
@@ -36,8 +34,6 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js
-          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v71.py
-          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/polish_context_art_v7.py
 
       - name: v0.8 staging PowerShell syntax
         shell: powershell
@@ -78,34 +74,6 @@ jobs:
           if ($candidate.helperSha256 -ne $env:PACKRAT_V08_DLL_SHA) { throw 'v0.8 candidate helper hash mismatch' }
           "PACKRAT_V08_CANDIDATE=$($candidate.candidateDir)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "staged v0.8 candidate: $($candidate.fileCount) files helper=$($candidate.helperSha256)"
-
-      - name: Generate v0.7.1 release art and profiles inside staged v0.8 only
-        shell: powershell
-        run: |
-          python -m pip install -r products/stream-deck-ultimate-bundle/prototype/requirements.txt
-          python products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v71.py "$env:PACKRAT_V08_CANDIDATE"
-          python products/stream-deck-ultimate-bundle/prototype/tools/polish_context_art_v7.py "$env:PACKRAT_V08_CANDIDATE"
-          $manifest = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'manifest.json') -Raw | ConvertFrom-Json
-          if ($manifest.Version -ne '0.8.0.0' -or $manifest.CodePath -ne 'bin/plugin-v08.cjs') { throw 'Asset generation changed v0.8 manifest identity' }
-          $profiles = @(Get-ChildItem -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'profiles') -Filter '*.streamDeckProfile' -File)
-          if ($profiles.Count -ne 8) { throw "Expected 8 generated profiles, found $($profiles.Count)" }
-          foreach ($rel in @(
-            'imgs/actions/smart-app/icon.png',
-            'imgs/actions/smart-app/icon@2x.png',
-            'imgs/actions/context/icon.png',
-            'imgs/actions/context/icon@2x.png',
-            'imgs/actions/audio/icon.png',
-            'imgs/actions/audio/icon@2x.png',
-            'imgs/actions/audio/key.png',
-            'imgs/actions/audio/key@2x.png',
-            'imgs/plugin/category.png',
-            'imgs/plugin/category@2x.png',
-            'imgs/plugin/marketplace.png',
-            'imgs/plugin/marketplace@2x.png'
-          )) {
-            if (-not (Test-Path -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE $rel))) { throw "Generated release asset missing: $rel" }
-          }
-          Write-Host "generated staged release assets and $($profiles.Count) profiles without changing v0.8 manifest"
 
       - name: Accepted v0.7.1 source remains byte-clean
         shell: powershell
@@ -155,49 +123,120 @@ jobs:
         shell: powershell
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-runtime-smoke.js "$env:PACKRAT_V08_CANDIDATE"
 
-      - name: Verify v0.8 candidate contract and packaged helper
+      - name: Verify Windows-staged v0.8 contract and helper
         shell: powershell
         run: |
           $manifest = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'manifest.json') -Raw | ConvertFrom-Json
           $info = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'V08_CANDIDATE_INFO.json') -Raw | ConvertFrom-Json
-          $acceptedManifest = 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/manifest.json'
-          $accepted = Get-Content -LiteralPath $acceptedManifest -Raw | ConvertFrom-Json
           $dll = Join-Path $env:PACKRAT_V08_CANDIDATE 'bin\app-audio\PackRatAppAudio.dll'
           $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll).Hash.ToLowerInvariant()
-          if ($accepted.Version -ne '0.7.1.0' -or $accepted.CodePath -ne 'bin/plugin-v071.cjs') { throw 'Accepted product is no longer the frozen v0.7.1 runtime' }
           if ($manifest.Version -ne '0.8.0.0' -or $manifest.CodePath -ne 'bin/plugin-v08.cjs') { throw 'Candidate manifest is not the expected v0.8 runtime' }
-          $app = @($manifest.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' })
-          if ($app.Count -ne 1) { throw "Expected exactly one App Volume action, found $($app.Count)" }
-          if ($app[0].PropertyInspectorPath -ne 'ui/property-inspector-app-volume.html') { throw 'App Volume must use its dedicated property inspector' }
+          if (@($manifest.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' }).Count -ne 1) { throw 'Expected exactly one App Volume action' }
           if ($sha -ne $info.helperSha256 -or $sha -ne $env:PACKRAT_V08_DLL_SHA) { throw 'v0.8 packaged helper integrity verification failed' }
-          $sourceFiles = @(Get-ChildItem -Recurse -File -LiteralPath $env:PACKRAT_V08_CANDIDATE | Where-Object { $_.Extension -eq '.cs' })
-          if ($sourceFiles.Count -ne 0) { throw 'v0.8 candidate unexpectedly contains C# source' }
           if (-not $info.lazyWorker) { throw 'v0.8 candidate must keep App Volume worker lazy' }
-          $profiles = @(Get-ChildItem -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'profiles') -Filter '*.streamDeckProfile' -File)
-          if ($profiles.Count -ne 8) { throw "v0.8 candidate profile count changed: $($profiles.Count)" }
-          Write-Host "v0.8 candidate contract verified: actions=$($manifest.Actions.Count) profiles=$($profiles.Count) helper=$sha lazyWorker=$($info.lazyWorker)"
+          Write-Host "Windows v0.8 runtime contract verified: actions=$($manifest.Actions.Count) helper=$sha lazyWorker=$($info.lazyWorker)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-v08-windows-stage
+          path: |
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/com.packrat.stream-deck-ultimate-bundle.sdPlugin/**
+            !products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/com.packrat.stream-deck-ultimate-bundle.sdPlugin/node_modules/**
+          if-no-files-found: error
+
+  validate-pack-v08:
+    needs: windows-v08-prepromotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    permissions:
+      contents: read
+    env:
+      PACKRAT_V08_CANDIDATE: products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stream-deck-ultimate-v08-windows-stage
+          path: ${{ env.PACKRAT_V08_CANDIDATE }}
+
+      - name: Generate proven v0.7.1 release art and profiles in staged v0.8
+        run: |
+          python -m pip install -r products/stream-deck-ultimate-bundle/prototype/requirements.txt
+          python products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v71.py "$PACKRAT_V08_CANDIDATE"
+          python products/stream-deck-ultimate-bundle/prototype/tools/polish_context_art_v7.py "$PACKRAT_V08_CANDIDATE"
+
+      - name: Verify release-stage identity, assets, profiles, and helper
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          p=Path(os.environ['PACKRAT_V08_CANDIDATE'])
+          m=json.loads((p/'manifest.json').read_text())
+          info=json.loads((p/'V08_CANDIDATE_INFO.json').read_text())
+          assert m['UUID']=='com.packrat.stream-deck-ultimate-bundle'
+          assert m['Version']=='0.8.0.0'
+          assert m['CodePath']=='bin/plugin-v08.cjs'
+          app=[a for a in m['Actions'] if a['UUID']=='com.packrat.stream-deck-ultimate-bundle.app-audio']
+          assert len(app)==1
+          assert app[0]['PropertyInspectorPath']=='ui/property-inspector-app-volume.html'
+          profiles=list((p/'profiles').glob('*.streamDeckProfile'))
+          assert len(profiles)==8, len(profiles)
+          required=[
+            'imgs/actions/smart-app/icon.png','imgs/actions/smart-app/icon@2x.png',
+            'imgs/actions/context/icon.png','imgs/actions/context/icon@2x.png',
+            'imgs/actions/audio/icon.png','imgs/actions/audio/icon@2x.png',
+            'imgs/actions/audio/key.png','imgs/actions/audio/key@2x.png',
+            'imgs/plugin/category.png','imgs/plugin/category@2x.png',
+            'imgs/plugin/marketplace.png','imgs/plugin/marketplace@2x.png'
+          ]
+          missing=[x for x in required if not (p/x).is_file()]
+          assert not missing, missing
+          dll=p/'bin/app-audio/PackRatAppAudio.dll'
+          sha=hashlib.sha256(dll.read_bytes()).hexdigest()
+          assert sha==info['helperSha256']
+          assert info['lazyWorker'] is True
+          assert not list(p.rglob('*.cs'))
+          print(f'release-stage v0.8 verified: actions={len(m["Actions"])} profiles={len(profiles)} helper={sha}')
+          PY
+          git diff --exit-code -- products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: Install locked staged runtime dependency
+        working-directory: ${{ env.PACKRAT_V08_CANDIDATE }}
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+      - name: Staged JavaScript syntax
+        run: |
+          node --check "$PACKRAT_V08_CANDIDATE/bin/plugin-v08.cjs"
+          node --check "$PACKRAT_V08_CANDIDATE/bin/lib-v08-app-audio.js"
+          node --check "$PACKRAT_V08_CANDIDATE/bin/app-audio/runtime-factory.js"
+          node --check "$PACKRAT_V08_CANDIDATE/bin/app-audio/streamdeck-bridge.js"
+          node --check "$PACKRAT_V08_CANDIDATE/bin/app-audio/worker-client.js"
 
       - name: Install Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
 
       - name: Officially validate v0.8 candidate
-        shell: powershell
-        run: streamdeck validate "$env:PACKRAT_V08_CANDIDATE" --force-update-check
+        run: streamdeck validate "$PACKRAT_V08_CANDIDATE" --force-update-check
 
       - name: Officially pack v0.8 prepromotion candidate
-        shell: powershell
         run: |
-          $output = Join-Path (Split-Path -Parent $env:PACKRAT_V08_CANDIDATE) 'packed'
-          New-Item -ItemType Directory -Force -Path $output | Out-Null
-          streamdeck pack "$env:PACKRAT_V08_CANDIDATE" --output "$output" --force --no-file-list
-          $packed = @(Get-ChildItem -LiteralPath $output -Filter '*.streamDeckPlugin' -File)
-          if ($packed.Count -ne 1) { throw "Expected one packed v0.8 candidate, found $($packed.Count)" }
-          Write-Host "packed v0.8 prepromotion candidate: $($packed[0].FullName) size=$($packed[0].Length)"
+          mkdir -p products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/packed
+          streamdeck pack "$PACKRAT_V08_CANDIDATE" --output products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/packed --force --no-file-list
+          test $(find products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/packed -name '*.streamDeckPlugin' | wc -l) -eq 1
 
       - uses: actions/upload-artifact@v4
         with:
           name: stream-deck-ultimate-v0.8-prepromotion-candidate
           path: |
-            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/packed/*.streamDeckPlugin
-            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/com.packrat.stream-deck-ultimate-bundle.sdPlugin/V08_CANDIDATE_INFO.json
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/packed/*.streamDeckPlugin
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-release-stage/com.packrat.stream-deck-ultimate-bundle.sdPlugin/V08_CANDIDATE_INFO.json
           if-no-files-found: error
