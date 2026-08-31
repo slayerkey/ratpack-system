@@ -2,7 +2,7 @@
 setlocal
 
 set "_RAT_NEEDS_BOOTSTRAP="
-for %%A in (dev audit ship submit stage kit ship-cloud kit-cloud) do (
+for %%A in (dev ship submit stage kit ship-cloud kit-cloud) do (
   if /I "%~1"=="%%A" set "_RAT_NEEDS_BOOTSTRAP=1"
 )
 
@@ -42,7 +42,7 @@ if /I "%~1"=="dev" (
     echo Rat Dev failed. No new validated development build was activated.
     if exist "%~dp0tools\local\rat-dev-open.ps1" (
       echo Opening the local development folder for inspection only...
-      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2"
+      %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\local\rat-dev-open.ps1" "%~2" >nul 2>&1
     )
     exit /b 1
   )

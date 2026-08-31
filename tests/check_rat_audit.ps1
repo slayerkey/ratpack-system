@@ -90,8 +90,11 @@ exit 0
     }
 
     $cmd = Get-Content $RatCmd -Raw
-    if ($cmd -notmatch 'for %%A in \(dev audit ship') {
-        throw "rat.cmd does not bootstrap the audit command."
+    if ($cmd -notmatch 'for %%A in \(dev ship submit stage kit ship-cloud kit-cloud\)') {
+        throw "rat.cmd bootstrap command set changed unexpectedly."
+    }
+    if ($cmd -match 'for %%A in \([^\r\n]*\baudit\b') {
+        throw "rat audit must remain read-only and must not require canonical checkout bootstrap."
     }
     if ($cmd -notmatch 'if /I "%~1"=="audit"') {
         throw "rat.cmd does not route the audit command."
