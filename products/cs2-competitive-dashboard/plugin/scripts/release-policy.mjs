@@ -17,6 +17,28 @@ validateProfileRegistrations(liteManifest, "lite");
 await validateProfileArchives(proDir, proManifest, "pro");
 await validateProfileArchives(liteDir, liteManifest, "lite");
 
+const canonicalNotices = await readFile("static/THIRD_PARTY_NOTICES.txt", "utf8");
+for (const marker of [
+  "@elgato/streamdeck 2.1.2",
+  "@elgato/schemas 0.4.16",
+  "@elgato/utils 0.6.0",
+  "ws 8.21.3",
+  "zod 3.25.76",
+  "Copyright (c) Corsair Memory Inc.",
+  "Copyright (c) 2023 Corsair Memory Inc.",
+  "Copyright (c) 2011 Einar Otto Stangvik",
+  "Copyright (c) 2013 Arnout Kazemier and contributors",
+  "Copyright (c) 2016 Luigi Pinca and contributors",
+  "Copyright (c) 2025 Colin McDonnell",
+  "The above copyright notice and this permission notice shall be included in all"
+]) {
+  assert(canonicalNotices.includes(marker), `Canonical third-party notices missing ${marker}`);
+}
+for (const [dir, flavor] of [[proDir, "Pro"], [liteDir, "Lite"]]) {
+  const packagedNotices = await readFile(path.join(dir, "THIRD_PARTY_NOTICES.txt"), "utf8");
+  assert(packagedNotices === canonicalNotices, `${flavor} package third-party notices do not match canonical source`);
+}
+
 const liteConfig = await readFile(path.join(liteDir, "ui", "build-config.js"), "utf8");
 for (const metric of ["score", "health", "money", "map"]) assert(liteConfig.includes(`\"${metric}\"`), `Lite missing allowed metric ${metric}`);
 for (const forbidden of ["kills", "deaths", "adr", "hs", "record", "premier", "current-map-rank", "elo", "recent-record"]) {
@@ -68,7 +90,7 @@ for (const dir of [proDir, liteDir]) {
   }
 }
 
-console.log("Release policy OK: Pro/Lite feature gates, bundled profiles, customer-owned provider keys, and provider no-storage policy passed.");
+console.log("Release policy OK: Pro/Lite feature gates, bundled profiles, third-party notices, customer-owned provider keys, and provider no-storage policy passed.");
 
 function validateProfileRegistrations(manifest, flavor) {
   const profiles = manifest.Profiles ?? [];
