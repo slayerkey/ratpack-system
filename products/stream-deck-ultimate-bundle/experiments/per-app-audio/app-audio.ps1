@@ -2,17 +2,41 @@ param(
   [ValidateSet("List","Find","SetVolume","AdjustVolume","Mute","Unmute","ToggleMute","Compile")]
   [string]$Action = "List",
   [string]$Match = "",
-  [int]$Value = 0
+  [int]$Value = 0,
+  [string]$AssemblyPath = ""
 )
 
 $ErrorActionPreference = "Stop"
-$source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
+$backend = "existing"
+$loadedPath = ""
+
 if (-not ("PackRatAppAudio.Core" -as [type])) {
-  Add-Type -Path $source
+  $candidateAssemblies = @()
+  if (-not [string]::IsNullOrWhiteSpace($AssemblyPath)) {
+    if (-not [IO.Path]::IsPathRooted($AssemblyPath)) { $AssemblyPath = Join-Path (Get-Location) $AssemblyPath }
+    $candidateAssemblies += [IO.Path]::GetFullPath($AssemblyPath)
+  } else {
+    $candidateAssemblies += (Join-Path $PSScriptRoot "PackRatAppAudio.dll")
+    $candidateAssemblies += (Join-Path $PSScriptRoot "build\PackRatAppAudio.dll")
+  }
+  $precompiled = $candidateAssemblies | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  if ($precompiled) {
+    Add-Type -Path $precompiled
+    $backend = "assembly"
+    $loadedPath = [IO.Path]::GetFullPath($precompiled)
+  } else {
+    $source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
+    if (-not (Test-Path -LiteralPath $source)) { throw "PackRatAppAudio helper source and precompiled assembly are both missing" }
+    Add-Type -Path $source
+    $backend = "source"
+    $loadedPath = [IO.Path]::GetFullPath($source)
+  }
 }
 
+if (-not ("PackRatAppAudio.Core" -as [type])) { throw "PackRatAppAudio.Core failed to load" }
+
 if ($Action -eq "Compile") {
-  [pscustomobject]@{ ok = $true; type = "PackRatAppAudio.Core" } | ConvertTo-Json -Compress
+  [pscustomobject]@{ ok = $true; type = "PackRatAppAudio.Core"; backend = $backend; path = $loadedPath } | ConvertTo-Json -Compress
   exit 0
 }
 
