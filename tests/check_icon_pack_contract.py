@@ -66,6 +66,7 @@ def main() -> None:
     finalizer = FINALIZER.read_text(encoding="utf-8")
     compile(finalizer, str(FINALIZER), "exec")
     for needle in (
+        "MARKETPLACE_APP_ICON_SIZE = 288",
         "exact_visual_duplicate_groups",
         "structural-reuse-report.json",
         "staged icon.svg does not match the pinned product source icon.svg",
