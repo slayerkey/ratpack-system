@@ -102,16 +102,17 @@ function New-LabIcon([string]$Path,[int]$Size,[string]$Text,[bool]$Transparent =
     else { $g.Clear([System.Drawing.Color]::FromArgb(255,24,27,31)) }
     $pad = [Math]::Max(2,[int]($Size * 0.08))
     $penWidth = [Math]::Max(1,[single]($Size * 0.045))
-    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255,69,226,124)),$penWidth
+    $pen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(255,69,226,124),[single]$penWidth)
     try { $g.DrawEllipse($pen,$pad,$pad,$Size-(2*$pad)-1,$Size-(2*$pad)-1) } finally { $pen.Dispose() }
     $fontSize = [Math]::Max(6,[single]($Size * 0.25))
-    $font = New-Object System.Drawing.Font "Segoe UI",$fontSize,[System.Drawing.FontStyle]::Bold,[System.Drawing.GraphicsUnit]::Pixel
-    $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-    $format = New-Object System.Drawing.StringFormat
+    $font = [System.Drawing.Font]::new("Segoe UI",[single]$fontSize,[System.Drawing.FontStyle]::Bold,[System.Drawing.GraphicsUnit]::Pixel)
+    $brush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::White)
+    $format = [System.Drawing.StringFormat]::new()
     try {
       $format.Alignment = [System.Drawing.StringAlignment]::Center
       $format.LineAlignment = [System.Drawing.StringAlignment]::Center
-      $g.DrawString($Text,$font,$brush,(New-Object System.Drawing.RectangleF 0,0,$Size,$Size),$format)
+      $rect = [System.Drawing.RectangleF]::new([single]0,[single]0,[single]$Size,[single]$Size)
+      $g.DrawString($Text,$font,$brush,$rect,$format)
     } finally {
       $format.Dispose(); $brush.Dispose(); $font.Dispose()
     }
