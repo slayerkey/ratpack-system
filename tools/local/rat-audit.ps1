@@ -8,17 +8,46 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Worktree = Join-Path $RepoRoot "out\dev\worktrees\$Slug"
+$StatePath = Join-Path $RepoRoot "out\dev\state\$Slug.json"
+$RegistrationPath = Join-Path $RepoRoot "plugins\$Slug\rat-dev.json"
 $Probe = [string]::Equals($Mode, "--probe", [System.StringComparison]::OrdinalIgnoreCase)
 
 if ($Mode -and -not $Probe) {
     throw "Unknown Rat Audit option '$Mode'. Supported option: --probe"
 }
 
-if (-not (Test-Path $Worktree -PathType Container)) {
-    throw "No Rat Dev worktree exists for '$Slug'. Run 'rat dev $Slug' first, then rerun 'rat audit $Slug'."
+function Read-JsonFile {
+    param([string]$Path)
+    if (-not (Test-Path $Path -PathType Leaf)) { return $null }
+    try { return (Get-Content $Path -Raw | ConvertFrom-Json) }
+    catch { throw "Invalid JSON file: $Path" }
 }
 
-function Get-GitValue {
+function Find-AuditScript {
+    param(
+        [string]$SearchRoot,
+        [string]$PreferredRoot
+    )
+
+    $preferred = @()
+    if ($PreferredRoot) { $preferred += (Join-Path $PreferredRoot "scripts\host-audit.ps1") }
+    $preferred += (Join-Path $SearchRoot "scripts\host-audit.ps1")
+    foreach ($path in $preferred | Select-Object -Unique) {
+        if (Test-Path $path -PathType Leaf) { return (Resolve-Path $path).Path }
+    }
+
+    $matches = @(Get-ChildItem $SearchRoot -Filter "host-audit.ps1" -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/](node_modules|\.git)[\\/]' } |
+        Sort-Object { $_.FullName.Length })
+    if ($matches.Count -eq 1) { return $matches[0].FullName }
+    if ($matches.Count -gt 1) {
+        $paths = ($matches | Select-Object -ExpandProperty FullName) -join [Environment]::NewLine
+        throw "Multiple host audit scripts were found for '$Slug'. Rat Audit will not guess:`n$paths"
+    }
+    throw "'$Slug' does not expose scripts/host-audit.ps1 in its active Rat Dev source. This product does not support 'rat audit' yet."
+}
+
+function Get-InternalGitValue {
     param([string[]]$Arguments)
     $gitMarker = Join-Path $Worktree ".git"
     if (-not (Test-Path $gitMarker)) { return "unknown" }
@@ -35,24 +64,48 @@ function Get-GitValue {
     return "unknown"
 }
 
-function Find-AuditScript {
-    $preferred = @(
-        (Join-Path $Worktree "plugins\$Slug\scripts\host-audit.ps1"),
-        (Join-Path $Worktree "scripts\host-audit.ps1")
-    )
-    foreach ($path in $preferred) {
-        if (Test-Path $path -PathType Leaf) { return (Resolve-Path $path).Path }
+function Resolve-AuditTarget {
+    $registration = Read-JsonFile $RegistrationPath
+    $isExternal = $registration -and [bool]$registration.repository -and [string]$registration.type -eq "streamdeck-plugin"
+
+    if ($isExternal) {
+        $state = Read-JsonFile $StatePath
+        if (-not $state -or -not $state.plugin_path) {
+            throw "No successful active Rat Dev deployment state exists for external product '$Slug'. Run 'rat dev $Slug' first."
+        }
+        $pluginPath = [string]$state.plugin_path
+        if (-not (Test-Path $pluginPath -PathType Container)) {
+            throw "The recorded active Rat Dev plugin path no longer exists for '$Slug': $pluginPath. Run 'rat dev $Slug' to create a fresh validated deployment."
+        }
+        $productRoot = Split-Path $pluginPath -Parent
+        $auditPath = Find-AuditScript -SearchRoot $productRoot -PreferredRoot $productRoot
+        return [PSCustomObject]@{
+            AuditPath = $auditPath
+            ProductRoot = $productRoot
+            Commit = if ($state.commit) { [string]$state.commit } else { "unknown" }
+            Branch = if ($state.ref) { [string]$state.ref } else { "unknown" }
+            SourceKind = "external active build"
+            PluginPath = $pluginPath
+        }
     }
 
-    $matches = @(Get-ChildItem $Worktree -Filter "host-audit.ps1" -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '[\\/](node_modules|\.git)[\\/]' } |
-        Sort-Object { $_.FullName.Length })
-    if ($matches.Count -eq 1) { return $matches[0].FullName }
-    if ($matches.Count -gt 1) {
-        $paths = ($matches | Select-Object -ExpandProperty FullName) -join [Environment]::NewLine
-        throw "Multiple host audit scripts were found for '$Slug'. Rat Audit will not guess:`n$paths"
+    if (-not (Test-Path $Worktree -PathType Container)) {
+        throw "No Rat Dev worktree exists for '$Slug'. Run 'rat dev $Slug' first, then rerun 'rat audit $Slug'."
     }
-    throw "'$Slug' does not expose scripts/host-audit.ps1 in its Rat Dev worktree. This product does not support 'rat audit' yet."
+    $preferredRoot = Join-Path $Worktree "plugins\$Slug"
+    $auditPath = Find-AuditScript -SearchRoot $Worktree -PreferredRoot $preferredRoot
+    $productRoot = Split-Path (Split-Path $auditPath -Parent) -Parent
+    $commit = Get-InternalGitValue @("rev-parse", "HEAD")
+    $branch = Get-InternalGitValue @("branch", "--show-current")
+    if ($branch -eq "unknown" -or [string]::IsNullOrWhiteSpace($branch)) { $branch = "detached" }
+    return [PSCustomObject]@{
+        AuditPath = $auditPath
+        ProductRoot = $productRoot
+        Commit = $commit
+        Branch = $branch
+        SourceKind = "RatPack worktree"
+        PluginPath = $null
+    }
 }
 
 function Invoke-ChildPowerShell {
@@ -70,23 +123,21 @@ function Invoke-ChildPowerShell {
     }
 }
 
-$auditPath = Find-AuditScript
-$productRoot = Split-Path (Split-Path $auditPath -Parent) -Parent
-$commit = Get-GitValue @("rev-parse", "HEAD")
-$branch = Get-GitValue @("branch", "--show-current")
-if ($branch -eq "unknown" -or [string]::IsNullOrWhiteSpace($branch)) { $branch = "detached" }
+$target = Resolve-AuditTarget
 
 Write-Host "Rat Audit: $Slug" -ForegroundColor Cyan
-Write-Host "Source commit: $commit"
-Write-Host "Source branch: $branch"
-Write-Host "Product root: $productRoot"
-Write-Host "Audit script: $auditPath"
+Write-Host "Source kind:   $($target.SourceKind)"
+Write-Host "Source commit: $($target.Commit)"
+Write-Host "Source branch: $($target.Branch)"
+Write-Host "Product root:  $($target.ProductRoot)"
+if ($target.PluginPath) { Write-Host "Active plugin: $($target.PluginPath)" }
+Write-Host "Audit script:  $($target.AuditPath)"
 Write-Host ""
 
-Invoke-ChildPowerShell $auditPath
+Invoke-ChildPowerShell $target.AuditPath
 
 if ($Probe) {
-    $packagePath = Join-Path $productRoot "package.json"
+    $packagePath = Join-Path $target.ProductRoot "package.json"
     if (-not (Test-Path $packagePath -PathType Leaf)) {
         throw "'$Slug' passed its host audit but has no package.json for the optional probe."
     }
@@ -100,7 +151,7 @@ if ($Probe) {
 
     Write-Host ""
     Write-Host "Running $Slug deep host probe..." -ForegroundColor Cyan
-    Push-Location $productRoot
+    Push-Location $target.ProductRoot
     try {
         & npm run host:probe
         if ($LASTEXITCODE -ne 0) {
