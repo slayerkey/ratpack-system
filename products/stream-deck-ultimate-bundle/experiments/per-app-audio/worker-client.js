@@ -81,6 +81,7 @@ class AppAudioWorkerClient {
   }
 
   ping() { return this.request("Ping"); }
+  foreground() { return this.request("Foreground"); }
   list() { return this.request("List"); }
   findExact(match) { return this.request("FindExact", { match: String(match || "") }); }
   setVolume(match, value) { return this.request("SetVolume", { match: String(match || ""), value: Number(value || 0) }); }
