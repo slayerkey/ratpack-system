@@ -34,6 +34,9 @@ jobs:
       - name: App Volume shadow action and settings UX
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.test.js
 
+      - name: Experimental App Volume property inspector
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/property-inspector.test.js
+
       - name: Strict v0.8 App Volume promotion gate
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/promotion-gate.test.js
 
@@ -51,6 +54,7 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/action-spec.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/property-inspector.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/promotion-gate.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/promotion-gate.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
