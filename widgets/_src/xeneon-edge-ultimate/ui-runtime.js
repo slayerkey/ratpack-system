@@ -1,6 +1,7 @@
 function renderAll() {
+  var cfg = settings();
   renderHealth(); renderWeather(); renderAgenda(); renderNetwork(); renderFocus(); renderContext();
-  setText("smartPerfState", settings().smartMode ? (Date.now()<state.manualHoldUntil?"HOLD":"AUTO") : "MANUAL");
+  setText("smartPerfState", cfg.smartMode && cfg.startMode === "auto" ? (Date.now()<state.manualHoldUntil?"HOLD":"AUTO") : "MANUAL");
   drawPerformanceGraph(); drawNetworkSpark(); drawWeatherSpark();
 }
 
@@ -21,10 +22,17 @@ function bindUi() {
   byId("focusReset").addEventListener("click", resetFocus);
   byId("drawerClose").addEventListener("click", closeDrawer);
   byId("drawerBackdrop").addEventListener("click", closeDrawer);
+  byId("drawerBody").addEventListener("click", function(event){
+    var button = event.target.closest && event.target.closest("[data-media-action]");
+    if (!button || !byId("drawerBody").contains(button)) return;
+    event.preventDefault();
+    mediaAction(button.getAttribute("data-media-action"), button);
+  });
   window.addEventListener("resize", applySlot);
 }
 
 function startTimers() {
+  state.timers.push(setInterval(syncSettings,250));
   state.timers.push(setInterval(updateClock,1000));
   state.timers.push(setInterval(pollSensors,1000));
   state.timers.push(setInterval(pollFps,1000));
@@ -72,10 +80,10 @@ async function start() {
   startTimers();
 }
 
-globalThis.icueEvents = {
+var icueEvents = globalThis.icueEvents = {
   onICUEInitialized: function () {
     start();
-    applySettings(false);
+    syncSettings(true);
     refreshWeather(true);
     refreshCalendar(true);
     discoverSensors().then(pollSensors);
@@ -83,17 +91,32 @@ globalThis.icueEvents = {
     pollMedia();
   },
   onDataUpdated: function () {
-    applySettings(false);
-    discoverSensors().then(pollSensors);
-    refreshWeather(true);
-    refreshCalendar(true);
-    renderAll();
+    syncSettings(true);
   }
 };
 
-globalThis.pluginSensorsdataproviderEvents = { onInitialized: function () { discoverSensors().then(pollSensors); } };
-globalThis.pluginFpsdataproviderEvents = { onInitialized: function () { pollFps(); } };
-globalThis.pluginMediadataproviderEvents = { onInitialized: function () { pollMedia(); } };
+var pluginSensorsdataproviderEvents = globalThis.pluginSensorsdataproviderEvents = {
+  onInitialized: function () { discoverSensors().then(pollSensors); }
+};
+var pluginFpsdataproviderEvents = globalThis.pluginFpsdataproviderEvents = {
+  onInitialized: function () { pollFps(); }
+};
+var pluginMediadataproviderEvents = globalThis.pluginMediadataproviderEvents = {
+  onInitialized: function () { pollMedia(); }
+};
+
+try {
+  if (typeof iCUE_initialized !== "undefined" && iCUE_initialized) icueEvents.onICUEInitialized();
+} catch (e) {}
+try {
+  if (typeof pluginSensorsdataprovider_initialized !== "undefined" && pluginSensorsdataprovider_initialized) pluginSensorsdataproviderEvents.onInitialized();
+} catch (e2) {}
+try {
+  if (typeof pluginFpsdataprovider_initialized !== "undefined" && pluginFpsdataprovider_initialized) pluginFpsdataproviderEvents.onInitialized();
+} catch (e3) {}
+try {
+  if (typeof pluginMediadataprovider_initialized !== "undefined" && pluginMediadataprovider_initialized) pluginMediadataproviderEvents.onInitialized();
+} catch (e4) {}
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
 else start();
