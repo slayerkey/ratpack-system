@@ -42,7 +42,20 @@ test("competitive actions use current GSI map and provider rank labels", () => {
   assert.equal(competitiveDisplay("recent-result", online).value, "WIN");
   assert.equal(competitiveDisplay("recent-result", online).subtitle, "MIRAGE 13-8");
   assert.equal(competitiveDisplay("win-rate", online).value, "54%");
-  assert.equal(competitiveDisplay("leetify-rating", online).value, "0.41");
+  assert.equal(competitiveDisplay("leetify-rating", online).value, "+0.41");
+});
+
+test("Leetify rating preserves provider sign display for positive zero and negative values", () => {
+  const online = ready();
+  online.leetify.recentMatches = [
+    { id: "positive", source: "matchmaking", mapName: "de_mirage", rating: 0.66 },
+    { id: "zero", source: "matchmaking", mapName: "de_nuke", rating: 0 },
+    { id: "negative", source: "matchmaking", mapName: "de_ancient", rating: -2.79 }
+  ];
+
+  assert.equal(competitiveDisplay("leetify-rating", online, "de_mirage").value, "+0.66");
+  assert.equal(competitiveDisplay("leetify-rating", online, "de_nuke").value, "+0.00");
+  assert.equal(competitiveDisplay("leetify-rating", online, "de_ancient").value, "-2.79");
 });
 
 test("FACEIT actions expose normalized provider metrics", () => {
