@@ -12,7 +12,7 @@ on:
 jobs:
   windows-v08-prepromotion:
     runs-on: windows-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
       - name: v0.8 integration source syntax
         run: |
@@ -32,6 +36,8 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js
+          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v71.py
+          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/polish_context_art_v7.py
 
       - name: v0.8 staging PowerShell syntax
         shell: powershell
@@ -72,6 +78,34 @@ jobs:
           if ($candidate.helperSha256 -ne $env:PACKRAT_V08_DLL_SHA) { throw 'v0.8 candidate helper hash mismatch' }
           "PACKRAT_V08_CANDIDATE=$($candidate.candidateDir)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "staged v0.8 candidate: $($candidate.fileCount) files helper=$($candidate.helperSha256)"
+
+      - name: Generate v0.7.1 release art and profiles inside staged v0.8 only
+        shell: powershell
+        run: |
+          python -m pip install -r products/stream-deck-ultimate-bundle/prototype/requirements.txt
+          python products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v71.py "$env:PACKRAT_V08_CANDIDATE"
+          python products/stream-deck-ultimate-bundle/prototype/tools/polish_context_art_v7.py "$env:PACKRAT_V08_CANDIDATE"
+          $manifest = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.Version -ne '0.8.0.0' -or $manifest.CodePath -ne 'bin/plugin-v08.cjs') { throw 'Asset generation changed v0.8 manifest identity' }
+          $profiles = @(Get-ChildItem -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'profiles') -Filter '*.streamDeckProfile' -File)
+          if ($profiles.Count -ne 8) { throw "Expected 8 generated profiles, found $($profiles.Count)" }
+          foreach ($rel in @(
+            'imgs/actions/smart-app/icon.png',
+            'imgs/actions/smart-app/icon@2x.png',
+            'imgs/actions/context/icon.png',
+            'imgs/actions/context/icon@2x.png',
+            'imgs/actions/audio/icon.png',
+            'imgs/actions/audio/icon@2x.png',
+            'imgs/actions/audio/key.png',
+            'imgs/actions/audio/key@2x.png',
+            'imgs/plugin/category.png',
+            'imgs/plugin/category@2x.png',
+            'imgs/plugin/marketplace.png',
+            'imgs/plugin/marketplace@2x.png'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE $rel))) { throw "Generated release asset missing: $rel" }
+          }
+          Write-Host "generated staged release assets and $($profiles.Count) profiles without changing v0.8 manifest"
 
       - name: Accepted v0.7.1 source remains byte-clean
         shell: powershell
@@ -139,7 +173,9 @@ jobs:
           $sourceFiles = @(Get-ChildItem -Recurse -File -LiteralPath $env:PACKRAT_V08_CANDIDATE | Where-Object { $_.Extension -eq '.cs' })
           if ($sourceFiles.Count -ne 0) { throw 'v0.8 candidate unexpectedly contains C# source' }
           if (-not $info.lazyWorker) { throw 'v0.8 candidate must keep App Volume worker lazy' }
-          Write-Host "v0.8 candidate contract verified: actions=$($manifest.Actions.Count) helper=$sha lazyWorker=$($info.lazyWorker)"
+          $profiles = @(Get-ChildItem -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'profiles') -Filter '*.streamDeckProfile' -File)
+          if ($profiles.Count -ne 8) { throw "v0.8 candidate profile count changed: $($profiles.Count)" }
+          Write-Host "v0.8 candidate contract verified: actions=$($manifest.Actions.Count) profiles=$($profiles.Count) helper=$sha lazyWorker=$($info.lazyWorker)"
 
       - name: Install Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
