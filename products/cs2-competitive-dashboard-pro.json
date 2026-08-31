@@ -3,11 +3,16 @@
   "name": "CS2 Competitive Dashboard Pro",
   "type": "plugin",
   "status": "built",
-  "workflow_state": "TESTING",
+  "workflow_state": "BLOCKED_EXTERNAL",
+  "blocker": "Final physical Windows host confirmation, real customer-owned Leetify and FACEIT key smoke tests, official Leetify attribution asset, and written Leetify paid-use clearance are still required.",
+  "final_boundary": "Move to READY_TO_SHIP only after products/cs2-competitive-dashboard/FINAL_HOST_TEST.md passes and npm run release:final reports FINAL MARKETPLACE GATE: PASS.",
+  "marketplace_launch": "held_until_release_gates_pass",
   "price_usd": 14.99,
   "version": "0.1.0.0",
   "platform": "Elgato Stream Deck / Windows",
   "source": "products/cs2-competitive-dashboard/plugin",
+  "ship_plugin_dir": "out/com.packrat.cs2-competitive-dashboard-pro.sdPlugin",
+  "submission": "products/cs2-competitive-dashboard/plugin/submission.json",
   "plugin_uuid": "com.packrat.cs2-competitive-dashboard-pro",
   "build_flavor": "pro",
   "minimum_stream_deck": "6.9",
@@ -59,6 +64,7 @@
     "real customer-owned Leetify and FACEIT key smoke test",
     "real normal-player CS2 GSI payload smoke test",
     "physical Stream Deck smoke test where required",
-    "deterministic Rat Art candidate passes visual review"
+    "deterministic Rat Art candidate passes visual review",
+    "Rat Ship resolves the explicit Pro build flavor and complete Marketplace media kit"
   ]
 }
