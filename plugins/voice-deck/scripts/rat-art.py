@@ -15,7 +15,17 @@ MUTED = (165, 176, 192)
 ACCENT = (43, 232, 106)
 DANGER = (255, 91, 109)
 DISCORD = (88, 101, 242)
+BORDER = (46, 54, 67)
 RAT = REPO / "tools" / "art" / "assets" / "ratpack-icon-transparent.png"
+
+AVATAR_COLORS = [
+    (88, 101, 242),
+    (87, 162, 224),
+    (226, 122, 92),
+    (87, 178, 138),
+    (190, 95, 153),
+    (145, 128, 222),
+]
 
 
 def font(size: int, bold: bool = False):
@@ -33,9 +43,9 @@ def background():
     img = Image.new("RGBA", (W, H), (*BG, 255))
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(glow)
-    d.ellipse((420, 240, 1500, 1320), fill=(*ACCENT, 22))
-    d.ellipse((1180, -420, 2200, 620), fill=(*DISCORD, 25))
-    return Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(170)))
+    d.ellipse((350, 260, 1450, 1360), fill=(*ACCENT, 20))
+    d.ellipse((1280, -420, 2200, 560), fill=(*DISCORD, 26))
+    return Image.alpha_composite(img, glow.filter(ImageFilter.GaussianBlur(180)))
 
 
 def signature(img):
@@ -44,164 +54,316 @@ def signature(img):
         box = rat.getbbox()
         if box:
             rat = rat.crop(box)
-        scale = min(46 / rat.width, 46 / rat.height)
+        scale = min(44 / rat.width, 44 / rat.height)
         rat = rat.resize((max(1, int(rat.width * scale)), max(1, int(rat.height * scale))), Image.Resampling.LANCZOS)
-        img.alpha_composite(rat, ((W - rat.width) // 2, 896 - rat.height // 2))
+        img.alpha_composite(rat, ((W - rat.width) // 2, 900 - rat.height // 2))
     else:
         d = ImageDraw.Draw(img)
-        d.ellipse((W // 2 - 14, 882, W // 2 + 14, 910), fill=ACCENT)
+        d.ellipse((W // 2 - 13, 886, W // 2 + 13, 912), fill=ACCENT)
 
 
 def title(img, headline, sub=""):
     d = ImageDraw.Draw(img)
-    d.text((96, 74), headline, font=font(58, True), fill=WHITE)
+    d.text((96, 68), headline, font=font(58, True), fill=WHITE)
     if sub:
-        d.text((98, 146), sub, font=font(25), fill=MUTED)
+        d.text((98, 142), sub, font=font(23), fill=MUTED)
 
 
-def key(draw, x, y, label, state="", accent=ACCENT, avatar=None, speaking=False, icon=None, size=126):
-    r = 24
-    draw.rounded_rectangle((x, y, x + size, y + size), r, fill=KEY, outline=accent if speaking else (46, 54, 67), width=6 if speaking else 2)
-    if avatar:
-        draw.ellipse((x + 31, y + 18, x + 95, y + 82), fill=avatar)
-        if speaking:
-            draw.ellipse((x + 27, y + 14, x + 99, y + 86), outline=accent, width=5)
+def chip(draw, x, y, value):
+    box = draw.textbbox((0, 0), value, font=font(17, True))
+    width = box[2] - box[0] + 34
+    draw.rounded_rectangle((x, y, x + width, y + 34), 17, fill=(18, 23, 34), outline=(65, 75, 96), width=1)
+    draw.text((x + 17, y + 17), value, font=font(17, True), fill=DISCORD, anchor="lm")
+
+
+def sc(value, size):
+    return int(round(value * size / 144.0))
+
+
+def discord_mark(draw, cx, cy, radius, fill=WHITE):
+    """Deterministic Discord-style default-profile glyph for mock member avatars."""
+    body_w = radius * 1.28
+    body_h = radius * 0.82
+    left = cx - body_w / 2
+    top = cy - body_h / 2
+    right = cx + body_w / 2
+    bottom = cy + body_h / 2
+    draw.rounded_rectangle((left, top, right, bottom), max(2, int(radius * 0.25)), fill=fill)
+    eye_r = max(1, int(radius * 0.10))
+    eye_y = cy - radius * 0.04
+    draw.ellipse((cx - radius * 0.27 - eye_r, eye_y - eye_r, cx - radius * 0.27 + eye_r, eye_y + eye_r), fill=BG)
+    draw.ellipse((cx + radius * 0.27 - eye_r, eye_y - eye_r, cx + radius * 0.27 + eye_r, eye_y + eye_r), fill=BG)
+    draw.arc((cx - radius * 0.36, cy - radius * 0.10, cx + radius * 0.36, cy + radius * 0.40), 20, 160, fill=BG, width=max(1, int(radius * 0.09)))
+
+
+def draw_avatar(draw, x, y, size, color, speaking=False, accent=ACCENT):
+    cx, cy = x + sc(72, size), y + sc(59, size)
+    avatar_r, ring_r = sc(31, size), sc(35, size)
+    ring_color = accent if speaking else (53, 60, 74)
+    ring_width = max(3, sc(6 if speaking else 3, size))
+    draw.ellipse((cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r), outline=ring_color, width=ring_width)
+    draw.ellipse((cx - avatar_r, cy - avatar_r, cx + avatar_r, cy + avatar_r), fill=color)
+    discord_mark(draw, cx, cy, avatar_r * 0.70, WHITE)
+
+
+def draw_mic(draw, x, y, size, active=False):
+    color = DANGER if active else ACCENT
+    cx, cy = x + sc(72, size), y + sc(55, size)
+    width = sc(25, size)
+    height = sc(39, size)
+    draw.rounded_rectangle((cx - width // 2, cy - height // 2, cx + width // 2, cy + height // 2), max(3, sc(11, size)), outline=color, width=max(3, sc(5, size)))
+    draw.arc((cx - sc(27, size), cy - sc(6, size), cx + sc(27, size), cy + sc(42, size)), 0, 180, fill=color, width=max(3, sc(5, size)))
+    draw.line((cx, cy + sc(23, size), cx, cy + sc(40, size)), fill=color, width=max(3, sc(5, size)))
+    draw.line((cx - sc(15, size), cy + sc(40, size), cx + sc(15, size), cy + sc(40, size)), fill=color, width=max(3, sc(5, size)))
+    if active:
+        draw.line((cx - sc(29, size), cy - sc(29, size), cx + sc(29, size), cy + sc(29, size)), fill=DANGER, width=max(4, sc(7, size)))
+
+
+def draw_headphones(draw, x, y, size, active=False):
+    color = DANGER if active else ACCENT
+    cx, cy = x + sc(72, size), y + sc(57, size)
+    radius = sc(30, size)
+    draw.arc((cx - radius, cy - radius, cx + radius, cy + radius), 180, 360, fill=color, width=max(4, sc(6, size)))
+    ear_w, ear_h = sc(12, size), sc(28, size)
+    draw.rounded_rectangle((cx - radius - sc(4, size), cy, cx - radius + ear_w, cy + ear_h), max(2, sc(4, size)), fill=color)
+    draw.rounded_rectangle((cx + radius - ear_w, cy, cx + radius + sc(4, size), cy + ear_h), max(2, sc(4, size)), fill=color)
+    if active:
+        draw.line((cx - sc(31, size), cy - sc(28, size), cx + sc(31, size), cy + sc(30, size)), fill=DANGER, width=max(4, sc(7, size)))
+
+
+def draw_channel(draw, x, y, size):
+    discord_mark(draw, x + sc(72, size), y + sc(55, size), sc(26, size), DISCORD)
+
+
+def draw_ready(draw, x, y, size):
+    cx, cy = x + sc(72, size), y + sc(55, size)
+    radius = sc(15, size)
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=ACCENT)
+    hole = sc(4, size)
+    draw.ellipse((cx - hole, cy - hole, cx + hole, cy + hole), fill=KEY)
+
+
+def draw_empty(draw, x, y, size):
+    cx, cy = x + sc(72, size), y + sc(53, size)
+    color = (114, 124, 143)
+    radius = sc(11, size)
+    draw.ellipse((cx - radius - sc(13, size), cy - radius, cx + radius - sc(13, size), cy + radius), outline=color, width=max(2, sc(3, size)))
+    draw.ellipse((cx - radius + sc(14, size), cy - radius, cx + radius + sc(14, size), cy + radius), outline=color, width=max(2, sc(3, size)))
+    draw.arc((cx - sc(37, size), cy, cx - sc(1, size), cy + sc(33, size)), 180, 360, fill=color, width=max(2, sc(3, size)))
+    draw.arc((cx + sc(1, size), cy, cx + sc(37, size), cy + sc(33, size)), 180, 360, fill=color, width=max(2, sc(3, size)))
+
+
+def key(draw, x, y, label, state="", accent=ACCENT, avatar=None, speaking=False, icon=None, size=126, active=False):
+    radius = max(10, sc(22, size))
+    outline = accent if speaking else BORDER
+    outline_width = max(2, sc(6 if speaking else 2, size))
+    draw.rounded_rectangle((x, y, x + size, y + size), radius, fill=KEY, outline=outline, width=outline_width)
+
+    if avatar is not None:
+        draw_avatar(draw, x, y, size, avatar, speaking, accent)
     elif icon == "mute":
-        draw.ellipse((x + 46, y + 26, x + 80, y + 60), outline=accent, width=5)
-        draw.line((x + 63, y + 59, x + 63, y + 77), fill=accent, width=5)
-        draw.line((x + 48, y + 77, x + 78, y + 77), fill=accent, width=5)
+        draw_mic(draw, x, y, size, active)
     elif icon == "deafen":
-        draw.arc((x + 38, y + 24, x + 88, y + 76), 190, 350, fill=accent, width=6)
-        draw.rounded_rectangle((x + 35, y + 52, x + 48, y + 76), 5, fill=accent)
-        draw.rounded_rectangle((x + 78, y + 52, x + 91, y + 76), 5, fill=accent)
+        draw_headphones(draw, x, y, size, active)
     elif icon == "channel":
-        draw.ellipse((x + 51, y + 36, x + 75, y + 60), fill=DISCORD)
-        draw.ellipse((x + 35, y + 44, x + 54, y + 63), fill=DISCORD)
-        draw.ellipse((x + 72, y + 44, x + 91, y + 63), fill=DISCORD)
+        draw_channel(draw, x, y, size)
+    elif icon == "empty":
+        draw_empty(draw, x, y, size)
     else:
-        draw.ellipse((x + 48, y + 25, x + 78, y + 55), fill=accent)
-    f = font(15, True)
-    draw.text((x + size / 2, y + 95), label, font=f, fill=WHITE, anchor="mm")
+        draw_ready(draw, x, y, size)
+
+    if label:
+        draw.text((x + size / 2, y + sc(108, size)), label, font=font(max(10, sc(13, size)), True), fill=WHITE, anchor="mm")
     if state:
-        draw.text((x + size / 2, y + 114), state, font=font(11), fill=accent if speaking else MUTED, anchor="mm")
+        state_color = DANGER if active else accent if speaking else MUTED
+        draw.text((x + size / 2, y + sc(127, size)), state, font=font(max(8, sc(9, size)), True), fill=state_color, anchor="mm")
 
 
-def deck(img, x=715, y=248, cols=5, rows=3, keys=None, key_size=126, gap=18):
+def deck_dimensions(cols=5, rows=3, key_size=126, gap=18, pad=30):
+    return pad * 2 + cols * key_size + (cols - 1) * gap, pad * 2 + rows * key_size + (rows - 1) * gap
+
+
+def deck(img, x, y, cols=5, rows=3, keys=None, key_size=126, gap=18):
     keys = keys or []
     pad = 30
-    width = pad * 2 + cols * key_size + (cols - 1) * gap
-    height = pad * 2 + rows * key_size + (rows - 1) * gap
+    width, height = deck_dimensions(cols, rows, key_size, gap, pad)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((x, y, x + width, y + height), 42, fill=(20, 23, 29), outline=(55, 61, 73), width=3)
     d.rounded_rectangle((x + 12, y + 12, x + width - 12, y + height - 12), 34, outline=(5, 6, 9), width=3)
     for idx in range(cols * rows):
         row, col = divmod(idx, cols)
-        spec = keys[idx] if idx < len(keys) else {"label": ""}
+        spec = keys[idx] if idx < len(keys) else {"label": f"SLOT {idx + 1}", "state": "EMPTY", "icon": "empty"}
         key(d, x + pad + col * (key_size + gap), y + pad + row * (key_size + gap), size=key_size, **spec)
+
+
+def room_keys():
+    return [
+        {"label": "VC1", "state": "4 MEMBERS", "icon": "channel", "accent": DISCORD},
+        {"label": "MUTE", "state": "READY", "icon": "mute"},
+        {"label": "DEAFEN", "state": "READY", "icon": "deafen"},
+        {"label": "ALEX", "state": "SPEAKING", "avatar": AVATAR_COLORS[0], "speaking": True},
+        {"label": "VOICE DECK", "state": "READY", "icon": "ready"},
+        {"label": "YOU", "state": "SPOKE", "avatar": AVATAR_COLORS[1]},
+        {"label": "MORIEN", "state": "LISTENING", "avatar": AVATAR_COLORS[2]},
+        {"label": "MUGZEY", "state": "DEAFENED", "avatar": AVATAR_COLORS[3], "active": True},
+        {"label": "SLOT 5", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 6", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 7", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 8", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 9", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 10", "state": "EMPTY", "icon": "empty"},
+        {"label": "SLOT 11", "state": "EMPTY", "icon": "empty"},
+    ]
 
 
 def hero(out):
     img = background()
-    title(img, "Your Discord voice room. On Stream Deck.", "Live members, speaking state, mute, deafen and automatic channel following.")
-    keys = [
-        {"label":"General","state":"5 IN VOICE","icon":"channel","accent":DISCORD},
-        {"label":"Mute","state":"LIVE","icon":"mute"},
-        {"label":"Deafen","state":"LISTENING","icon":"deafen"},
-        {"label":"Avery","state":"SPEAKING","avatar":(124,94,225),"speaking":True},
-        {"label":"Ready","state":"DISCORD","accent":ACCENT},
-        {"label":"Mika","state":"LISTENING","avatar":(76,148,209)},
-        {"label":"Jules","state":"MUTED","avatar":(203,117,91)},
-        {"label":"Noah","state":"LISTENING","avatar":(81,173,130)},
-        {"label":"Sam","state":"LISTENING","avatar":(204,95,154)},
-        {"label":"Kai","state":"LISTENING","avatar":(146,130,224)},
-        {"label":"Rin","state":"LISTENING","avatar":(72,156,166)},
-        {"label":"Eli","state":"LISTENING","avatar":(185,132,75)},
-        {"label":"Zoe","state":"LISTENING","avatar":(92,130,214)},
-        {"label":"Ivy","state":"LISTENING","avatar":(187,91,131)},
-        {"label":"Max","state":"LISTENING","avatar":(92,163,104)},
-    ]
-    deck(img, x=905, y=258, keys=keys, key_size=112, gap=14)
+    title(img, "Your Discord voice room. On Stream Deck.", "See members, speaking state, mute, deafen and channel changes without opening Discord.")
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((96, 278, 770, 720), 36, fill=(*PANEL, 235), outline=(50,59,72), width=2)
-    d.text((142, 330), "VOICE DECK", font=font(21, True), fill=ACCENT)
-    d.text((142, 380), "SEE WHO'S IN VOICE", font=font(33, True), fill=WHITE)
-    d.text((142, 432), "SEE WHO'S TALKING", font=font(33, True), fill=WHITE)
-    d.text((142, 484), "MUTE + DEAFEN", font=font(33, True), fill=WHITE)
-    d.text((142, 536), "FOLLOW CHANNELS", font=font(33, True), fill=WHITE)
-    d.text((142, 618), "$9.99  ONE TIME", font=font(23, True), fill=DISCORD)
-    d.line((80, 850, 1840, 850), fill=(59,69,84), width=1)
+    chip(d, 96, 205, "PACKRAT VOICE DECK FOR DISCORD")
+    d.rounded_rectangle((96, 280, 755, 720), 36, fill=(*PANEL, 238), outline=(50, 59, 72), width=2)
+    d.text((140, 332), "VOICE CONTROL, AT A GLANCE", font=font(20, True), fill=ACCENT)
+    for i, value in enumerate(["SEE WHO'S IN VOICE", "SEE WHO'S TALKING", "MUTE + DEAFEN", "FOLLOW CHANNELS"]):
+        d.text((140, 390 + i * 55), value, font=font(31, True), fill=WHITE)
+    d.text((140, 640), "$9.99  ONE TIME", font=font(22, True), fill=DISCORD)
+
+    keys = room_keys()
+    deck_width, _ = deck_dimensions(5, 3, 112, 14, 30)
+    deck_x = 1020
+    deck(img, deck_x, 270, keys=keys, key_size=112, gap=14)
+    d.text((deck_x + deck_width / 2, 755), "REALISTIC 4 PERSON ROOM  •  EMPTY SLOTS STAY CLEAR", font=font(16, True), fill=MUTED, anchor="mm")
+    d.line((80, 850, 1840, 850), fill=(59, 69, 84), width=1)
     signature(img)
     img.convert("RGB").save(out / "02_cover.png", quality=95)
 
 
 def features(out):
-    img = background(); title(img, "One voice console. Twelve focused actions.", "Built around what you actually need while Discord stays in the background.")
-    d=ImageDraw.Draw(img)
-    items=[("Live Members","Dynamic participant keys follow your current voice channel."),("Speaking State","A thick illuminated ring reads instantly at key size."),("Mute + Deafen","Dedicated keys plus a configurable combined control."),("Automatic Channels","Switch voice rooms and the dashboard repopulates itself."),("Local Discord","Discord Desktop RPC only. No user token scraping.")]
-    for i,(h,s) in enumerate(items):
-        y=245+i*110
-        d.rounded_rectangle((120,y,1800,y+82),24,fill=(*PANEL,235),outline=(45,53,66),width=2)
-        d.ellipse((150,y+24,184,y+58),fill=ACCENT if i!=4 else DISCORD)
-        d.text((220,y+18),h,font=font(25,True),fill=WHITE)
-        d.text((220,y+49),s,font=font(18),fill=MUTED)
-    signature(img); img.convert("RGB").save(out/"03_gallery_01.png",quality=95)
+    img = background()
+    title(img, "The states you actually care about", "A dashboard that changes with the call instead of a wall of generic member dots.")
+    d = ImageDraw.Draw(img)
+    examples = [
+        ("CURRENT CHANNEL", {"label": "VC1", "state": "4 MEMBERS", "icon": "channel", "accent": DISCORD}, "Always know which room you're in."),
+        ("SPEAKER SPOTLIGHT", {"label": "ALEX", "state": "SPEAKING", "avatar": AVATAR_COLORS[0], "speaking": True}, "The active speaker is impossible to miss."),
+        ("VOICE STATE", {"label": "MUGZEY", "state": "DEAFENED", "avatar": AVATAR_COLORS[3], "active": True}, "Mute and deafen state reads instantly."),
+        ("CONNECTION", {"label": "VOICE DECK", "state": "READY", "icon": "ready"}, "A clear ready state when Discord is connected."),
+    ]
+    for i, (heading, spec, desc) in enumerate(examples):
+        x = 125 + i * 445
+        d.rounded_rectangle((x, 255, x + 390, 710), 30, fill=(*PANEL, 235), outline=(48, 57, 70), width=2)
+        key(d, x + 90, 310, size=210, **spec)
+        d.text((x + 195, 570), heading, font=font(21, True), fill=ACCENT if i == 1 else WHITE, anchor="mm")
+        d.multiline_text((x + 195, 618), desc, font=font(17), fill=MUTED, anchor="ma", align="center", spacing=5)
+    signature(img)
+    img.convert("RGB").save(out / "03_gallery_01.png", quality=95)
 
 
 def dashboard(out):
-    img=background(); title(img,"A full Discord voice dashboard","Purpose-built layouts instead of filler profiles.")
-    keys=[
-        {"label":"General","state":"8 IN VOICE","icon":"channel","accent":DISCORD},{"label":"Mute","state":"LIVE","icon":"mute"},{"label":"Deafen","state":"LISTENING","icon":"deafen"},{"label":"Mika","state":"SPEAKING","avatar":(76,148,209),"speaking":True},{"label":"Ready","state":"DISCORD"},
-    ]
-    for name,color in [("Jules",(203,117,91)),("Noah",(81,173,130)),("Sam",(204,95,154)),("Kai",(146,130,224)),("Rin",(72,156,166)),("Eli",(185,132,75)),("Zoe",(92,130,214)),("Ivy",(187,91,131)),("Max",(92,163,104)),("Avery",(124,94,225))]: keys.append({"label":name,"state":"LISTENING","avatar":color})
-    deck(img,x=440,y=245,keys=keys,key_size=130,gap=20)
-    d=ImageDraw.Draw(img); d.text((960,790),"VOICE DASHBOARD  •  MK.2 / 15 KEY",font=font(23,True),fill=MUTED,anchor="mm")
-    signature(img); img.convert("RGB").save(out/"04_gallery_02.png",quality=95)
+    img = background()
+    title(img, "A real Discord voice dashboard", "Designed around a normal call: a few people, clear states, and unused slots that stay quiet.")
+    keys = room_keys()
+    deck_width, _ = deck_dimensions(5, 3, 130, 18, 30)
+    x = (W - deck_width) // 2
+    deck(img, x, 240, keys=keys, key_size=130, gap=18)
+    d = ImageDraw.Draw(img)
+    d.text((960, 800), "VOICE DASHBOARD  •  MK.2 / 15 KEY", font=font(22, True), fill=MUTED, anchor="mm")
+    signature(img)
+    img.convert("RGB").save(out / "04_gallery_02.png", quality=95)
 
 
 def spotlight(out):
-    img=background(); title(img,"Speaking should be obvious","Stable roster keys plus a dedicated speaker spotlight. No constant key shuffling.")
-    d=ImageDraw.Draw(img)
-    key(d,250,290,"Avery","SPEAKING",avatar=(124,94,225),speaking=True,size=230)
-    d.text((365,565),"SPEAKER SPOTLIGHT",font=font(22,True),fill=ACCENT,anchor="mm")
-    d.text((365,610),"Most recent active speaker\nwith a short hold to prevent flicker.",font=font(18),fill=MUTED,anchor="ma",spacing=8,align="center")
-    for i,(name,color,state) in enumerate([("Mika",(76,148,209),"LISTENING"),("Jules",(203,117,91),"MUTED"),("Noah",(81,173,130),"LISTENING"),("Sam",(204,95,154),"LISTENING")]):
-        key(d,720+i*245,330,name,state,avatar=color,size=185)
-    d.text((1190,570),"DYNAMIC MEMBER SLOTS",font=font(22,True),fill=WHITE,anchor="mm")
-    d.text((1190,610),"Members stay in a predictable physical order.\nSpeaking state changes the key, not its position.",font=font(18),fill=MUTED,anchor="ma",spacing=8,align="center")
-    signature(img); img.convert("RGB").save(out/"05_gallery_03.png",quality=95)
+    img = background()
+    title(img, "Speaking should be obvious", "The spotlight and roster use the same centered avatar geometry at every key size.")
+    d = ImageDraw.Draw(img)
+    left_x = 230
+    key(d, left_x, 280, "ALEX", "SPEAKING", avatar=AVATAR_COLORS[0], speaking=True, size=240)
+    d.text((left_x + 120, 575), "SPEAKER SPOTLIGHT", font=font(22, True), fill=ACCENT, anchor="mm")
+    d.multiline_text((left_x + 120, 620), "Large, centered, and readable.\nNo layout jump when someone talks.", font=font(17), fill=MUTED, anchor="ma", align="center", spacing=6)
+
+    roster = [
+        ("YOU", AVATAR_COLORS[1], "SPOKE", False),
+        ("MORIEN", AVATAR_COLORS[2], "LISTENING", False),
+        ("MUGZEY", AVATAR_COLORS[3], "DEAFENED", True),
+        ("SAM", AVATAR_COLORS[4], "LISTENING", False),
+    ]
+    for i, (name, color, state, active) in enumerate(roster):
+        key(d, 720 + i * 250, 315, name, state, avatar=color, active=active, size=190)
+    d.text((1190, 565), "DYNAMIC MEMBER SLOTS", font=font(22, True), fill=WHITE, anchor="mm")
+    d.multiline_text((1190, 610), "Members stay in a predictable position.\nOnly their live state changes.", font=font(17), fill=MUTED, anchor="ma", align="center", spacing=6)
+    signature(img)
+    img.convert("RGB").save(out / "05_gallery_03.png", quality=95)
 
 
 def compatibility(out):
-    img=background(); title(img,"Built for your Stream Deck","Four device-specific profiles plus flexible individual actions.")
-    d=ImageDraw.Draw(img)
-    cards=[("MK.2 / 15 KEY","Full 10-member dashboard","5 × 3"),("STREAM DECK XL","24 live member slots","8 × 4"),("STREAM DECK +","Keys + Voice Navigator dial","4 × 2 + dial"),("STREAM DECK NEO","Compact essentials","4 × 2")]
-    for i,(name,desc,shape) in enumerate(cards):
-        col=i%2; row=i//2; x=150+col*840; y=250+row*250
-        d.rounded_rectangle((x,y,x+730,y+190),32,fill=(*PANEL,235),outline=(51,60,73),width=2)
-        d.text((x+42,y+42),name,font=font(28,True),fill=WHITE)
-        d.text((x+42,y+89),desc,font=font(20),fill=MUTED)
-        d.text((x+42,y+136),shape,font=font(18,True),fill=ACCENT if i!=2 else DISCORD)
-    signature(img); img.convert("RGB").save(out/"06_gallery_04.png",quality=95)
+    img = background()
+    title(img, "Built for your Stream Deck", "Four device-specific profiles with the same readable voice language.")
+    d = ImageDraw.Draw(img)
+    cards = [
+        ("MK.2 / 15 KEY", "10 live member slots", "5 × 3", 5, 3),
+        ("STREAM DECK XL", "24 live member slots", "8 × 4", 8, 4),
+        ("STREAM DECK +", "Voice Navigator dial", "4 × 2 + dial", 4, 2),
+        ("STREAM DECK NEO", "Compact essentials", "4 × 2", 4, 2),
+    ]
+    for i, (name, desc, shape, cols, rows) in enumerate(cards):
+        col = i % 2
+        row = i // 2
+        x = 120 + col * 860
+        y = 235 + row * 275
+        d.rounded_rectangle((x, y, x + 780, y + 220), 30, fill=(*PANEL, 235), outline=(51, 60, 73), width=2)
+        d.text((x + 38, y + 36), name, font=font(26, True), fill=WHITE)
+        d.text((x + 38, y + 80), desc, font=font(18), fill=MUTED)
+        d.text((x + 38, y + 126), shape, font=font(17, True), fill=ACCENT if i != 2 else DISCORD)
+        gx = x + 420
+        gy = y + 45
+        cell = 26 if cols <= 5 else 18
+        gap = 7
+        grid_width = cols * cell + (cols - 1) * gap
+        for rr in range(rows):
+            for cc in range(cols):
+                xx = gx + cc * (cell + gap)
+                yy = gy + rr * (cell + gap)
+                outline = ACCENT if rr == 0 and cc == min(cols - 1, 3) else BORDER
+                d.rounded_rectangle((xx, yy, xx + cell, yy + cell), 6, fill=KEY, outline=outline, width=2)
+        d.text((gx + grid_width / 2, y + 178), "PROFILE INCLUDED", font=font(13, True), fill=MUTED, anchor="mm")
+    signature(img)
+    img.convert("RGB").save(out / "06_gallery_04.png", quality=95)
 
 
 def search_icon(out):
-    img=Image.new("RGBA",(288,288),(*BG,255)); d=ImageDraw.Draw(img)
-    d.rounded_rectangle((18,18,270,270),58,fill=KEY,outline=ACCENT,width=8)
-    for cx,cy,color in [(96,104,DISCORD),(144,83,ACCENT),(192,104,DISCORD)]:
-        d.ellipse((cx-30,cy-30,cx+30,cy+30),fill=color)
-    d.arc((75,110,213,228),15,165,fill=WHITE,width=13)
-    d.text((144,238),"VOICE",font=font(27,True),fill=WHITE,anchor="mm")
-    img.convert("RGB").save(out/"01_search_icon.png",quality=95)
+    img = Image.new("RGBA", (288, 288), (*BG, 255))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((18, 18, 270, 270), 58, fill=KEY, outline=ACCENT, width=8)
+    cx, cy = 144, 118
+    ring_r = 72
+    d.ellipse((cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r), outline=ACCENT, width=10)
+    d.ellipse((cx - 61, cy - 61, cx + 61, cy + 61), fill=DISCORD)
+    discord_mark(d, cx, cy, 43, WHITE)
+    d.text((144, 230), "VOICE", font=font(26, True), fill=WHITE, anchor="mm")
+    img.convert("RGB").save(out / "01_search_icon.png", quality=95)
 
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument("--destination",required=True); args=parser.parse_args()
-    out=Path(args.destination); out.mkdir(parents=True,exist_ok=True)
-    search_icon(out); hero(out); features(out); dashboard(out); spotlight(out); compatibility(out)
-    required=["01_search_icon.png","02_cover.png","03_gallery_01.png","04_gallery_02.png","05_gallery_03.png","06_gallery_04.png"]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--destination", required=True)
+    args = parser.parse_args()
+    out = Path(args.destination)
+    out.mkdir(parents=True, exist_ok=True)
+    search_icon(out)
+    hero(out)
+    features(out)
+    dashboard(out)
+    spotlight(out)
+    compatibility(out)
+    required = ["01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png", "06_gallery_04.png"]
     for name in required:
-        path=out/name
-        if not path.is_file(): raise SystemExit(f"Missing Rat Art output: {name}")
+        path = out / name
+        if not path.is_file():
+            raise SystemExit(f"Missing Rat Art output: {name}")
+        with Image.open(path) as check:
+            expected = (288, 288) if name == "01_search_icon.png" else (W, H)
+            if check.size != expected:
+                raise SystemExit(f"Wrong Rat Art size for {name}: {check.size} != {expected}")
     print(f"Voice Deck Rat Art ready: {out}")
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()
