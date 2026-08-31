@@ -15,9 +15,31 @@ function Normalize-Process([string]$value) {
   return $s.ToLowerInvariant()
 }
 
+function Helper-Evidence {
+  $dll = @(
+    (Join-Path $PSScriptRoot "PackRatAppAudio.dll"),
+    (Join-Path $PSScriptRoot "build\PackRatAppAudio.dll")
+  ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  if ($dll) {
+    return [ordered]@{
+      backend = 'assembly'
+      file = [IO.Path]::GetFileName($dll)
+      sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll).Hash.ToLowerInvariant()
+    }
+  }
+  $source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
+  return [ordered]@{
+    backend = 'source'
+    file = if (Test-Path -LiteralPath $source) { [IO.Path]::GetFileName($source) } else { '' }
+    sha256 = if (Test-Path -LiteralPath $source) { (Get-FileHash -Algorithm SHA256 -LiteralPath $source).Hash.ToLowerInvariant() } else { '' }
+  }
+}
+
 function Read-Sessions {
+  # app-audio.ps1 is another PowerShell script, not a native executable. Exceptions propagate
+  # through ErrorActionPreference=Stop; LASTEXITCODE is intentionally not used here because a
+  # clean cmd -> powershell launch can leave it null after a successful script invocation.
   $raw = & $audio -Action List
-  if ($LASTEXITCODE -ne 0) { throw "app-audio List failed with exit code $LASTEXITCODE" }
   if ([string]::IsNullOrWhiteSpace([string]$raw)) { return @() }
   $parsed = $raw | ConvertFrom-Json
   return @($parsed)
@@ -40,6 +62,7 @@ $report = [ordered]@{
     os = [Environment]::OSVersion.VersionString
     powershell = $PSVersionTable.PSVersion.ToString()
   }
+  helper = Helper-Evidence
   requested = [ordered]@{ process = $Process; pid = $TargetPid; exercise = [bool]$Exercise }
   endpointAvailable = $false
   sessionCount = 0
