@@ -56,8 +56,9 @@ function cleanUrl(v) {
 function sanitizeWorkspace(raw, fallback) {
   const src = isObject(raw) ? raw : {};
   const layout = ["work", "columns", "grid", "none"].includes(src.layout) ? src.layout : fallback.layout;
+  const hasApps = Object.prototype.hasOwnProperty.call(src, "apps");
   return {
-    apps: cleanApps(src.apps?.length ? src.apps : fallback.apps),
+    apps: cleanApps(hasApps ? src.apps : fallback.apps),
     layout,
     url: cleanUrl(src.url)
   };
@@ -80,7 +81,6 @@ function sanitizeConfig(raw) {
   out.outputDevice = String(merged.outputDevice || "").slice(0, 512);
   out.inputDevice = String(merged.inputDevice || "").slice(0, 512);
   for (const name of ["work", "focus", "meeting", "gaming"]) {
-    // Use the raw nested object here so legacy micMuted can migrate before defaults inject micMode.
     out.workspaces[name] = sanitizeWorkspace(source.workspaces?.[name], DEFAULT_CONFIG.workspaces[name]);
     out.presets[name] = sanitizePreset(source.presets?.[name], DEFAULT_CONFIG.presets[name]);
   }
