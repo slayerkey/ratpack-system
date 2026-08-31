@@ -22,6 +22,8 @@ const report = {
   entry: path.basename(entry),
   network: { observedRequests: 0, responses: [], text: null, state: null },
   providers: {},
+  liveSettings: {},
+  mediaTransport: {},
   slots: [],
   runtimeErrors: [],
 };
@@ -86,9 +88,10 @@ function initFixture() {
     getSongName: () => 'Midnight Circuit',
     getArtist: () => 'Velvet Static',
   });
-  media.triggerPreviousTrack = () => {};
-  media.triggerPlayPause = () => {};
-  media.triggerNextTrack = () => {};
+  globalThis.__mediaTransportCalls = { previous: 0, playPause: 0, next: 0 };
+  media.triggerPreviousTrack = () => { globalThis.__mediaTransportCalls.previous += 1; };
+  media.triggerPlayPause = () => { globalThis.__mediaTransportCalls.playPause += 1; };
+  media.triggerNextTrack = () => { globalThis.__mediaTransportCalls.next += 1; };
   globalThis.plugins = {
     Sensorsdataprovider: sensors,
     Fpsdataprovider: fps,
@@ -137,6 +140,44 @@ try {
         fps: document.getElementById('fpsValue')?.textContent?.trim(),
         mediaTitle: globalThis.state?.media?.title || '',
       }));
+
+      await page.evaluate(() => {
+        globalThis.temperatureUnit = 'f';
+        globalThis.pinnedNote = 'Live settings applied';
+        globalThis.smartMode = true;
+        globalThis.startMode = 'auto';
+      });
+      await page.waitForFunction(() => document.getElementById('noteText')?.textContent?.trim() === 'Live settings applied', { timeout: 2000 });
+      await page.waitForFunction(() => document.getElementById('gpuTemp')?.textContent?.trim() === '153', { timeout: 2000 });
+      await page.waitForFunction(() => document.body?.getAttribute('data-mode') === 'performance', { timeout: 2000 });
+      report.liveSettings = await page.evaluate(() => ({
+        note: document.getElementById('noteText')?.textContent?.trim(),
+        gpuTempF: document.getElementById('gpuTemp')?.textContent?.trim(),
+        mode: document.body?.getAttribute('data-mode'),
+        autoLabel: document.getElementById('autoLabel')?.textContent?.trim(),
+      }));
+
+      await page.evaluate(() => {
+        openMediaDrawer();
+      });
+      await page.locator('#drawerPrev').click();
+      await page.locator('#drawerPlay').click();
+      await page.locator('#drawerNext').click();
+      await page.waitForTimeout(80);
+      report.mediaTransport = await page.evaluate(() => ({
+        calls: globalThis.__mediaTransportCalls,
+        lastAction: globalThis.state?.media?.lastAction || '',
+      }));
+      await page.evaluate(() => closeDrawer());
+
+      await page.evaluate(() => {
+        globalThis.temperatureUnit = 'c';
+        globalThis.pinnedNote = 'Smoke fixture';
+        globalThis.smartMode = false;
+        globalThis.startMode = 'home';
+      });
+      await page.waitForFunction(() => document.body?.getAttribute('data-mode') === 'home', { timeout: 2000 });
+      await page.waitForFunction(() => document.getElementById('gpuTemp')?.textContent?.trim() === '67', { timeout: 2000 });
     }
 
     const geometry = await page.evaluate(() => {
@@ -184,6 +225,13 @@ try {
   if (report.network.observedRequests < 1) throw new Error('Cloudflare HTTPS probe request was not observed');
   if (report.providers.fps !== '237' || report.providers.gpuTemp !== '67' || report.providers.gpuLoad !== '78') {
     throw new Error(`native provider fixture did not render expected values: ${JSON.stringify(report.providers)}`);
+  }
+  if (report.liveSettings.note !== 'Live settings applied' || report.liveSettings.gpuTempF !== '153' || report.liveSettings.mode !== 'performance' || report.liveSettings.autoLabel !== 'AUTO') {
+    throw new Error(`live settings / Smart Mode did not react without navigation: ${JSON.stringify(report.liveSettings)}`);
+  }
+  const calls = report.mediaTransport.calls || {};
+  if (calls.previous !== 1 || calls.playPause !== 1 || calls.next !== 1 || report.mediaTransport.lastAction !== 'triggerNextTrack') {
+    throw new Error(`media transport did not reach all native provider methods: ${JSON.stringify(report.mediaTransport)}`);
   }
 } catch (error) {
   report.error = String(error?.stack || error);
