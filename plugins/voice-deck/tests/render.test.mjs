@@ -30,6 +30,16 @@ test("dynamic member rendering escapes hostile display text", () => {
   assert.equal(svg.includes("&lt;script&gt;"), true);
 });
 
+test("member avatars stay circular and the speaking ring is a separate layer", () => {
+  const avatarData = "data:image/png;base64,AAAA";
+  const svg = decode(renderKey("member-slot", ready, { slotIndex: 1 }, { now: 100, avatarData, pulsePhase: true }));
+  assert.equal(svg.includes("clipPath"), false);
+  assert.match(svg, /<pattern id="avatarPattern"/);
+  assert.match(svg, /<circle cx="72" cy="59" r="35"[^>]*stroke-width="8"/);
+  assert.match(svg, /<circle cx="72" cy="59" r="31" fill="url\(#avatarPattern\)"\/>/);
+  assert.ok(svg.indexOf('r="35"') < svg.indexOf('fill="url(#avatarPattern)"'));
+});
+
 test("mute and deafen state changes alter rendered image immediately", () => {
   const muteOff = renderKey("mute", ready, {});
   const muteOn = renderKey("mute", { ...ready, voice: { mute: true, deaf: false } }, {});
