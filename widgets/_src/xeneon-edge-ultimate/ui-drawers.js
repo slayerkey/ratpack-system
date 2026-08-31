@@ -39,13 +39,11 @@ function openMediaDrawer() {
   var title = state.media.title || "Nothing playing", artist = state.media.artist || "Windows system media";
   openDrawer("MEDIA", title,
     "<div class='detailStat'><span>ARTIST</span><strong>"+escapeHtml(artist)+"</strong></div>"+
-    "<div class='mediaControls'><button id='drawerPrev'>◀</button><button id='drawerPlay'>▶Ⅱ</button><button id='drawerNext'>▶</button></div>");
-  setTimeout(function(){
-    var a=byId("drawerPrev"),b=byId("drawerPlay"),c=byId("drawerNext");
-    if(a)a.onclick=function(){mediaAction("triggerPreviousTrack");};
-    if(b)b.onclick=function(){mediaAction("triggerPlayPause");};
-    if(c)c.onclick=function(){mediaAction("triggerNextTrack");};
-  },0);
+    "<div class='mediaControls'>"+
+    "<button type='button' id='drawerPrev' data-media-action='triggerPreviousTrack' aria-label='Previous track'>◀</button>"+
+    "<button type='button' id='drawerPlay' data-media-action='triggerPlayPause' aria-label='Play or pause'>▶Ⅱ</button>"+
+    "<button type='button' id='drawerNext' data-media-action='triggerNextTrack' aria-label='Next track'>▶</button>"+
+    "</div>");
 }
 
 function openEventDrawer(event) {
@@ -69,7 +67,7 @@ function openMetricDrawer(role) {
 }
 
 function escapeHtml(value) {
-  return String(value || "").replace(/[&<>"']/g,function(ch){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[ch];});
+  return String(value || "").replace(/[&<>"']/g,function(ch){return({"&":"&amp;","<":"&lt;"," >":"&gt;",'"':"&quot;","'":"&#39;"})[ch] || ch;});
 }
 
 function openAboutDrawer() {
