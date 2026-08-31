@@ -57,7 +57,17 @@ jobs:
           if ($audit.structural_reuse.unique_glyphs -ne 507 -or $audit.structural_reuse.reuse_groups -ne 75 -or $audit.structural_reuse.unexpected_groups -ne 0) { throw 'Persisted structural audit drifted.' }
           if ($audit.exact_visual_duplicates.groups -ne 0) { throw 'Persisted exact-duplicate audit drifted.' }
           if (-not $audit.package_icon.provenance_match) { throw 'Package icon provenance check failed.' }
-          if ($audit.search_icon.source -ne 'package-staging/icon.svg' -or $audit.search_icon.width -ne 512 -or $audit.search_icon.height -ne 512) { throw 'Marketplace search icon was not produced from staged product icon.svg at 512x512.' }
+          if ($audit.search_icon.source -ne 'package-staging/icon.svg' -or $audit.search_icon.width -ne 288 -or $audit.search_icon.height -ne 288) { throw 'Marketplace search icon was not produced from staged product icon.svg at 288x288.' }
+
+          Add-Type -AssemblyName System.Drawing
+          $searchIconPath = Join-Path $kit '01_search_icon.png'
+          $searchBitmap = [System.Drawing.Image]::FromFile($searchIconPath)
+          try {
+            if ($searchBitmap.Width -ne 288 -or $searchBitmap.Height -ne 288) { throw "Marketplace search icon dimensions are $($searchBitmap.Width)x$($searchBitmap.Height), expected 288x288." }
+          }
+          finally {
+            $searchBitmap.Dispose()
+          }
 
           $required = @(
             '01_search_icon.png',
@@ -81,7 +91,7 @@ jobs:
           $factoryAudit = @(Get-ChildItem $kit -File -Filter '*-iconpack-audit.zip')
           if ($dev.Count -ne 1) { throw "Expected one development installer, found $($dev.Count)." }
           if ($factoryAudit.Count -ne 1) { throw "Expected one audit ZIP, found $($factoryAudit.Count)." }
-          Write-Host "Icon pack Rat kit PASS: 627 static + 96 animated = 723 picker entries; 507 distinct glyphs; 75 reviewed reuse groups; 0 exact visual duplicate groups"
+          Write-Host "Icon pack Rat kit PASS: 627 static + 96 animated = 723 picker entries; 507 distinct glyphs; 75 reviewed reuse groups; 0 exact visual duplicate groups; 288x288 Marketplace app icon"
 
       - name: Upload compact review evidence
         uses: actions/upload-artifact@v4
