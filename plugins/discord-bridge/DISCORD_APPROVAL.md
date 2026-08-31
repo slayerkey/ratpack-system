@@ -47,7 +47,14 @@ Later PackRat application seen in the Developer Portal. It was used during an ab
 https://oauth2-redirect.elgato.com/streamdeck/plugins/message/com.packrat.discord-bridge/auth
 ```
 
-Neither historical ID is automatically the production choice. Before filing the request, inspect the current Discord Developer Portal and deliberately choose or create the PackRat application that should represent the Voice product family long term. Record the selected application ID and application name in this file and in the approval request.
+Neither historical ID is automatically the production choice. Before filing the request, inspect the current Discord Developer Portal and deliberately choose or create the PackRat application that should represent the Voice product family long term. If neither existing application was intentionally created as the durable PackRat Voice identity, prefer creating a clean PackRat Voice application rather than repurposing a proof-of-concept app with stale OAuth configuration.
+
+Record the selected application ID and application name here before filing:
+
+```text
+Production Application ID: [SELECT IN DISCORD DEVELOPER PORTAL]
+Production Application Name: [SELECT IN DISCORD DEVELOPER PORTAL]
+```
 
 Do not change the runtime from StreamKit development identity to a historical PackRat ID before Discord approves the production path; doing so would only replace a working feasibility identity with an unapproved one.
 
@@ -109,7 +116,7 @@ Could you please advise on the review and approval process for rpc, rpc.voice.re
 
 Application ID: [PACKRAT APPLICATION ID THAT WILL SHIP]
 Application name: [PACKRAT DISCORD APPLICATION NAME]
-Product website / marketplace listing: [ADD WHEN AVAILABLE]
+Product status: Release candidates are complete and are being held from public Marketplace submission pending this Discord approval.
 
 During development we also verified the same local voice flow using Discord StreamKit's public RPC client identity and streamkit.discord.com/overlay/token. Discord's Developer Terms say an assigned Application ID is to be used solely with the application it belongs to, so we are not assuming that StreamKit identity may be reused by PackRat. If Discord specifically permits third-party commercial software like these PackRat products to authenticate through the public StreamKit identity, please confirm that in writing; otherwise we will use the approved PackRat-owned application and production token exchange architecture you require.
 
