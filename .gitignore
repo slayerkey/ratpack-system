@@ -29,6 +29,9 @@ out/
 # directory. These are release/dev artifacts, not canonical source files.
 plugins/claude-auto-queue/com.packrat.claude-auto-queue.sdPlugin/bin/
 plugins/claude-auto-queue/com.packrat.claude-auto-queue.sdPlugin/profiles/
+# Discord Bridge deterministically generates runtime and icon assets during build.
+plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/bin/
+plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/imgs/
 
 # Generated XENEON widget outputs
 # tools/xeneon/inline.py writes the flattened shipping entry point here.
