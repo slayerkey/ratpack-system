@@ -12,11 +12,23 @@ on:
 jobs:
   windows-per-app-audio:
     runs-on: windows-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Per-app audio product/session model
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
+
+      - name: JavaScript syntax checks
+        run: |
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
 
       - name: Parse experimental PowerShell wrapper
         shell: powershell
