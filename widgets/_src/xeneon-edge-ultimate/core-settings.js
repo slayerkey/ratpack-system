@@ -26,7 +26,7 @@ var state = {
   metrics: { cpuTemp: null, gpuTemp: null, cpuLoad: null, gpuLoad: null },
   history: { fps: [], cpuTemp: [], gpuTemp: [], cpuLoad: [], gpuLoad: [], network: [] },
   fps: { available: false, value: null, process: "", activeStreak: 0, inactiveStreak: 0 },
-  media: { title: "", artist: "", available: false },
+  media: { title: "", artist: "", available: false, lastAction: "", lastActionAt: 0 },
   weather: { ready: false, loading: false, error: "", current: null, hourly: [], daily: null, updatedAt: 0 },
   calendar: { ready: false, loading: false, error: "", events: [], updatedAt: 0 },
   network: { current: null, jitter: null, failures: 0, verified: 0, state: "checking", lastOk: 0 },
@@ -34,7 +34,9 @@ var state = {
   timers: [],
   pending: { sensors: {}, fps: {}, media: {} },
   requestId: 7000,
-  connectedPlugins: {}
+  connectedPlugins: {},
+  appliedSettings: null,
+  settingsFingerprint: ""
 };
 
 function byId(id) { return document.getElementById(id); }
@@ -83,6 +85,14 @@ function settings() {
     accent: String(getIcueProperty("accentColor", "#2BE86A") || "#2BE86A"),
     background: String(getIcueProperty("backgroundColor", "#07090D") || "#07090D")
   };
+}
+
+function settingsFingerprint(cfg) {
+  return JSON.stringify([
+    cfg.preset, cfg.startMode, cfg.smartMode, cfg.use24, cfg.tempUnit,
+    cfg.weatherEnabled, cfg.weatherLatitude, cfg.weatherLongitude, cfg.calendarUrl,
+    cfg.focusMinutes, cfg.pinnedNote, cfg.graphWindow, cfg.text, cfg.accent, cfg.background
+  ]);
 }
 
 function instanceKey(namespace) {
