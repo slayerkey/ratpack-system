@@ -31,6 +31,8 @@ assert(submission.version === pro.version, "submission version does not match Pr
 assert(submission.marketplace_auto_publish === false, "CS2 submission must never auto publish");
 assert(Array.isArray(submission.marketplace_operating_systems) && submission.marketplace_operating_systems.includes("Windows"), "submission must declare Windows");
 assert(Array.isArray(submission.marketplace_category) && submission.marketplace_category.includes("Gaming"), "submission must include Gaming category");
+assert(typeof submission.description === "string" && submission.description.trim().length > 0, "submission description must be nonempty");
+assert(Array.from(submission.description).length <= 1500, `submission description exceeds Elgato's 1500-character limit (${Array.from(submission.description).length})`);
 assert(/automatic|automatically/i.test(submission.description), "submission must explain automatic live setup");
 assert(/localhost/i.test(submission.description), "submission must explain localhost live telemetry");
 assert(/customer-owned|your own provider keys|your own provider/i.test(submission.description), "submission must explain customer-owned provider credentials");
