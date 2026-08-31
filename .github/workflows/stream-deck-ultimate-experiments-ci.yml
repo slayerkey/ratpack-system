@@ -69,6 +69,7 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/test-worker.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
