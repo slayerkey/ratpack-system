@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { highestPacketCheckpoint, latestProcessSegment, logLines, providersReadyTogether } from "./release-evidence-parse.mjs";
 import { releaseRuntimeFingerprint } from "./release-fingerprint.mjs";
 
 const MIN_SUSTAINED_PACKET_CHECKPOINT = 300;
@@ -45,21 +46,10 @@ try {
 }
 
 const text = readFileSync(logPath, "utf8");
-const latestStart = text.lastIndexOf("plugin process started");
-const session = latestStart >= 0 ? text.slice(text.lastIndexOf("\n", latestStart) + 1) : text;
-const lines = session.split(/\r?\n/).filter(Boolean);
-
-let highestPacketCount = session.includes("first GSI payload received") ? 1 : 0;
-for (const line of lines.filter((line) => line.includes("GSI payload heartbeat"))) {
-  const match = line.match(/"requestCount":(\d+)/);
-  if (match) highestPacketCount = Math.max(highestPacketCount, Number(match[1]));
-}
-
-const providerLines = lines.filter((line) => line.includes("provider refresh completed"));
-const bothProvidersReadyLine = providerLines.find((line) =>
-  /"leetifyStatus":"ready"/.test(line) && /"faceitStatus":"ready"/.test(line)
-);
-const bothProvidersReady = Boolean(bothProvidersReadyLine);
+const session = latestProcessSegment(text);
+const lines = logLines(session);
+const highestPacketCount = highestPacketCheckpoint(session);
+const bothProvidersReady = providersReadyTogether(session);
 const openLogPass = session.includes("open log folder launched");
 const diagnosticsReachable = coreAudit.includes("PASS  Redacted localhost diagnostics discovered");
 const sustainedLivePass = highestPacketCount >= MIN_SUSTAINED_PACKET_CHECKPOINT;
