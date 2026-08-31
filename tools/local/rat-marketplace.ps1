@@ -93,8 +93,70 @@ function Assert-ProductReleaseState {
     throw $message
 }
 
+function Repair-StalePluginBuildArtifacts {
+    param([string[]]$ProductSlugs)
+
+    foreach ($productSlug in $ProductSlugs) {
+        $productPath = Join-Path $RepoRoot "products\$productSlug.json"
+        if (-not (Test-Path $productPath)) { continue }
+
+        try {
+            $product = Get-Content $productPath -Raw | ConvertFrom-Json
+        }
+        catch {
+            continue
+        }
+
+        if ($product.type -ne "plugin" -or -not $product.source) { continue }
+
+        $sourceRelative = ([string]$product.source).TrimEnd('/').Replace('\', '/')
+        $sourceDir = Join-Path $RepoRoot ($sourceRelative -replace '/', '\')
+        if (-not (Test-Path $sourceDir)) { continue }
+
+        $pluginDirs = @(Get-ChildItem -Path $sourceDir -Directory -Filter *.sdPlugin -ErrorAction SilentlyContinue)
+        if ($pluginDirs.Count -ne 1) { continue }
+
+        $pluginRelative = "$sourceRelative/$($pluginDirs[0].Name)"
+        $dirtyLines = @(& git -C $RepoRoot status --porcelain -- $sourceRelative 2>$null)
+        if ($LASTEXITCODE -ne 0 -or -not $dirtyLines.Count) { continue }
+
+        $unsafe = @()
+        foreach ($line in $dirtyLines) {
+            if (-not $line -or $line.Length -lt 4) {
+                $unsafe += $line
+                continue
+            }
+
+            $path = $line.Substring(3).Trim().Trim('"').Replace('\', '/')
+            $allowed = $path -eq "$pluginRelative/manifest.json" -or
+                $path.StartsWith("$pluginRelative/bin/", [System.StringComparison]::OrdinalIgnoreCase) -or
+                $path.StartsWith("$pluginRelative/imgs/", [System.StringComparison]::OrdinalIgnoreCase) -or
+                $path -eq "$sourceRelative/.rat-art-runtime.ps1"
+
+            if (-not $allowed) { $unsafe += $line }
+        }
+
+        if ($unsafe.Count) { continue }
+
+        Write-Host "Recovering stale generated Rat Ship files for '$productSlug'..." -ForegroundColor Yellow
+        & git -C $RepoRoot restore --worktree --staged -- $sourceRelative *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not restore stale tracked Rat Ship output for '$productSlug'."
+        }
+        & git -C $RepoRoot clean -fd -- $sourceRelative *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not remove stale untracked Rat Ship output for '$productSlug'."
+        }
+    }
+}
+
 $queue = @(@($Slug) + @($AdditionalSlugs) | ForEach-Object { if ($_ -and $_.Trim()) { $_.Trim() } })
 if (-not $queue.Count) { throw "rat $Action needs at least one product slug." }
+
+# A failed local plugin build may have generated bin/imgs or normalized manifest.json
+# before a later step failed. Recover only those known build artifacts. Any unrelated
+# local source edit is preserved and the normal clean-worktree guard still stops sync.
+Repair-StalePluginBuildArtifacts -ProductSlugs $queue
 
 # Preserve the canonical shipping invariant: Marketplace operations always ship
 # committed main, never an arbitrary product branch or dirty local candidate.
