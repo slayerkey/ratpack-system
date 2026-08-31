@@ -63,6 +63,47 @@ function Remove-KnownGeneratedArtifacts {
         }
 }
 
+function Recover-LegacyDiscordBridgeShipResidue {
+    # Older local Rat Ship builds could fail in rat-art.ps1 after building the
+    # Discord Bridge directly inside canonical main. That exact failure leaves
+    # only a modified generated manifest plus untracked bin/ and imgs/ output.
+    # Recover that known residue before the self-update cleanliness gate so the
+    # machine can pull the permanent ship-pipeline fixes. Any other local edit
+    # remains protected and will still stop bootstrap below.
+    $statusRaw = Get-GitText -Arguments @("status", "--porcelain", "--untracked-files=all")
+    if (-not $statusRaw) { return }
+
+    $manifest = "plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/manifest.json"
+    $binPrefix = "plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/bin/"
+    $imgsPrefix = "plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/imgs/"
+
+    $paths = @()
+    foreach ($line in @($statusRaw -split "`r?`n")) {
+        if (-not $line) { continue }
+        $normalized = $line.TrimStart()
+        if ($normalized.Length -lt 3) { return }
+        $path = $normalized.Substring(2).Trim()
+        $paths += $path
+    }
+
+    if (-not $paths.Count) { return }
+    $hasGeneratedOutput = $false
+    foreach ($path in $paths) {
+        $known = $path -eq $manifest -or $path.StartsWith($binPrefix, [System.StringComparison]::Ordinal) -or $path.StartsWith($imgsPrefix, [System.StringComparison]::Ordinal)
+        if (-not $known) { return }
+        if ($path.StartsWith($binPrefix, [System.StringComparison]::Ordinal) -or $path.StartsWith($imgsPrefix, [System.StringComparison]::Ordinal)) {
+            $hasGeneratedOutput = $true
+        }
+    }
+    if (-not $hasGeneratedOutput) { return }
+
+    Write-Host "Recovering stale Discord Bridge Rat Ship build output..." -ForegroundColor Yellow
+    & git -C $RepoRoot restore -- $manifest *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Could not restore stale Discord Bridge manifest output." }
+    & git -C $RepoRoot clean -fd -- "plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/bin" "plugins/discord-bridge/com.packrat.discord-bridge.sdPlugin/imgs" *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Could not remove stale Discord Bridge generated output." }
+}
+
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required for RatPack commands."
 }
@@ -70,6 +111,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 # Local XENEON build/package outputs are disposable and must never block a
 # self-updating Rat command. Only known generated paths are cleaned here.
 Remove-KnownGeneratedArtifacts
+Recover-LegacyDiscordBridgeShipResidue
 
 $dirty = Get-GitText -Arguments @("status", "--porcelain")
 if ($dirty) {
