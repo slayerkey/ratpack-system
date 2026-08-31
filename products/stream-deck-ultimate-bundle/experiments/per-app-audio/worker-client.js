@@ -6,6 +6,7 @@ class AppAudioWorkerClient {
   constructor(options = {}) {
     this.script = path.resolve(options.script || path.join(__dirname, "app-audio-worker.ps1"));
     this.mock = !!options.mock;
+    this.assemblyPath = options.assemblyPath ? path.resolve(options.assemblyPath) : "";
     this.timeoutMs = Math.max(250, Number(options.timeoutMs || 6000));
     this.process = null;
     this.buffer = "";
@@ -20,6 +21,7 @@ class AppAudioWorkerClient {
     this.closed = false;
     const args = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", this.script];
     if (this.mock) args.push("-Mock");
+    else if (this.assemblyPath) args.push("-AssemblyPath", this.assemblyPath);
     this.process = spawn("powershell.exe", args, { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     this.process.stdout.setEncoding("utf8");
     this.process.stderr.setEncoding("utf8");
