@@ -31,6 +31,9 @@ jobs:
       - name: Stream Deck Current App / named app surface semantics
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
 
+      - name: Stream Deck app-audio lifecycle controller
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
+
       - name: JavaScript syntax checks
         run: |
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
@@ -39,6 +42,8 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
