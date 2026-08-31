@@ -93,7 +93,7 @@ $manifest = [ordered]@{
 
 Add-Type -AssemblyName System.Drawing
 function New-LabIcon([string]$Path,[int]$Size,[string]$Text,[bool]$Transparent = $false) {
-  $bitmap = New-Object System.Drawing.Bitmap $Size,$Size,[System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+  $bitmap = [System.Drawing.Bitmap]::new($Size,$Size,[System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($bitmap)
   try {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
