@@ -72,15 +72,17 @@ function sanitizePreset(raw, fallback) {
   };
 }
 function sanitizeConfig(raw) {
-  const merged = deepMerge(DEFAULT_CONFIG, raw || {});
+  const source = isObject(raw) ? raw : {};
+  const merged = deepMerge(DEFAULT_CONFIG, source);
   const out = clone(DEFAULT_CONFIG);
   out.version = 2;
   out.setupComplete = !!merged.setupComplete;
   out.outputDevice = String(merged.outputDevice || "").slice(0, 512);
   out.inputDevice = String(merged.inputDevice || "").slice(0, 512);
   for (const name of ["work", "focus", "meeting", "gaming"]) {
-    out.workspaces[name] = sanitizeWorkspace(merged.workspaces?.[name], DEFAULT_CONFIG.workspaces[name]);
-    out.presets[name] = sanitizePreset(merged.presets?.[name], DEFAULT_CONFIG.presets[name]);
+    // Use the raw nested object here so legacy micMuted can migrate before defaults inject micMode.
+    out.workspaces[name] = sanitizeWorkspace(source.workspaces?.[name], DEFAULT_CONFIG.workspaces[name]);
+    out.presets[name] = sanitizePreset(source.presets?.[name], DEFAULT_CONFIG.presets[name]);
   }
   out.clipboard.enabled = merged.clipboard?.enabled !== false;
   out.clipboard.maxItems = Math.round(clamp(merged.clipboard?.maxItems, 1, 20, 8));
