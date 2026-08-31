@@ -22,7 +22,7 @@
   "plan": "products/cs2-competitive-dashboard/PLAN.md",
   "qa": "products/cs2-competitive-dashboard/QA.md",
   "release": "products/cs2-competitive-dashboard/RELEASE.md",
-  "marketplace_creator_url": "https://marketplace.elgato.com/%40packrat",
+  "marketplace_creator_url": "https://marketplace.elgato.com/maker/packrat",
   "bundled_profiles": {
     "value_proposition": "Pro includes separate ready-to-use Competitive and Live Match layouts instead of requiring manual key-by-key setup",
     "layouts": ["Competitive", "Live Match"],
