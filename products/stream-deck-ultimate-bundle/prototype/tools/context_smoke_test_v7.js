@@ -57,8 +57,8 @@ function cleanup() {
 
 (async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(pluginDir, "manifest.json"), "utf8"));
-  if (manifest.CodePath !== "bin/plugin-v07.cjs") {
-    throw new Error("Smoke must launch v0.7 manifest CodePath, saw " + manifest.CodePath);
+  if (!["bin/plugin-v07.cjs", "bin/plugin-v071.cjs"].includes(manifest.CodePath)) {
+    throw new Error("Smoke must launch a supported v0.7 Context manifest CodePath, saw " + manifest.CodePath);
   }
 
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
@@ -85,7 +85,6 @@ function cleanup() {
       }
     }
   );
-
   let stderr = "";
   child.stderr.on("data", d => stderr += d);
   const ws = await Promise.race([
@@ -117,7 +116,7 @@ function cleanup() {
   const active = data("imgs/keys/web-active.png");
   await waitFor(m => m.event === "setImage" && m.context === "web" && m.payload?.image === active, 5000, mark);
 
-  console.log("v0.7 context smoke passed: manifest runtime, multiplex registration, adaptive slot, active app feedback");
+  console.log(`v0.7 context smoke passed through ${manifest.CodePath}: multiplex registration, adaptive slot, active app feedback`);
   try { ws.terminate(); } catch {}
   try { server.close(); } catch {}
   cleanup();
