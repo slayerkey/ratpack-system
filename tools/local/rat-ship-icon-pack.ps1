@@ -55,6 +55,18 @@ if ($factoryCommit -notmatch '^[0-9a-fA-F]{40}$') {
 if (-not $product.marketplace_id) {
     throw "Icon pack '$IconPackSlug' must declare marketplace_id."
 }
+foreach ($metric in @(
+    "expected_static_icons",
+    "expected_animated_icons",
+    "expected_picker_entries",
+    "expected_unique_glyphs",
+    "expected_reuse_groups",
+    "expected_exact_visual_duplicate_groups"
+)) {
+    if ($null -eq $product.$metric) {
+        throw "Icon pack '$IconPackSlug' must declare $metric for reproducible release kits."
+    }
+}
 
 Require-Command "git" "Install Git for Windows first."
 Require-Command "python" "Install Python 3.11 or newer first."
@@ -78,13 +90,13 @@ if ($origin.TrimEnd('/') -ne $factoryRepository.TrimEnd('/')) {
 # Resetting and cleaning it cannot touch the user's working icon-factory checkout.
 Invoke-ExternalStep "refresh exact factory commit" {
     & git -C $factoryRoot fetch --prune origin
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { throw "Could not refresh icon-factory origin." }
     & git -C $factoryRoot fetch --depth=1 origin $factoryCommit
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { throw "Could not fetch pinned icon-factory commit $factoryCommit." }
     & git -C $factoryRoot reset --hard
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { throw "Could not reset generated icon-factory controller." }
     & git -C $factoryRoot clean -fdx
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { throw "Could not clean generated icon-factory controller." }
     & git -C $factoryRoot checkout --detach $factoryCommit
 }
 
@@ -95,8 +107,9 @@ if ($LASTEXITCODE -ne 0 -or $actualHead -ne $factoryCommit) {
 
 $requirements = Join-Path $factoryRoot "tools\icons\requirements.txt"
 $runner = Join-Path $factoryRoot "tools\icons\rat_icons.py"
-if (-not (Test-Path $requirements) -or -not (Test-Path $runner)) {
-    throw "Pinned icon factory commit is missing the V2 requirements or rat_icons.py entry point."
+$structuralAuditScript = Join-Path $factoryRoot "tools\icons\audit_structural_reuse.py"
+if (-not (Test-Path $requirements) -or -not (Test-Path $runner) -or -not (Test-Path $structuralAuditScript)) {
+    throw "Pinned icon factory commit is missing the V2 requirements, rat_icons.py, or structural reuse audit entry point."
 }
 
 Invoke-ExternalStep "install/reuse icon factory runtime" {
@@ -108,6 +121,7 @@ try {
     Invoke-ExternalStep "factory preflight" { & python tools/icons/rat_icons.py doctor $factoryProduct }
     Invoke-ExternalStep "prefetch pinned icon sources" { & python tools/icons/rat_icons.py sources $factoryProduct --prefetch }
     Invoke-ExternalStep "build all static icons" { & python tools/icons/rat_icons.py build $factoryProduct --force }
+    Invoke-ExternalStep "audit structural glyph reuse" { & python tools/icons/audit_structural_reuse.py $factoryProduct }
     Invoke-ExternalStep "build semantic animations" { & python tools/icons/rat_icons.py animate $factoryProduct }
     Invoke-ExternalStep "run animated QA" { & python tools/icons/rat_icons.py qa $factoryProduct --animated }
     Invoke-ExternalStep "build factory marketing handoff" { & python tools/icons/rat_icons.py marketing $factoryProduct }
@@ -119,17 +133,28 @@ finally {
 
 $factoryOut = Join-Path $factoryRoot "out\icons\$factoryProduct"
 $qaPath = Join-Path $factoryOut "qa\qa-report.json"
+$structuralReportPath = Join-Path $factoryOut "qa\structural-reuse-report.json"
 $handoffPath = Join-Path $factoryOut "marketing\rat-art-icons.json"
 $stage = Join-Path $factoryOut "package-staging"
 $packageNotePath = Join-Path $stage "PACKAGING-NOTE.json"
 $stagedIconsPath = Join-Path $stage "icons.json"
-if (-not (Test-Path $qaPath) -or -not (Test-Path $handoffPath) -or -not (Test-Path $packageNotePath) -or -not (Test-Path $stagedIconsPath)) {
-    throw "Factory completed but the deterministic QA/marketing/package handoff is incomplete under $factoryOut"
+if (
+    -not (Test-Path $qaPath) -or
+    -not (Test-Path $structuralReportPath) -or
+    -not (Test-Path $handoffPath) -or
+    -not (Test-Path $packageNotePath) -or
+    -not (Test-Path $stagedIconsPath)
+) {
+    throw "Factory completed but the deterministic QA/structural/marketing/package handoff is incomplete under $factoryOut"
 }
 
 $qa = Get-Content $qaPath -Raw | ConvertFrom-Json
 if (-not $qa.pass -or $qa.summary.failures -ne 0 -or $qa.summary.warnings -ne 0) {
     throw "Icon pack QA is not release-clean: failures=$($qa.summary.failures), warnings=$($qa.summary.warnings)."
+}
+$structural = Get-Content $structuralReportPath -Raw | ConvertFrom-Json
+if (-not $structural.pass -or [int]$structural.summary.unexpected_groups -ne 0) {
+    throw "Icon pack structural reuse audit is not release-clean: unexpected=$($structural.summary.unexpected_groups)."
 }
 $handoff = Get-Content $handoffPath -Raw | ConvertFrom-Json
 $packageNote = Get-Content $packageNotePath -Raw | ConvertFrom-Json
@@ -138,14 +163,20 @@ $stagedEntries = @(Get-Content $stagedIconsPath -Raw | ConvertFrom-Json)
 if ([string]$packageNote.identifier -ne [string]$product.marketplace_id) {
     throw "Staged production identifier '$($packageNote.identifier)' does not match RatPack product marketplace_id '$($product.marketplace_id)'."
 }
-if ($null -ne $product.expected_static_icons -and [int]$handoff.actual_icon_count -ne [int]$product.expected_static_icons) {
+if ([int]$handoff.actual_icon_count -ne [int]$product.expected_static_icons) {
     throw "Static icon count drift: expected $($product.expected_static_icons), factory produced $($handoff.actual_icon_count)."
 }
-if ($null -ne $product.expected_animated_icons -and [int]$handoff.animated_icon_count -ne [int]$product.expected_animated_icons) {
+if ([int]$handoff.animated_icon_count -ne [int]$product.expected_animated_icons) {
     throw "Animated icon count drift: expected $($product.expected_animated_icons), factory produced $($handoff.animated_icon_count)."
 }
-if ($null -ne $product.expected_picker_entries -and $stagedEntries.Count -ne [int]$product.expected_picker_entries) {
+if ($stagedEntries.Count -ne [int]$product.expected_picker_entries) {
     throw "Picker-entry count drift: expected $($product.expected_picker_entries), staging contains $($stagedEntries.Count)."
+}
+if ([int]$structural.summary.unique_glyphs -ne [int]$product.expected_unique_glyphs) {
+    throw "Distinct glyph count drift: expected $($product.expected_unique_glyphs), factory produced $($structural.summary.unique_glyphs)."
+}
+if ([int]$structural.summary.reuse_groups -ne [int]$product.expected_reuse_groups) {
+    throw "Structural reuse group drift: expected $($product.expected_reuse_groups), factory produced $($structural.summary.reuse_groups)."
 }
 $duplicateNames = @($stagedEntries | Group-Object { ([string]$_.name).Trim().ToLowerInvariant() } | Where-Object Count -gt 1)
 $duplicatePaths = @($stagedEntries | Group-Object { ([string]$_.path).Trim().ToLowerInvariant() } | Where-Object Count -gt 1)
@@ -183,8 +214,29 @@ $submission | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $Destinatio
 Set-Content -Path (Join-Path $Destination "PASTE_description.txt") -Value ([string]$product.description).Trim() -Encoding UTF8
 Set-Content -Path (Join-Path $Destination "PASTE_release_notes.txt") -Value ([string]$product.release_notes).Trim() -Encoding UTF8
 
+$ratArt = Join-Path $RepoRoot "tools\art\rat_art_icon_pack.py"
+$ratAsset = Join-Path $RepoRoot "tools\art\assets\ratpack-icon-transparent.png"
+if (-not (Test-Path $ratArt)) { throw "Canonical icon-pack Rat Art renderer missing: $ratArt" }
+Invoke-ExternalStep "render deterministic Marketplace media" {
+    & python $ratArt --factory-out $factoryOut --out $Destination --rat-asset $ratAsset
+}
+
+$releaseFinalizer = Join-Path $RepoRoot "tools\art\finalize_icon_pack_release.py"
+if (-not (Test-Path $releaseFinalizer)) { throw "Canonical icon-pack release finalizer missing: $releaseFinalizer" }
+Invoke-ExternalStep "re-audit release output and finalize product search icon" {
+    & python $releaseFinalizer --factory-root $factoryRoot --factory-out $factoryOut --product-spec $productPath --kit $Destination
+}
+$releaseAuditPath = Join-Path $Destination "FACTORY-RELEASE-AUDIT.json"
+if (-not (Test-Path $releaseAuditPath)) {
+    throw "Icon-pack release finalizer did not write FACTORY-RELEASE-AUDIT.json."
+}
+$releaseAudit = Get-Content $releaseAuditPath -Raw | ConvertFrom-Json
+if (-not $releaseAudit.pass) {
+    throw "FACTORY-RELEASE-AUDIT.json did not record a passing release audit."
+}
+
 $identity = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     ratpack_product = $IconPackSlug
     factory_repository = $factoryRepository
     factory_commit = $factoryCommit
@@ -196,15 +248,15 @@ $identity = [ordered]@{
     picker_entries = $stagedEntries.Count
     qa_failures = [int]$qa.summary.failures
     qa_warnings = [int]$qa.summary.warnings
+    unique_glyphs = [int]$releaseAudit.structural_reuse.unique_glyphs
+    reuse_groups = [int]$releaseAudit.structural_reuse.reuse_groups
+    unexpected_reuse_groups = [int]$releaseAudit.structural_reuse.unexpected_groups
+    exact_visual_duplicate_groups = [int]$releaseAudit.exact_visual_duplicates.groups
+    package_icon_sha256 = [string]$releaseAudit.package_icon.source_sha256
+    search_icon_sha256 = [string]$releaseAudit.search_icon.output_sha256
+    search_icon_source = [string]$releaseAudit.search_icon.source
 }
 $identity | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $Destination "SOURCE-IDENTITY.json") -Encoding UTF8
-
-$ratArt = Join-Path $RepoRoot "tools\art\rat_art_icon_pack.py"
-$ratAsset = Join-Path $RepoRoot "tools\art\assets\ratpack-icon-transparent.png"
-if (-not (Test-Path $ratArt)) { throw "Canonical icon-pack Rat Art renderer missing: $ratArt" }
-Invoke-ExternalStep "render deterministic Marketplace media" {
-    & python $ratArt --factory-out $factoryOut --out $Destination --rat-asset $ratAsset
-}
 
 $iconPackManNote = @"
 OFFICIAL MARKETPLACE PACKAGE BOUNDARY
@@ -253,4 +305,5 @@ if ($missingMedia.Count) {
 Write-Host "Stream Deck icon-pack review kit ready at:`n$Destination" -ForegroundColor Green
 Write-Host "Pinned factory: $factoryCommit" -ForegroundColor Green
 Write-Host "Counts: $($handoff.actual_icon_count) static + $($handoff.animated_icon_count) animated = $($stagedEntries.Count) picker entries" -ForegroundColor Green
+Write-Host "Release audit: $($releaseAudit.structural_reuse.unique_glyphs) distinct glyphs, $($releaseAudit.structural_reuse.reuse_groups) reviewed reuse groups, $($releaseAudit.exact_visual_duplicates.groups) exact visual duplicate groups" -ForegroundColor Green
 Write-Host "Public stage/ship remains intentionally unsupported until Icon Pack Man and Maker Console icon-pack automation are validated." -ForegroundColor Yellow
