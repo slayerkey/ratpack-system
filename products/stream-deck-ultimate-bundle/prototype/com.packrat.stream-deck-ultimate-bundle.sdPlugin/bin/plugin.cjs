@@ -1,5 +1,5 @@
 "use strict";
-// Node 20 in Stream Deck does not provide a reliable browser-style global WebSocket.
-// Supply the proven ws implementation, then load the existing runtime.
+// Stream Deck runs this exact file from manifest CodePath.
+// Keep the WebSocket polyfill here, then load the current premium runtime.
 global.WebSocket = require("ws");
-require("./plugin.js");
+require("./plugin-v05.js");
