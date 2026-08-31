@@ -51,4 +51,6 @@ The repository test suite covers:
 
 The automated release candidate is not a substitute for `REAL_WINDOWS_SMOKE.md`. Actual Discord Desktop authorization, live Discord voice behavior, Stream Deck software/hardware interaction, and packaged-plugin parity still need to be recorded against the final candidate before public submission.
 
-Discord commercial RPC approval or explicit written permission to use the StreamKit development identity remains a separate external release boundary. `BLOCKED_EXTERNAL_APPROVAL` must stay fail closed until that is resolved.
+The preferred real-host diagnostic flow is `rat dev voice-deck` followed by `rat audit voice-deck`, with `rat audit voice-deck --probe` reserved for deeper Discord transport isolation. Those diagnostics support the physical smoke but do not replace it.
+
+Discord commercial RPC approval or explicit written permission to use the StreamKit development identity remains a separate external release boundary. Canonical `workflow_state` must remain `BLOCKED` until that approval boundary and the real Windows smoke are both resolved. Only then should the product move to `READY_TO_SHIP`.
