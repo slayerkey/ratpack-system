@@ -27,7 +27,24 @@ const files = [
 for (const rel of files) { const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, tiny); }
 for (const rel of ["ui/onboarding-v06.html", "bin/audio.ps1"]) { const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, rel.endsWith(".html") ? "<html>ok</html>" : "param()"); }
 function image(rel) { return "data:image/png;base64," + fs.readFileSync(path.join(pluginDir, rel)).toString("base64"); }
-function waitFor(pred, timeout = 8000, from = 0, label = "event") { return new Promise((resolve, reject) => { const start = Date.now(); const t = setInterval(() => { const v = messages.slice(from).find(pred); if (v) { clearInterval(t); resolve(v); } else if (Date.now() - start > timeout) { clearInterval(t); reject(new Error(`Timed out waiting for ${label}. Seen: ` + JSON.stringify(messages.slice(from).map(x => ({ event: x.event, context: x.context, value: x.payload?.value })))); } }, 35); }); }
+function waitFor(pred, timeout = 8000, from = 0, label = "event") {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const found = messages.slice(from).find(pred);
+      if (found) {
+        clearInterval(timer);
+        resolve(found);
+        return;
+      }
+      if (Date.now() - start > timeout) {
+        clearInterval(timer);
+        const seen = messages.slice(from).map(x => ({ event: x.event, context: x.context, value: x.payload?.value }));
+        reject(new Error(`Timed out waiting for ${label}. Seen: ${JSON.stringify(seen)}`));
+      }
+    }, 35);
+  });
+}
 function cleanup() { try { child?.kill(); } catch {} try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore", timeout: 2000 }); } catch {} }
 (async () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "packrat-ultimate-v6-"));
