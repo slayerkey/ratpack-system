@@ -16,9 +16,11 @@ assert(pro.price_usd === 14.99, `Pro registry price must be 14.99, found ${pro.p
 assert(pro.version === "0.1.0.0", `Pro registry version must be 0.1.0.0, found ${pro.version}`);
 assert(pro.source === "products/cs2-competitive-dashboard/plugin", "Pro source must remain the shared plugin source");
 assert(pro.ship_plugin_dir === "out/com.packrat.cs2-competitive-dashboard-pro.sdPlugin", "Pro must explicitly select the Pro deterministic build for Rat Ship");
-assert(["BLOCKED_EXTERNAL", "READY_TO_SHIP"].includes(pro.workflow_state), `Pro workflow must fail closed or be explicitly ready, found ${pro.workflow_state}`);
+assert(["BLOCKED", "READY_TO_SHIP"].includes(pro.workflow_state), `Pro workflow must fail closed or be explicitly ready, found ${pro.workflow_state}`);
+assert(pro.workflow_state !== "BLOCKED" || pro.blocker_kind === "external_release_gates", "Blocked Pro must identify the external_release_gates blocker kind");
 
-assert(lite.workflow_state === "BLOCKED_STRATEGY_HOLD", `Lite must remain strategy-blocked, found ${lite.workflow_state}`);
+assert(lite.workflow_state === "BLOCKED", `Lite must remain blocked, found ${lite.workflow_state}`);
+assert(lite.blocker_kind === "strategy_hold", `Lite must remain strategy-held, found ${lite.blocker_kind}`);
 assert(lite.marketplace_launch === "held", "Lite Marketplace launch must remain held");
 
 assert(submission.slug === pro.id, `submission slug ${submission.slug} does not match ${pro.id}`);
