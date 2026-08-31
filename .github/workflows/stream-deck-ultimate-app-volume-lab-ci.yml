@@ -1,0 +1,131 @@
+name: Stream Deck Ultimate App Volume Lab CI
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/**'
+      - '.github/workflows/stream-deck-ultimate-app-volume-lab-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  windows-app-volume-lab:
+    runs-on: windows-latest
+    timeout-minutes: 16
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: App Volume product and Stream Deck semantics
+        run: |
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/property-inspector.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/promotion-gate.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
+          node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.test.js
+
+      - name: Lab JavaScript syntax
+        run: |
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/shadow-plugin-entry.cjs
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/shadow-plugin-runtime-smoke.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
+
+      - name: Lab PowerShell syntax
+        shell: powershell
+        run: |
+          foreach ($file in @(
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-shadow-plugin.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1'
+          )) {
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors)
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          }
+          Write-Host 'App Volume lab PowerShell syntax parsed'
+
+      - name: Build precompiled Core Audio and foreground helper
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1'
+          $build = $json | ConvertFrom-Json
+          if (-not $build.ok) { throw 'Lab helper build did not report ok' }
+          if ($build.type -ne 'PackRatAppAudio.Core') { throw "Unexpected helper type: $($build.type)" }
+          if ($build.foregroundType -ne 'PackRatAppAudio.Foreground') { throw "Unexpected foreground helper type: $($build.foregroundType)" }
+          if (-not (Test-Path -LiteralPath $build.path)) { throw "Lab helper missing: $($build.path)" }
+          "PACKRAT_APP_AUDIO_DLL=$($build.path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKRAT_APP_AUDIO_SHA=$($build.sha256)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "lab helper built: $($build.sizeBytes) bytes sha256=$($build.sha256)"
+
+      - name: Stage co-installable App Volume Lab plugin
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-shadow-plugin.ps1' -AssemblyPath $env:PACKRAT_APP_AUDIO_DLL
+          $lab = $json | ConvertFrom-Json
+          if (-not $lab.ok) { throw 'Shadow plugin staging did not report ok' }
+          if ($lab.pluginUuid -ne 'com.packrat.stream-deck-ultimate-app-volume-lab') { throw "Unexpected lab plugin UUID: $($lab.pluginUuid)" }
+          if ($lab.actionUuid -ne 'com.packrat.stream-deck-ultimate-app-volume-lab.app-audio') { throw "Unexpected lab action UUID: $($lab.actionUuid)" }
+          if ($lab.helperSha256 -ne $env:PACKRAT_APP_AUDIO_SHA) { throw 'Staged lab helper hash mismatch' }
+          if (-not (Test-Path -LiteralPath (Join-Path $lab.pluginDir 'manifest.json'))) { throw 'Staged lab manifest missing' }
+          "PACKRAT_APP_VOLUME_LAB=$($lab.pluginDir)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "staged App Volume Lab: $($lab.fileCount) files helper=$($lab.helperSha256)"
+
+      - name: Install locked lab WebSocket runtime
+        shell: powershell
+        run: |
+          Push-Location $env:PACKRAT_APP_VOLUME_LAB
+          try { npm install --omit=dev --ignore-scripts --no-audit --no-fund --package-lock-only=false } finally { Pop-Location }
+
+      - name: Packaged lab runtime through real WebSocket protocol
+        shell: powershell
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/shadow-plugin-runtime-smoke.js "$env:PACKRAT_APP_VOLUME_LAB"
+
+      - name: Verify staged lab identity and helper integrity
+        shell: powershell
+        run: |
+          $manifest = Get-Content -LiteralPath (Join-Path $env:PACKRAT_APP_VOLUME_LAB 'manifest.json') -Raw | ConvertFrom-Json
+          $info = Get-Content -LiteralPath (Join-Path $env:PACKRAT_APP_VOLUME_LAB 'LAB_INFO.json') -Raw | ConvertFrom-Json
+          $dll = Join-Path $env:PACKRAT_APP_VOLUME_LAB 'bin\PackRatAppAudio.dll'
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll).Hash.ToLowerInvariant()
+          if ($manifest.UUID -ne $info.pluginUuid) { throw 'Lab manifest UUID does not match LAB_INFO' }
+          if ($manifest.UUID -eq 'com.packrat.stream-deck-ultimate-bundle') { throw 'Lab must never reuse the accepted plugin UUID' }
+          if ($manifest.Actions[0].UUID -ne $info.actionUuid) { throw 'Lab action UUID does not match LAB_INFO' }
+          if ($sha -ne $info.helperSha256 -or $sha -ne $env:PACKRAT_APP_AUDIO_SHA) { throw 'Lab helper integrity verification failed' }
+          Write-Host "lab isolation verified: plugin=$($manifest.UUID) action=$($manifest.Actions[0].UUID) helper=$sha"
+
+      - name: Install Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.9.0
+
+      - name: Validate App Volume Lab plugin
+        shell: powershell
+        run: streamdeck validate "$env:PACKRAT_APP_VOLUME_LAB" --force-update-check
+
+      - name: Pack installable App Volume Lab plugin
+        shell: powershell
+        run: |
+          $output = Join-Path (Split-Path -Parent $env:PACKRAT_APP_VOLUME_LAB) 'packed'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          streamdeck pack "$env:PACKRAT_APP_VOLUME_LAB" --output "$output" --force --no-file-list
+          $packed = @(Get-ChildItem -LiteralPath $output -Filter '*.streamDeckPlugin' -File)
+          if ($packed.Count -ne 1) { throw "Expected one packed lab plugin, found $($packed.Count)" }
+          Write-Host "packed lab plugin: $($packed[0].FullName) size=$($packed[0].Length)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-app-volume-lab
+          path: |
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/shadow-plugin-dist/packed/*.streamDeckPlugin
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/shadow-plugin-dist/com.packrat.stream-deck-ultimate-app-volume-lab.sdPlugin/LAB_INFO.json
+          if-no-files-found: error
