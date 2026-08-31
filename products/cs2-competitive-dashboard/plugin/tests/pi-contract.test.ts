@@ -36,6 +36,11 @@ test("Property Inspector exposes its Stream Deck callback before DOM load", () =
   assert.match(pi, /window\.connectElgatoStreamDeckSocket\s*=/);
 });
 
+test("Property Inspector fallback uses the canonical PackRat maker URL", () => {
+  assert.match(pi, /https:\/\/marketplace\.elgato\.com\/maker\/packrat/);
+  assert.doesNotMatch(pi, /marketplace\.elgato\.com\/%40packrat/);
+});
+
 test("Property Inspector registers and requests ordinary plugin state over WebSocket", () => {
   const sent: Array<Record<string, unknown>> = [];
   let createdSocket: FakeWebSocket | undefined;
