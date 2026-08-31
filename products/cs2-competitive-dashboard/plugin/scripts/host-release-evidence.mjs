@@ -56,8 +56,10 @@ for (const line of lines.filter((line) => line.includes("GSI payload heartbeat")
 }
 
 const providerLines = lines.filter((line) => line.includes("provider refresh completed"));
-const leetifyReady = providerLines.some((line) => /"leetifyStatus":"ready"/.test(line));
-const faceitReady = providerLines.some((line) => /"faceitStatus":"ready"/.test(line));
+const bothProvidersReadyLine = providerLines.find((line) =>
+  /"leetifyStatus":"ready"/.test(line) && /"faceitStatus":"ready"/.test(line)
+);
+const bothProvidersReady = Boolean(bothProvidersReadyLine);
 const openLogPass = session.includes("open log folder launched");
 const diagnosticsReachable = coreAudit.includes("PASS  Redacted localhost diagnostics discovered");
 const sustainedLivePass = highestPacketCount >= MIN_SUSTAINED_PACKET_CHECKPOINT;
@@ -74,16 +76,16 @@ const automated = {
   highestPacketCount,
   openLogPass,
   diagnosticsReachable,
-  leetifyReady,
-  faceitReady
+  leetifyReady: bothProvidersReady,
+  faceitReady: bothProvidersReady,
+  bothProvidersReady
 };
 
 const failures = [];
 if (!automated.sustainedLivePass) failures.push(`sustained GSI evidence needs checkpoint >= ${MIN_SUSTAINED_PACKET_CHECKPOINT}; saw ${highestPacketCount}`);
 if (!automated.openLogPass) failures.push("Open Log Folder was not successfully exercised in the latest plugin process");
 if (!automated.diagnosticsReachable) failures.push("run this release audit while Stream Deck / the plugin is still running so localhost diagnostics can be verified");
-if (!automated.leetifyReady) failures.push("no real Leetify refresh reached ready state in the latest plugin process");
-if (!automated.faceitReady) failures.push("no real FACEIT refresh reached ready state in the latest plugin process");
+if (!automated.bothProvidersReady) failures.push("no single real provider refresh reached ready for both Leetify and FACEIT in the latest plugin process");
 if (!human.hsPercentAccurateAcrossRespawns) failures.push("missing human attestation --hs-ok");
 if (!human.longLabelsReadable) failures.push("missing human attestation --labels-ok");
 if (!human.restartRecoveryPassed) failures.push("missing human attestation --restart-ok");
@@ -92,8 +94,7 @@ console.log("\nCS2 PHYSICAL RELEASE EVIDENCE");
 console.log(`${automated.sustainedLivePass ? "PASS" : "FAIL"}  Sustained live GSI (${highestPacketCount} packet checkpoint)`);
 console.log(`${automated.openLogPass ? "PASS" : "FAIL"}  Open Log Folder`);
 console.log(`${automated.diagnosticsReachable ? "PASS" : "FAIL"}  Live localhost diagnostics reachable`);
-console.log(`${automated.leetifyReady ? "PASS" : "FAIL"}  Real Leetify provider ready`);
-console.log(`${automated.faceitReady ? "PASS" : "FAIL"}  Real FACEIT provider ready`);
+console.log(`${automated.bothProvidersReady ? "PASS" : "FAIL"}  Real Leetify + FACEIT providers ready in one refresh`);
 console.log(`${human.hsPercentAccurateAcrossRespawns ? "PASS" : "FAIL"}  Human check: Deathmatch HS% across respawns`);
 console.log(`${human.longLabelsReadable ? "PASS" : "FAIL"}  Human check: long labels readable`);
 console.log(`${human.restartRecoveryPassed ? "PASS" : "FAIL"}  Human check: CS2 + Stream Deck restart recovery`);
@@ -101,7 +102,7 @@ console.log(`${human.restartRecoveryPassed ? "PASS" : "FAIL"}  Human check: CS2 
 if (failures.length) {
   console.log("\nCS2 RELEASE EVIDENCE: BLOCKED");
   for (const failure of failures) console.log(`  • ${failure}`);
-  console.log("\nAfter all three visual/restart checks are true, run:");
+  console.log("\nAfter both providers are ready together and all three visual/restart checks are true, run:");
   console.log("npm run host:audit:release -- --hs-ok --labels-ok --restart-ok");
   process.exit(1);
 }
