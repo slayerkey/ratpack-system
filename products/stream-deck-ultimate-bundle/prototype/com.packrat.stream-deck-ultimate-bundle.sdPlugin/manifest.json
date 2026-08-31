@@ -36,7 +36,7 @@
     {"Name":"profiles/Stream Deck Ultimate - Plus","DeviceType":7,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true},
     {"Name":"profiles/Stream Deck Ultimate - Neo","DeviceType":9,"Readonly":false,"DontAutoSwitchWhenInstalled":false,"AutoInstall":true}
   ],
-  "PropertyInspectorPath":"ui/property-inspector-v07.html",
+  "PropertyInspectorPath":"ui/property-inspector-v071.html",
   "SDKVersion":2,
   "Software":{"MinimumVersion":"6.6"},
   "UUID":"com.packrat.stream-deck-ultimate-bundle",
