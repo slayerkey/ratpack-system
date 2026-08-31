@@ -1,6 +1,6 @@
-# PackRat Voice Deck
+# PackRat Voice Deck for Discord
 
-PackRat Voice Deck is the paid Stream Deck-native Discord voice dashboard and control plugin.
+PackRat Voice Deck for Discord is the paid Stream Deck-native Discord voice dashboard and control plugin.
 
 It is intentionally independent from PackRat Voice Bridge and PackRat Voice Panel. Voice Deck owns one local Discord Desktop RPC session itself, normalizes that state once, and fans it out to every visible Stream Deck action.
 
@@ -56,8 +56,16 @@ rat audit voice-deck --probe
 
 The probe first runs the normal audit, then exercises the same development Discord IPC/auth/channel/roster path as Voice Deck. It prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
 
-Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. Neither diagnostic replaces the physical Stream Deck smoke.
+Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. The physical smoke is complete and recorded as PASS.
 
-## Release boundary
+## Release status
 
-Development uses the same proven Discord StreamKit RPC feasibility path as PackRat Voice Bridge. Public commercial release remains fail-closed until Discord grants the PackRat production application the required RPC scopes or explicitly permits the StreamKit production path. See `DISCORD_APPROVAL.md`.
+Status: `READY_TO_SHIP`
+
+The Windows/Stream Deck physical smoke passed, the Discord transport probe passed, and the operator confirmed that the external Discord commercial release and product naming approval has been received. The current tested Discord transport remains the release path for this build; no runtime authentication migration is being made in this release pass.
+
+Public submission is now routed through:
+
+```text
+rat ship voice-deck
+```
