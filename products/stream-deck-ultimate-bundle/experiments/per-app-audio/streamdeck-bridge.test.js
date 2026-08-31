@@ -10,9 +10,10 @@ const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = requir
   assert.equal(compactKeyTitle({ title: "Anything", value: "SET APP", status: "unconfigured" }), "SET\nAPP");
 
   const outbound = [];
-  const renderer = createProtocolRenderer(message => outbound.push(JSON.parse(JSON.stringify(message))));
+  const send = message => outbound.push(JSON.parse(JSON.stringify(message)));
+  const renderer = createProtocolRenderer(send);
   const runtime = createAppAudioRuntime({ mock: true, cacheMs: 5000, coalesceMs: 15, render: renderer });
-  const bridge = new AppAudioActionBridge({ runtime });
+  const bridge = new AppAudioActionBridge({ runtime, send });
   try {
     await runtime.start();
 
@@ -20,8 +21,28 @@ const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = requir
     assert.equal(ignored.handled, false);
     assert.equal(outbound.length, 0);
 
-    // Actual Stream Deck encoder payload -> setFeedback.
+    // Property Inspector asks for active audio apps and gets clean unique process choices.
     let result = await bridge.handle({
+      event: "sendToPlugin", action: ACTION_UUID, context: "pi",
+      payload: { command: "list-apps" }
+    });
+    assert.equal(result.handled, true);
+    assert.equal(result.result.unavailable, false);
+    assert.deepEqual(result.result.apps.map(x => x.value), ["discord", "spotify"]);
+    assert.deepEqual(outbound.at(-1), {
+      event: "sendToPropertyInspector", action: ACTION_UUID, context: "pi",
+      payload: {
+        type: "app-options",
+        apps: [
+          { value: "discord", label: "Discord", pidCount: 1, sessionCount: 2, active: true },
+          { value: "spotify", label: "Spotify", pidCount: 1, sessionCount: 1, active: true }
+        ],
+        unavailable: false
+      }
+    });
+
+    // Actual Stream Deck encoder payload -> setFeedback.
+    result = await bridge.handle({
       event: "willAppear", action: ACTION_UUID, context: "current-dial",
       payload: { controller: "Encoder", settings: { mode: "current", step: 2 } }
     });
@@ -68,7 +89,7 @@ const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = requir
       payload: { title: "SET\nAPP", target: 0 }
     });
 
-    console.log("shadow App Volume Stream Deck protocol passed: action routing, real payload shapes, encoder setFeedback, compact keypad setTitle, live Current App and mute updates");
+    console.log("shadow App Volume Stream Deck protocol passed: active-app PI options, action routing, real payload shapes, encoder setFeedback, compact keypad setTitle, live Current App and mute updates");
   } finally {
     await runtime.dispose();
   }
