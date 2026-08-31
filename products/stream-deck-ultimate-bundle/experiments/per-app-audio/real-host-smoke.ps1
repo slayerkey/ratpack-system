@@ -1,6 +1,7 @@
 param(
   [string]$Process = "",
-  [int]$Pid = 0,
+  [Alias("Pid")]
+  [int]$TargetPid = 0,
   [switch]$Exercise,
   [string]$OutputPath = ""
 )
@@ -39,7 +40,7 @@ $report = [ordered]@{
     os = [Environment]::OSVersion.VersionString
     powershell = $PSVersionTable.PSVersion.ToString()
   }
-  requested = [ordered]@{ process = $Process; pid = $Pid; exercise = [bool]$Exercise }
+  requested = [ordered]@{ process = $Process; pid = $TargetPid; exercise = [bool]$Exercise }
   endpointAvailable = $false
   sessionCount = 0
   sessions = @()
@@ -56,12 +57,12 @@ try {
   $report.sessionCount = $sessions.Count
   $report.sessions = @($sessions | ForEach-Object { Public-Session $_ })
 
-  if ($Pid -le 0 -and [string]::IsNullOrWhiteSpace($Process)) {
+  if ($TargetPid -le 0 -and [string]::IsNullOrWhiteSpace($Process)) {
     $report.status = 'audit-only-needs-target'
   } else {
     $key = Normalize-Process $Process
     $matches = @($sessions | Where-Object {
-      if ($Pid -gt 0) { [int]$_.pid -eq $Pid }
+      if ($TargetPid -gt 0) { [int]$_.pid -eq $TargetPid }
       else { (Normalize-Process ([string]$_.process)) -eq $key }
     })
     $pids = @($matches | ForEach-Object { [int]$_.pid } | Where-Object { $_ -gt 0 } | Select-Object -Unique)
