@@ -7,6 +7,7 @@ import { releaseRuntimeFingerprint } from "./release-fingerprint.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
 const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
+const THIRD_PARTY_NOTICES = "static/THIRD_PARTY_NOTICES.txt";
 const HOST_LOG_DIR = "%APPDATA%\\PackRat\\CS2CompetitiveDashboard\\logs";
 const RUNTIME_FINGERPRINT = releaseRuntimeFingerprint();
 
@@ -27,6 +28,7 @@ for (const build of builds) {
     "utf8"
   );
 
+  await copyFile(THIRD_PARTY_NOTICES, path.join(build.output, "THIRD_PARTY_NOTICES.txt"));
   await copyFile("static/ui/property-inspector.html", path.join(build.output, "ui", "property-inspector.html"));
   await copyFile("static/ui/pi.js", path.join(build.output, "ui", "pi.js"));
   await copyFile("static/ui/diagnostics.js", path.join(build.output, "ui", "diagnostics.js"));
