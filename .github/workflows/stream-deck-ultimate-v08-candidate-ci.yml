@@ -1,0 +1,165 @@
+name: Stream Deck Ultimate v0.8 Prepromotion CI
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/**'
+      - '.github/workflows/stream-deck-ultimate-v08-candidate-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  windows-v08-prepromotion:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: v0.8 integration source syntax
+        run: |
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-app-audio-adapter.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/plugin-v08-shadow.cjs
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-runtime-smoke.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
+
+      - name: v0.8 staging PowerShell syntax
+        shell: powershell
+        run: |
+          foreach ($file in @(
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-v08-candidate.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1'
+          )) {
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors)
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          }
+          Write-Host 'v0.8 prepromotion PowerShell syntax parsed'
+
+      - name: Build precompiled App Volume helper
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1'
+          $build = $json | ConvertFrom-Json
+          if (-not $build.ok) { throw 'v0.8 helper build did not report ok' }
+          if ($build.type -ne 'PackRatAppAudio.Core') { throw "Unexpected helper type: $($build.type)" }
+          if ($build.foregroundType -ne 'PackRatAppAudio.Foreground') { throw "Unexpected foreground helper type: $($build.foregroundType)" }
+          if (-not (Test-Path -LiteralPath $build.path)) { throw "v0.8 helper missing: $($build.path)" }
+          "PACKRAT_V08_DLL=$($build.path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKRAT_V08_DLL_SHA=$($build.sha256)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "v0.8 helper built: $($build.sizeBytes) bytes sha256=$($build.sha256)"
+
+      - name: Stage v0.8 candidate from frozen v0.7.1
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-v08-candidate.ps1' -AssemblyPath $env:PACKRAT_V08_DLL
+          $candidate = $json | ConvertFrom-Json
+          if (-not $candidate.ok) { throw 'v0.8 candidate staging did not report ok' }
+          if ($candidate.pluginUuid -ne 'com.packrat.stream-deck-ultimate-bundle') { throw "Unexpected candidate plugin UUID: $($candidate.pluginUuid)" }
+          if ($candidate.actionUuid -ne 'com.packrat.stream-deck-ultimate-bundle.app-audio') { throw "Unexpected candidate action UUID: $($candidate.actionUuid)" }
+          if ($candidate.version -ne '0.8.0.0') { throw "Unexpected candidate version: $($candidate.version)" }
+          if ($candidate.helperSha256 -ne $env:PACKRAT_V08_DLL_SHA) { throw 'v0.8 candidate helper hash mismatch' }
+          "PACKRAT_V08_CANDIDATE=$($candidate.candidateDir)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "staged v0.8 candidate: $($candidate.fileCount) files helper=$($candidate.helperSha256)"
+
+      - name: Accepted v0.7.1 source remains byte-clean
+        shell: powershell
+        run: |
+          git diff --exit-code -- products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+          if ($LASTEXITCODE -ne 0) { throw 'Accepted v0.7.1 source directory changed during candidate staging' }
+          Write-Host 'accepted v0.7.1 source directory remains untouched'
+
+      - name: Install locked candidate runtime dependency
+        shell: powershell
+        run: |
+          Push-Location $env:PACKRAT_V08_CANDIDATE
+          try { npm ci --omit=dev --ignore-scripts --no-audit --no-fund } finally { Pop-Location }
+
+      - name: Frozen v0.6 product logic regression
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Frozen v0.7 Smart Context logic regression
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_logic_test_v7.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Frozen v0.7.1 diagnostics privacy regression
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_logic_test_v71.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Frozen core through v0.8 multiplexed CodePath
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Smart Context through v0.8 multiplexed CodePath
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_CONTEXT_PROCESS: 'chrome'
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Diagnostics through v0.8 multiplexed CodePath
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_DIAGNOSTICS_MOCK: '1'
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Combined frozen-core plus lazy App Volume runtime
+        shell: powershell
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-runtime-smoke.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Verify v0.8 candidate contract and packaged helper
+        shell: powershell
+        run: |
+          $manifest = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'manifest.json') -Raw | ConvertFrom-Json
+          $info = Get-Content -LiteralPath (Join-Path $env:PACKRAT_V08_CANDIDATE 'V08_CANDIDATE_INFO.json') -Raw | ConvertFrom-Json
+          $acceptedManifest = 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/manifest.json'
+          $accepted = Get-Content -LiteralPath $acceptedManifest -Raw | ConvertFrom-Json
+          $dll = Join-Path $env:PACKRAT_V08_CANDIDATE 'bin\app-audio\PackRatAppAudio.dll'
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll).Hash.ToLowerInvariant()
+          if ($accepted.Version -ne '0.7.1.0' -or $accepted.CodePath -ne 'bin/plugin-v071.cjs') { throw 'Accepted product is no longer the frozen v0.7.1 runtime' }
+          if ($manifest.Version -ne '0.8.0.0' -or $manifest.CodePath -ne 'bin/plugin-v08.cjs') { throw 'Candidate manifest is not the expected v0.8 runtime' }
+          $app = @($manifest.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' })
+          if ($app.Count -ne 1) { throw "Expected exactly one App Volume action, found $($app.Count)" }
+          if ($app[0].PropertyInspectorPath -ne 'ui/property-inspector-app-volume.html') { throw 'App Volume must use its dedicated property inspector' }
+          if ($sha -ne $info.helperSha256 -or $sha -ne $env:PACKRAT_V08_DLL_SHA) { throw 'v0.8 packaged helper integrity verification failed' }
+          $sourceFiles = @(Get-ChildItem -Recurse -File -LiteralPath $env:PACKRAT_V08_CANDIDATE | Where-Object { $_.Extension -eq '.cs' })
+          if ($sourceFiles.Count -ne 0) { throw 'v0.8 candidate unexpectedly contains C# source' }
+          if (-not $info.lazyWorker) { throw 'v0.8 candidate must keep App Volume worker lazy' }
+          Write-Host "v0.8 candidate contract verified: actions=$($manifest.Actions.Count) helper=$sha lazyWorker=$($info.lazyWorker)"
+
+      - name: Install Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.9.0
+
+      - name: Officially validate v0.8 candidate
+        shell: powershell
+        run: streamdeck validate "$env:PACKRAT_V08_CANDIDATE" --force-update-check
+
+      - name: Officially pack v0.8 prepromotion candidate
+        shell: powershell
+        run: |
+          $output = Join-Path (Split-Path -Parent $env:PACKRAT_V08_CANDIDATE) 'packed'
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+          streamdeck pack "$env:PACKRAT_V08_CANDIDATE" --output "$output" --force --no-file-list
+          $packed = @(Get-ChildItem -LiteralPath $output -Filter '*.streamDeckPlugin' -File)
+          if ($packed.Count -ne 1) { throw "Expected one packed v0.8 candidate, found $($packed.Count)" }
+          Write-Host "packed v0.8 prepromotion candidate: $($packed[0].FullName) size=$($packed[0].Length)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-v0.8-prepromotion-candidate
+          path: |
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/packed/*.streamDeckPlugin
+            products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-dist/com.packrat.stream-deck-ultimate-bundle.sdPlugin/V08_CANDIDATE_INFO.json
+          if-no-files-found: error
