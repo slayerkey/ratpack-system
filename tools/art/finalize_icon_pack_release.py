@@ -13,8 +13,9 @@ properties RatPack depends on instead of trusting historical CI alone:
 * Marketplace search icon provenance
 
 The finalizer writes FACTORY-RELEASE-AUDIT.json into the Rat kit and replaces the
-Marketplace search icon with a deterministic 512px raster of the staged product
-icon.svg. The staged SVG remains the source of truth.
+Marketplace search icon with a deterministic 288px raster of the staged product
+icon.svg, matching current Elgato Marketplace product-image requirements. The
+staged SVG remains the source of truth.
 """
 from __future__ import annotations
 
@@ -27,6 +28,8 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
+
+MARKETPLACE_APP_ICON_SIZE = 288
 
 
 def fail(message: str) -> None:
@@ -70,8 +73,8 @@ def rasterize_product_icon(svg_path: Path, destination: Path) -> dict[str, Any]:
         png_bytes = bytes(
             resvg_py.svg_to_bytes(
                 svg_string=svg_bytes.decode("utf-8"),
-                width=512,
-                height=512,
+                width=MARKETPLACE_APP_ICON_SIZE,
+                height=MARKETPLACE_APP_ICON_SIZE,
             )
         )
     except Exception as exc:
@@ -80,8 +83,9 @@ def rasterize_product_icon(svg_path: Path, destination: Path) -> dict[str, Any]:
     try:
         with Image.open(io.BytesIO(png_bytes)) as image:
             rendered = image.convert("RGBA")
-            if rendered.size != (512, 512):
-                fail(f"product search icon rendered at {rendered.size}, expected 512x512")
+            expected = (MARKETPLACE_APP_ICON_SIZE, MARKETPLACE_APP_ICON_SIZE)
+            if rendered.size != expected:
+                fail(f"product search icon rendered at {rendered.size}, expected {expected[0]}x{expected[1]}")
             if rendered.getbbox() is None:
                 fail("product search icon rendered completely transparent")
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -94,8 +98,8 @@ def rasterize_product_icon(svg_path: Path, destination: Path) -> dict[str, Any]:
         "source_sha256": sha256_bytes(svg_bytes),
         "output": destination.name,
         "output_sha256": sha256_bytes(destination.read_bytes()),
-        "width": 512,
-        "height": 512,
+        "width": MARKETPLACE_APP_ICON_SIZE,
+        "height": MARKETPLACE_APP_ICON_SIZE,
     }
 
 
@@ -231,7 +235,8 @@ def main() -> None:
         "Icon-pack release audit PASS:",
         f"{static_count} static + {animated_count} animated = {len(staged_entries)} picker entries;",
         f"{unique_glyphs} distinct glyphs; {reuse_groups} reviewed reuse groups;",
-        f"{unexpected_groups} unexpected structural groups; {len(duplicate_groups)} exact RGBA duplicate groups",
+        f"{unexpected_groups} unexpected structural groups; {len(duplicate_groups)} exact RGBA duplicate groups;",
+        f"Marketplace app icon {MARKETPLACE_APP_ICON_SIZE}x{MARKETPLACE_APP_ICON_SIZE}",
     )
 
 
