@@ -3,15 +3,29 @@ import { access, copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { builds } from "./builds.mjs";
 import { generateBundledProfiles } from "./profiles.mjs";
+import { releaseRuntimeFingerprint } from "./release-fingerprint.mjs";
 
 const SUPPORT_URL = "https://discord.gg/Fp6jUAtyas";
 const LEETIFY_ATTRIBUTION = "static/ui/leetify-provided-dark.svg";
 const HOST_LOG_DIR = "%APPDATA%\\PackRat\\CS2CompetitiveDashboard\\logs";
+const RUNTIME_FINGERPRINT = releaseRuntimeFingerprint();
 
 for (const build of builds) {
   await mkdir(path.join(build.output, "bin"), { recursive: true });
   await mkdir(path.join(build.output, "ui"), { recursive: true });
   await mkdir(path.join(build.output, "imgs", "actions"), { recursive: true });
+
+  await writeFile(
+    path.join(build.output, "build-info.json"),
+    `${JSON.stringify({
+      schema: 1,
+      product: "cs2-competitive-dashboard",
+      flavor: build.flavor,
+      version: "0.1.0.0",
+      runtimeFingerprint: RUNTIME_FINGERPRINT
+    }, null, 2)}\n`,
+    "utf8"
+  );
 
   await copyFile("static/ui/property-inspector.html", path.join(build.output, "ui", "property-inspector.html"));
   await copyFile("static/ui/pi.js", path.join(build.output, "ui", "pi.js"));
@@ -41,6 +55,7 @@ for (const build of builds) {
   await generateImages(build);
 }
 
+console.log(`Runtime fingerprint embedded in both plugin flavors: ${RUNTIME_FINGERPRINT}`);
 console.log(`Pro host diagnostics after install: ${HOST_LOG_DIR}\\cs2-competitive-dashboard-pro.log`);
 console.log(`Lite host diagnostics after install: ${HOST_LOG_DIR}\\cs2-competitive-dashboard-lite.log`);
 
