@@ -1,6 +1,18 @@
 # CS2 Competitive Dashboard Pro Final Host Test
 
-This is the final physical Windows release candidate test. The goal is one complete pass that produces machine-readable release evidence tied to the exact runtime being tested. Do not reopen basic GSI setup investigation unless this pass produces new evidence that the transport itself regressed.
+This is the final physical Windows release-candidate test. The goal is one complete pass that produces machine-readable release evidence tied to the exact Rat Dev runtime being tested. Do not reopen basic GSI setup investigation unless this pass produces new evidence that the transport itself regressed.
+
+## Important path rule
+
+`rat main` intentionally keeps the canonical RatPack checkout on current `main`.
+
+`rat dev cs2-competitive-dashboard` then fetches `origin/product/cs2-competitive-dashboard` and builds the CS2 candidate in the ignored detached development worktree:
+
+```text
+out\dev\worktrees\cs2-competitive-dashboard
+```
+
+That means all product-specific audit/release commands **before PR #29 is merged** must target the plugin inside that Rat Dev worktree. Do not `cd products\cs2-competitive-dashboard\plugin` in the canonical `main` checkout; that product path is not on `main` yet.
 
 ## Before launching CS2
 
@@ -12,10 +24,11 @@ rat main
 rat dev cs2-competitive-dashboard
 ```
 
-3. Use the Pro build installed by Rat Dev.
-4. Import/open the bundled **CS2 Live Match** profile if Stream Deck developer linking did not run the normal bundled profile install lifecycle.
-5. Open the Property Inspector for any CS2 Competitive Dashboard Pro action.
-6. In Advanced Diagnostics confirm:
+3. Read the Rat Dev success footer and confirm it reports the CS2 product branch/candidate and Pro UUID.
+4. Use the Pro build installed/linked by Rat Dev.
+5. Import/open the bundled **CS2 Live Match** profile if Stream Deck developer linking did not run the normal bundled profile install lifecycle.
+6. Open the Property Inspector for any CS2 Competitive Dashboard Pro action.
+7. In Advanced Diagnostics confirm:
 
    * Plugin process: running
    * Stream Deck: connected
@@ -77,7 +90,7 @@ While the current Pro process is still running:
 
 ## Provider smoke test
 
-Both provider integrations are part of the intended Pro launch, so the final release evidence requires one real successful refresh from each provider in the same latest plugin process.
+Both provider integrations are part of the intended Pro launch, so the final release evidence requires one real refresh where **Leetify and FACEIT are both ready in the same refresh**.
 
 ### Leetify
 
@@ -114,7 +127,7 @@ Both provider integrations are part of the intended Pro launch, so the final rel
 
 4. Confirm **View on FACEIT** opens the expected profile when available.
 
-A provider with no matching public profile/data should show a clear not-found/private/setup state rather than fake values, but the final release evidence itself needs one `ready` refresh from each shipping provider.
+A provider with no matching public profile/data should show a clear not-found/private/setup state rather than fake values, but the final release evidence itself needs one refresh where both shipping providers are `ready`.
 
 ## Restart and recovery pass
 
@@ -124,7 +137,8 @@ A provider with no matching public profile/data should show a clear not-found/pr
 4. Re-enter a normal game mode.
 5. Confirm live values reconnect without re-running setup or rewriting anything manually.
 6. Restart Stream Deck once and confirm the plugin returns to a working local listener/config state.
-7. After the restart, keep Stream Deck/plugin running for the final evidence command. If your provider settings are still configured, allow the provider refresh to complete again so the latest process contains current provider-ready evidence.
+7. After the Stream Deck restart, keep Stream Deck/plugin running for the final evidence command.
+8. Allow the configured online refresh to complete again, or press **Refresh Stats**, so the **latest plugin process** contains one Leetify + FACEIT both-ready event.
 
 ## One-command final physical release audit
 
@@ -134,14 +148,15 @@ When all three human observations below are true:
 * long key values remained readable
 * CS2 + Stream Deck restart/recovery worked
 
-leave Stream Deck/plugin running and execute:
+leave Stream Deck/plugin running. From the **canonical RatPack root** execute this exact command:
 
 ```powershell
-cd products\cs2-competitive-dashboard\plugin
-npm run host:audit:release -- --hs-ok --labels-ok --restart-ok
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run host:audit:release -- --hs-ok --labels-ok --restart-ok
 ```
 
-This command first runs the normal core host audit, then requires and records:
+This targets the exact product-branch worktree Rat Dev built and linked.
+
+The command first runs the normal core host audit, then requires and records:
 
 * Stream Deck connection success
 * CS2 installation detection
@@ -157,57 +172,61 @@ This command first runs the normal core host audit, then requires and records:
 * sustained live traffic reaching at least the 300-packet logged checkpoint
 * **Open Log Folder** successfully exercised in the latest plugin process
 * live redacted localhost diagnostics reachable
-* a real Leetify provider refresh reaching `ready`
-* a real FACEIT provider refresh reaching `ready`
+* one real provider refresh with **both Leetify and FACEIT `ready`**
 * your explicit HS%, long-label, and restart/recovery attestations
 
-If all of that passes, it writes this local gitignored evidence file:
+If all of that passes, it writes the local gitignored evidence file inside the Rat Dev worktree:
 
 ```text
-products\cs2-competitive-dashboard\plugin\.release-evidence\host-pass.json
+out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin\.release-evidence\host-pass.json
 ```
 
-The evidence includes a SHA-256 fingerprint of the runtime, Property Inspector, build inputs, profiles, and locked dependencies you actually tested. `npm run release:final` requires that exact fingerprint, so meaningful runtime changes after the physical test automatically force a new host pass. The official Leetify badge asset and Marketplace art/copy are intentionally outside that runtime fingerprint, so adding the approved attribution asset later does not by itself force another CS2 match.
+The evidence includes a SHA-256 fingerprint of the runtime, Property Inspector, build inputs, profiles, and locked dependencies you actually tested. `release:final` requires that exact fingerprint, so meaningful runtime changes after the physical test automatically force a new host pass.
 
-You can still run the lighter diagnostic-only command at any time:
+The official Leetify badge asset, clearance record, Marketplace art/copy, and release docs are intentionally outside that physical runtime fingerprint. Those can be completed after the host pass without making you replay a CS2 match.
+
+The Rat Dev worktree cleanup uses normal Git clean behavior and the evidence path is intentionally ignored, so a later `rat dev cs2-competitive-dashboard` refresh can update badge/clearance-only branch changes without deleting the local evidence file.
+
+### Lighter diagnostic command
+
+If you only want diagnostics without recording final release evidence:
 
 ```powershell
-npm run host:audit
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run host:audit
 ```
 
-but **`host:audit:release` is the final physical release gate**.
+But **`host:audit:release` is the final physical release gate**.
 
 ## Pass criteria
 
 The physical host gate is complete only when:
 
-1. `npm run host:audit:release -- --hs-ok --labels-ok --restart-ok` reports `CS2 RELEASE EVIDENCE: PASS`.
-2. `.release-evidence/host-pass.json` exists.
-3. You did not knowingly use the three attestation flags for a check that actually failed.
+1. The worktree-targeted `host:audit:release` command reports `CS2 RELEASE EVIDENCE: PASS`.
+2. The worktree `.release-evidence\host-pass.json` exists.
+3. You did not knowingly use an attestation flag for a check that actually failed.
 
-There is no separate manual checklist to remember after that command; the evidence file is the source of truth for `release:final`.
+There is no second manual checklist after that command. The evidence file is the source of truth for `release:final`.
 
 ## If anything fails
 
 Do not start a sequence of small blind troubleshooting experiments.
 
-Collect this one evidence bundle:
-
-1. Full output of:
+Run the same command but use only the flags for checks that actually passed. For example, if restart recovery failed, omit `--restart-ok`:
 
 ```powershell
-npm run host:audit:release -- --hs-ok --labels-ok --restart-ok
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run host:audit:release -- --hs-ok --labels-ok
 ```
 
-Use only the flags for observations that genuinely passed. If one human check failed, omit that flag; the command will tell us exactly which gate is missing.
+Then collect only:
 
-2. The current Pro log:
+1. the full command output;
+2. the current Pro log:
 
 ```text
 %APPDATA%\PackRat\CS2CompetitiveDashboard\logs\cs2-competitive-dashboard-pro.log
 ```
 
-3. One sentence describing the visible mismatch, for example `Session HS% showed 42% after 5 headshot kills out of 6 total kills` or `DESERT EAGLE is clipped on the right edge`.
+3. one sentence describing the visible mismatch, for example `Session HS% showed 42% after 5 headshot kills out of 6 total kills` or `DESERT EAGLE is clipped on the right edge`.
 
 If the plugin was still running when the audit ran, its output already contains the redacted localhost Diagnostic Summary. Only use the Property Inspector's **Copy Diagnostic Summary** as a fallback if the audit says the live diagnostic endpoint was unreachable.
 
@@ -215,10 +234,18 @@ That bundle should be treated as the source of truth for the next debugging pass
 
 ## Marketplace release after host PASS
 
-The software/hardware evidence alone does not override provider licensing requirements. After the physical evidence passes and the official Leetify asset/paid-use clearance are available, run:
+The software/hardware evidence alone does not override provider licensing requirements.
+
+After the physical evidence passes:
+
+1. Obtain the official Leetify dark-background badge.
+2. Obtain written paid-use clearance and record `Status: CLEARED` in `LEETIFY_COMMERCIAL_CLEARANCE.md`.
+3. Commit those **non-runtime** release changes to the product branch.
+4. Run `rat dev cs2-competitive-dashboard` once more so the detached worktree receives the current product-branch release files. The ignored physical evidence remains in place.
+5. From the canonical RatPack root run:
 
 ```powershell
-npm run release:final
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run release:final
 ```
 
 The final Marketplace gate requires all of these together:
@@ -227,10 +254,12 @@ The final Marketplace gate requires all of these together:
 * Lite Marketplace launch remains held
 * fresh physical host evidence is present and no more than 7 days old
 * host evidence runtime fingerprint matches the exact release candidate
-* real Leetify + FACEIT provider-ready evidence is included in that host pass
+* real Leetify + FACEIT both-ready evidence is included in that host pass
 * the official unmodified Leetify attribution SVG is present and wired into the built Property Inspector
 * Leetify paid/commercial product use has written clearance recorded in `LEETIFY_COMMERCIAL_CLEARANCE.md`
 
-`rat ship` / `rat submit` also fail closed while the canonical Pro product workflow state is `BLOCKED`. Only move Pro to `READY_TO_SHIP` after `release:final` passes.
+`rat ship` / `rat submit` also fail closed while the canonical Pro product workflow state is `BLOCKED`.
+
+Do **not** run repository promotion from the detached Rat Dev worktree. After `release:final` reports `FINAL MARKETPLACE GATE: PASS`, promote the actual `product/cs2-competitive-dashboard` branch to `READY_TO_SHIP`, merge PR #29 to main, run `rat main`, then ship from canonical main.
 
 Once the physical evidence and final Marketplace gate pass, stop adding features and submit CS2 Competitive Dashboard Pro.
