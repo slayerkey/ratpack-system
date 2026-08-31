@@ -2,9 +2,9 @@
 
 ## Release candidate state
 
-PackRat Voice Panel `1.0.0` is strongly validated and priced at `$7.99` one time.
+PackRat Voice Panel `1.0.0` is strongly validated, priced at `$7.99` one time, and is `READY_TO_SHIP`.
 
-Required PackRat Voice Bridge companion `1.0.0.0` is free.
+Required PackRat Voice Bridge companion `1.0.0.0` is free and is also `READY_TO_SHIP`.
 
 Live path:
 
@@ -22,7 +22,9 @@ The XENEON widget performs no Discord OAuth and contains no Discord token, Clien
 - 50-member stress at all eight sizes on source and package
 - Unicode/emoji/pathological name safety
 - reduced-motion and iCUE appearance settings
-- speaking promotion/hold, member detail, joins/leaves, channel switching
+- stable member slots while speaking state changes
+- smaller contained real Discord avatars with separate nameplate geometry
+- member detail, joins/leaves, channel switching
 - mute/deafen state and command mapping
 - idle/auth/failure/disconnected/recovery states
 - packaged `file://` localhost WebSocket test
@@ -32,43 +34,33 @@ The XENEON widget performs no Discord OAuth and contains no Discord token, Clien
 - StreamSpell package verification at all eight presets
 - exact official package through the Corsair Labs Windows iCUE Widget Runner
 - lexical iCUE binding regression covering real-host-style variable updates
+- external tester field run on real XENEON Edge hardware reported working successfully
+
+Latest stable-roster / avatar-layout Deep QA: run `33348380403`, **PASS**.
+Latest Marketplace Kit: run `33348380455`, **PASS**.
 
 ## Companion state
 
-The free companion has been migrated to official `@elgato/streamdeck` `2.1.2`, `SDKVersion: 3`, Node.js 24, a deterministic lockfile, bundled output, and official Elgato validate/pack release CI.
+The free companion uses official `@elgato/streamdeck` `2.1.2`, `SDKVersion: 3`, Node.js 24, a deterministic lockfile, bundled output, and official Elgato validate/pack release CI.
 
-The same Discord transport was previously proven on the user's real Windows machine with native Discord IPC, authorization, current channel/roster, speaking state, and mute/deafen state.
+The Discord transport has been proven on real Windows with native Discord IPC, authorization, current channel/roster, speaking state, and mute/deafen state. The combined Bridge + Panel integration has also now been field-tested by an external XENEON tester and reported working successfully.
 
-Completed user smoke: the final `1.0.0.0` Bridge Status check on the user's real Windows Stream Deck/Discord installation looked good after the SDK migration and memory-only credential changes.
+No additional local engineering smoke is required before Marketplace submission. If the Discord application identity or token exchange path is changed later, rerun the full real Windows authorization/channel/roster/speaking/mute/deafen smoke after that implementation change.
 
-No additional local engineering smoke is currently required. If Discord approval changes the production application identity or token exchange path, rerun the full real Windows authorization/channel/roster/speaking/mute/deafen smoke after that change.
+## Discord permission documentation
 
-## Physical XENEON boundary
+The earlier Discord RPC / StreamKit production-permission investigation remains in `plugins/discord-bridge/DISCORD_APPROVAL.md` for reference.
 
-PackRat does not currently own a physical XENEON Edge. The canonical automated release tiers are complete. A physical import/touch/local-bridge smoke test is additional confidence if hardware becomes available, but is not a reason to keep iterating ordinary widget code.
+On 2026-08-30 the operator explicitly elected **not** to treat that documentation question as a Marketplace release blocker for Voice Bridge or Voice Panel after successful real-world testing. This does not assert separate written Discord approval; it records the shipping decision for these two products.
 
-## Commercial Discord blocker
+Do not automatically restore the old Discord approval blocker unless the operator reverses this decision or a concrete Discord / Marketplace rejection requires it.
 
-Discord documents `rpc`, `rpc.voice.read`, and `rpc.voice.write` as approval-only scopes.
+## Marketplace finishing work
 
-The current technical feasibility path uses Discord StreamKit's public application identity. Do not assume that identity can be used by a separate paid PackRat product in production.
+Engineering and package gates are complete. The remaining normal release operation is authenticated Marketplace submission:
 
-Before public commercial release, satisfy one of these:
+```powershell
+rat ship discord-bridge discord-panel
+```
 
-1. obtain approval for the required scopes on a PackRat-owned Discord application and switch the free companion to that approved identity; or
-2. obtain explicit written confirmation from Discord that this third-party commercial use of the StreamKit public identity/token endpoint is permitted.
-
-Anything less should be treated as not approved.
-
-The companion repository includes `plugins/discord-bridge/DISCORD_APPROVAL.md` with the official support path and a prepared request template.
-
-## Marketplace finishing work after Discord clearance
-
-Once the Discord production identity is compliant:
-
-1. rerun the real Windows companion smoke if the identity/token path changed
-2. rerun Discord Bridge Release QA
-3. rerun Discord Panel Deep QA
-4. review the current private Elgato Maker/Marketplace agreement for companion disclosure requirements
-5. run current Rat Ship so it regenerates the final deterministic Rat Art and ship kits from canonical `main`
-6. submit the free PackRat Voice Bridge plus the `$7.99` PackRat Voice Panel
+Rat Ship should regenerate/verify the current deterministic kit from canonical `main` and proceed to Maker Console. If a new error occurs, troubleshoot that concrete submission error rather than reinstating the retired Discord permission blocker automatically.
