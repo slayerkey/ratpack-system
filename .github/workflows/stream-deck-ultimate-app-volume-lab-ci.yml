@@ -103,7 +103,13 @@ jobs:
           if ($manifest.UUID -eq 'com.packrat.stream-deck-ultimate-bundle') { throw 'Lab must never reuse the accepted plugin UUID' }
           if ($manifest.Actions[0].UUID -ne $info.actionUuid) { throw 'Lab action UUID does not match LAB_INFO' }
           if ($sha -ne $info.helperSha256 -or $sha -ne $env:PACKRAT_APP_AUDIO_SHA) { throw 'Lab helper integrity verification failed' }
-          Write-Host "lab isolation verified: plugin=$($manifest.UUID) action=$($manifest.Actions[0].UUID) helper=$sha"
+          $accepted = 'com.packrat.stream-deck-ultimate-bundle'
+          $textExtensions = @('.json','.js','.cjs','.html','.ps1','.txt','.md')
+          $stale = @(Get-ChildItem -Recurse -File -LiteralPath $env:PACKRAT_APP_VOLUME_LAB | Where-Object { $textExtensions -contains $_.Extension.ToLowerInvariant() } | Where-Object {
+            (Get-Content -LiteralPath $_.FullName -Raw -ErrorAction SilentlyContinue) -match [regex]::Escape($accepted)
+          })
+          if ($stale.Count -ne 0) { throw "Lab package contains accepted-product UUID in: $($stale.FullName -join ', ')" }
+          Write-Host "lab isolation verified: plugin=$($manifest.UUID) action=$($manifest.Actions[0].UUID) helper=$sha acceptedUuidReferences=0"
 
       - name: Install Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
