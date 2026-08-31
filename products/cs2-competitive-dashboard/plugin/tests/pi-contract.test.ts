@@ -166,11 +166,12 @@ test("persistent diagnostics are independent of Property Inspector RPC", () => {
   assert.doesNotMatch(diagnostics, /sendToPlugin/);
 });
 
-test("Property Inspector makes provider ownership explicit", () => {
+test("Property Inspector makes provider ownership explicit with approved Leetify attribution wording", () => {
   assert.match(html, /Leetify · Premier & Competitive/);
   assert.match(html, /FACEIT · FACEIT Stats/);
-  assert.match(html, /Leetify powers Premier and Competitive stats/);
-  assert.match(html, /FACEIT powers FACEIT stats only/);
+  assert.match(html, /Premier and Competitive stats use Data Provided by Leetify/);
+  assert.doesNotMatch(html, /Leetify powers Premier and Competitive stats/);
+  assert.match(html, /Data Provided by Leetify/);
   assert.match(pi, /LEETIFY_DEVELOPER_PAGE/);
   assert.match(pi, /FACEIT_DEVELOPER_PORTAL/);
 });
