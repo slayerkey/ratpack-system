@@ -3,8 +3,8 @@
   "name": "PackRat Voice Panel",
   "type": "widget",
   "status": "qa_passed",
-  "workflow_state": "BLOCKED",
-  "blocker": "Discord commercial RPC approval or explicit StreamKit reuse permission",
+  "workflow_state": "READY_TO_SHIP",
+  "blocker": null,
   "price_usd": 7.99,
   "version": "1.0.0",
   "platform": "CORSAIR iCUE / XENEON Edge",
@@ -22,5 +22,6 @@
     "deterministic Rat Art",
     "Rat Ship Maker Console kit preflight"
   ],
-  "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission, then authenticated Maker Console submission"
+  "release_note": "Operator elected to proceed with Marketplace submission after successful real-world testing. Discord RPC / StreamKit production permission remains documented for reference but is not treated as a release gate for this product.",
+  "final_boundary": "Authenticated Maker Console submission"
 }
