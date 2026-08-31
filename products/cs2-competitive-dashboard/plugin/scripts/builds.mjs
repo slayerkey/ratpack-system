@@ -1,4 +1,4 @@
-export const CREATOR_URL = "https://marketplace.elgato.com/%40packrat";
+export const CREATOR_URL = "https://marketplace.elgato.com/maker/packrat";
 
 export const builds = [
   {
