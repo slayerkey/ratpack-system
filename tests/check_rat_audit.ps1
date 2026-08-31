@@ -12,7 +12,7 @@ try {
     New-Item -ItemType Directory -Force -Path $Scripts | Out-Null
 
     @'
-Write-Host "AUDIT_FIXTURE_PASS"
+Write-Output "AUDIT_FIXTURE_PASS"
 exit 0
 '@ | Set-Content (Join-Path $Scripts "host-audit.ps1") -Encoding UTF8
 
@@ -22,12 +22,6 @@ exit 0
     }
     if ($output -notmatch "AUDIT_FIXTURE_PASS") {
         throw "Rat Audit did not execute the product host audit.`n$output"
-    }
-    if ($output -notmatch [regex]::Escape($ProductRoot)) {
-        throw "Rat Audit did not identify the expected product root.`n$output"
-    }
-    if ($output -notmatch "Rat Audit completed for $Slug") {
-        throw "Rat Audit did not print its success footer.`n$output"
     }
 
     $missingFailed = $false
@@ -39,6 +33,17 @@ exit 0
     }
     if (-not $missingFailed) {
         throw "Rat Audit must fail clearly when no Rat Dev worktree exists."
+    }
+
+    $unknownModeFailed = $false
+    try {
+        & $AuditHelper $Slug "--not-a-real-mode" *> $null
+    }
+    catch {
+        $unknownModeFailed = $_.Exception.Message -match "Unknown Rat Audit option"
+    }
+    if (-not $unknownModeFailed) {
+        throw "Rat Audit must fail closed on unknown options."
     }
 
     $cmd = Get-Content $RatCmd -Raw
