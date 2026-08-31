@@ -2,6 +2,7 @@
 const assert = require("assert");
 const { ACTION_UUID } = require("./action-spec.js");
 const { createAppAudioRuntime } = require("./runtime-factory.js");
+const { TestAppAudioWorker } = require("./test-worker.js");
 const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = require("./streamdeck-bridge.js");
 
 (async () => {
@@ -12,10 +13,13 @@ const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = requir
   const outbound = [];
   const send = message => outbound.push(JSON.parse(JSON.stringify(message)));
   const renderer = createProtocolRenderer(send);
-  const runtime = createAppAudioRuntime({ mock: true, cacheMs: 5000, coalesceMs: 15, render: renderer });
+  const worker = new TestAppAudioWorker();
+  const runtime = createAppAudioRuntime({ worker, cacheMs: 5000, coalesceMs: 15, render: renderer });
   const bridge = new AppAudioActionBridge({ runtime, send });
   try {
-    await runtime.start();
+    const started = await runtime.start();
+    assert.equal(started.ready, true);
+    assert.equal(started.worker.backend, "test");
 
     const ignored = await bridge.handle({ event: "willAppear", action: "com.other.action", context: "x", payload: {} });
     assert.equal(ignored.handled, false);
@@ -89,8 +93,9 @@ const { compactKeyTitle, createProtocolRenderer, AppAudioActionBridge } = requir
       payload: { title: "SET\nAPP", target: 0 }
     });
 
-    console.log("shadow App Volume Stream Deck protocol passed: active-app PI options, action routing, real payload shapes, encoder setFeedback, compact keypad setTitle, live Current App and mute updates");
+    console.log("shadow App Volume Stream Deck protocol passed: deterministic active-app PI options, action routing, real payload shapes, encoder setFeedback, compact keypad setTitle, live Current App and mute updates");
   } finally {
     await runtime.dispose();
+    assert.equal(worker.closed, true);
   }
 })().catch(e => { console.error(e.stack || e); process.exit(1); });
