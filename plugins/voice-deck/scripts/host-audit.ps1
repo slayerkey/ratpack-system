@@ -8,7 +8,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $PluginDir = Join-Path $Root "com.packrat.voice-deck.sdPlugin"
 $ManifestPath = Join-Path $PluginDir "manifest.json"
 $ReportPath = Join-Path $Root "HOST_AUDIT_LATEST.txt"
-$results = New-Object System.Collections.Generic.List[object]
+$script:results = @()
 
 function Add-Check {
     param(
@@ -17,7 +17,7 @@ function Add-Check {
         [string]$Status,
         [string]$Detail
     )
-    $results.Add([PSCustomObject]@{ name = $Name; status = $Status; detail = $Detail })
+    $script:results += [PSCustomObject]@{ name = $Name; status = $Status; detail = $Detail }
 }
 
 function Get-GitValue {
@@ -49,10 +49,11 @@ $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
 $commit = Get-GitValue @("rev-parse", "HEAD")
 $branch = Get-GitValue @("branch", "--show-current")
 if (-not $branch) { $branch = "detached" }
+$actionCount = @($manifest.Actions).Count
 
 Add-Check "manifest UUID" $(if ($manifest.UUID -eq "com.packrat.voice-deck") { "PASS" } else { "FAIL" }) ([string]$manifest.UUID)
 Add-Check "manifest version" $(if ($manifest.Version -eq "1.0.0.0") { "PASS" } else { "WARN" }) ([string]$manifest.Version)
-Add-Check "action count" $(if (@($manifest.Actions).Count -eq 12) { "PASS" } else { "FAIL" }) ("{0} actions" -f @($manifest.Actions).Count)
+Add-Check "action count" $(if ($actionCount -eq 12) { "PASS" } else { "FAIL" }) ("{0} actions" -f $actionCount)
 
 $profiles = @(Get-ChildItem (Join-Path $PluginDir "profiles") -Filter *.streamDeckProfile -File -ErrorAction SilentlyContinue)
 Add-Check "bundled profiles" $(if ($profiles.Count -eq 4) { "PASS" } else { "FAIL" }) ("{0} profiles" -f $profiles.Count)
@@ -110,9 +111,17 @@ if (-not $StaticOnly) {
     }
 }
 
-$failed = @($results | Where-Object status -eq "FAIL")
-$warned = @($results | Where-Object status -eq "WARN")
+$failed = @($script:results | Where-Object status -eq "FAIL")
+$warned = @($script:results | Where-Object status -eq "WARN")
 $overall = if ($failed.Count) { "FAIL" } elseif ($warned.Count) { "WARN" } else { "PASS" }
+$manualEvidence = if ($StaticOnly) { @() } else { @(
+    "Confirm a real Discord voice channel populates member keys.",
+    "Confirm speaking state lights the correct member key.",
+    "Confirm Stream Deck mute changes Discord and Discord mute changes Stream Deck.",
+    "Confirm Stream Deck deafen changes Discord and Discord deafen changes Stream Deck.",
+    "Switch voice channels and confirm the roster repopulates.",
+    "Restart Discord, then Stream Deck, and confirm automatic recovery."
+) }
 
 $report = [PSCustomObject]@{
     product = "PackRat Voice Deck"
@@ -123,44 +132,40 @@ $report = [PSCustomObject]@{
     branch = $branch
     plugin_uuid = [string]$manifest.UUID
     version = [string]$manifest.Version
-    checks = @($results)
-    manual_evidence = if ($StaticOnly) { @() } else { @(
-        "Confirm a real Discord voice channel populates member keys.",
-        "Confirm speaking state lights the correct member key.",
-        "Confirm Stream Deck mute changes Discord and Discord mute changes Stream Deck.",
-        "Confirm Stream Deck deafen changes Discord and Discord deafen changes Stream Deck.",
-        "Switch voice channels and confirm the roster repopulates.",
-        "Restart Discord, then Stream Deck, and confirm automatic recovery."
-    ) }
+    checks = @($script:results | ForEach-Object { $_ })
+    manual_evidence = $manualEvidence
 }
 
 if ($Json) {
     $report | ConvertTo-Json -Depth 6
 }
 else {
-    $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add("PACKRAT VOICE DECK HOST AUDIT")
-    $lines.Add("Overall: $overall")
-    $lines.Add("Time: $($report.generated_at)")
-    $lines.Add("Commit: $commit")
-    $lines.Add("Branch: $branch")
-    $lines.Add("UUID: $($report.plugin_uuid)")
-    $lines.Add("Version: $($report.version)")
-    $lines.Add("")
-    foreach ($check in $results) {
-        $lines.Add(("[{0}] {1}: {2}" -f $check.status, $check.name, $check.detail))
+    $lines = @(
+        "PACKRAT VOICE DECK HOST AUDIT",
+        "Overall: $overall",
+        "Time: $($report.generated_at)",
+        "Commit: $commit",
+        "Branch: $branch",
+        "UUID: $($report.plugin_uuid)",
+        "Version: $($report.version)",
+        ""
+    )
+    foreach ($check in $script:results) {
+        $lines += ("[{0}] {1}: {2}" -f $check.status, $check.name, $check.detail)
     }
     if (-not $StaticOnly) {
-        $lines.Add("")
-        $lines.Add("MANUAL EVIDENCE STILL REQUIRED")
-        foreach ($item in $report.manual_evidence) { $lines.Add("[ ] $item") }
-        $lines.Add("")
-        $lines.Add("If anything fails, share this one report plus one sentence describing what you saw. Do not reinstall first; plugin logs disappear on uninstall.")
+        $lines += ""
+        $lines += "MANUAL EVIDENCE STILL REQUIRED"
+        foreach ($item in $report.manual_evidence) { $lines += "[ ] $item" }
+        $lines += ""
+        $lines += "If anything fails, share this one report plus one sentence describing what you saw. Do not reinstall first; plugin logs disappear on uninstall."
     }
     $text = $lines -join [Environment]::NewLine
     $text | Write-Host
-    Set-Content -Path $ReportPath -Value $text -Encoding UTF8
-    if (-not $StaticOnly) { Write-Host "`nSaved shareable report: $ReportPath" -ForegroundColor Cyan }
+    if (-not $StaticOnly) {
+        Set-Content -Path $ReportPath -Value $text -Encoding UTF8
+        Write-Host "`nSaved shareable report: $ReportPath" -ForegroundColor Cyan
+    }
 }
 
 if ($failed.Count) { exit 1 }
