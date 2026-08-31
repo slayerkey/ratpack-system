@@ -12,7 +12,7 @@ on:
 jobs:
   windows-per-app-audio:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     permissions:
       contents: read
     steps:
@@ -29,18 +29,28 @@ jobs:
         run: |
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
 
-      - name: Parse experimental PowerShell wrapper
+      - name: Parse experimental PowerShell wrappers
         shell: powershell
         run: |
-          $errors = $null
-          $null = [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1'),
-            [ref]$null,
-            [ref]$errors
-          )
-          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          foreach ($file in @(
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1'
+          )) {
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors)
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          }
           Write-Host 'per-app audio PowerShell syntax parsed'
+
+      - name: Persistent mock worker protocol and behavior
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
+
+      - name: Persistent native worker loads real Core Audio interop
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
 
       - name: Compile Core Audio session COM interop under Windows PowerShell
         shell: powershell
