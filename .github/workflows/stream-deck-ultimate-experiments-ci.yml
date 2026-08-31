@@ -31,14 +31,23 @@ jobs:
       - name: Stream Deck Current App / named app surface semantics
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-surface-model.test.js
 
+      - name: App Volume shadow action and settings UX
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.test.js
+
       - name: Stream Deck app-audio lifecycle controller
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
 
       - name: Composed persistent Current App runtime
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
 
+      - name: Shadow Stream Deck protocol bridge
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.test.js
+
       - name: JavaScript syntax checks
         run: |
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/action-spec.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/settings-model.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/session-model.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-service.js
@@ -49,6 +58,8 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-controller.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
