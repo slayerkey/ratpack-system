@@ -1,6 +1,12 @@
 # Leetify Commercial Release Clearance
 
 Status: PENDING
+Approval-Date: PENDING
+Approval-Channel: PENDING
+Approval-Scope: PENDING
+Approval-Reference: PENDING
+Attribution-Asset-Source: PENDING
+Additional-Conditions: PENDING
 
 ## Why this exists
 
@@ -38,14 +44,17 @@ The build already detects that exact file and replaces the development text plac
 
 ## Evidence to record after approval
 
-When cleared, replace `Status: PENDING` above with `Status: CLEARED` and record:
+When written approval arrives, replace the structured fields at the top of this file:
 
-* approval date
-* Leetify contact or official channel
-* exact scope approved, including the $14.99 one-time paid product and customer-owned API-key model
-* link, message ID, or screenshot reference to the written response
-* any additional conditions Leetify asked PackRat to follow
-* source used for the official attribution asset
+* `Status: CLEARED`
+* `Approval-Date:` the date of the written approval, preferably `YYYY-MM-DD`
+* `Approval-Channel:` the Leetify contact or official channel that supplied it
+* `Approval-Scope:` explicitly state that the approved scope includes the **$14.99 one-time paid product** and **customer-owned Leetify API-key** model
+* `Approval-Reference:` a durable link, message ID, ticket ID, or screenshot/file reference to the written response
+* `Attribution-Asset-Source:` where the exact official badge file was obtained, preferably the official Leetify badge package/folder
+* `Additional-Conditions:` record Leetify's extra conditions, or `NONE` if the approval had no additional requirements
+
+`release:final` checks these fields when `Status: CLEARED`; changing only the status line is intentionally not enough to release the product.
 
 Do not put credentials, API keys, private tokens, or unrelated personal information in this file.
 
