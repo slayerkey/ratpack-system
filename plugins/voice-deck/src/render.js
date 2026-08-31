@@ -11,7 +11,7 @@ function esc(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
 
@@ -146,16 +146,27 @@ function renderChannel(snapshot, accent, settings) {
 }
 
 function renderAvatar(member, avatarData, accent, speaking, pulsePhase, showAvatar = true, fallbackInitials = true) {
+  const cx = 72;
+  const cy = 59;
+  const avatarRadius = 31;
+  const ringRadius = 35;
   const ringWidth = speaking ? (pulsePhase ? 8 : 6) : 3;
   const ringColor = speaking ? accent : "#343B49";
-  const ring = `<circle cx="72" cy="59" r="35" fill="#151A24" stroke="${ringColor}" stroke-width="${ringWidth}"/>`;
+  const imageX = cx - avatarRadius;
+  const imageY = cy - avatarRadius;
+  const imageSize = avatarRadius * 2;
+  const ring = `<circle cx="${cx}" cy="${cy}" r="${ringRadius}" fill="none" stroke="${ringColor}" stroke-width="${ringWidth}"/>`;
+
   if (showAvatar && avatarData) {
-    const patternId = "avatarPattern";
-    const avatar = `<defs><pattern id="${patternId}" patternUnits="userSpaceOnUse" x="40" y="27" width="64" height="64"><image href="${esc(avatarData)}" x="40" y="27" width="64" height="64" preserveAspectRatio="xMidYMid slice"/></pattern></defs><circle cx="72" cy="59" r="31" fill="url(#${patternId})"/>`;
-    return `${ring}${avatar}`;
+    const circlePath = `M ${cx} ${cy - avatarRadius} A ${avatarRadius} ${avatarRadius} 0 1 1 ${cx} ${cy + avatarRadius} A ${avatarRadius} ${avatarRadius} 0 1 1 ${cx} ${cy - avatarRadius} Z`;
+    const mattePath = `M ${imageX} ${imageY} H ${imageX + imageSize} V ${imageY + imageSize} H ${imageX} Z ${circlePath}`;
+    const avatar = `<circle cx="${cx}" cy="${cy}" r="${avatarRadius}" fill="#151A24"/><image href="${esc(avatarData)}" x="${imageX}" y="${imageY}" width="${imageSize}" height="${imageSize}" preserveAspectRatio="xMidYMid slice"/><path d="${mattePath}" fill="${BG}" fill-rule="evenodd"/>`;
+    return `${avatar}${ring}`;
   }
+
+  const base = `<circle cx="${cx}" cy="${cy}" r="${avatarRadius}" fill="#151A24"/>`;
   const label = fallbackInitials ? initials(member?.displayName) : "•";
-  return `${ring}${text(72, 68, label, 23, { fill: speaking ? FG : MUTED })}`;
+  return `${base}${text(cx, cy + 9, label, 23, { fill: speaking ? FG : MUTED })}${ring}`;
 }
 
 function renderMember(kind, snapshot, settings, accent, avatarData, now, pulsePhase) {
