@@ -1,6 +1,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
 const sys = require("./lib-v06-system.js");
 
 const UUID = "com.packrat.stream-deck-ultimate-bundle.context";
@@ -8,11 +9,12 @@ const pluginRoot = path.resolve(__dirname, "..");
 const imageCache = new Map();
 const contexts = new Map();
 const smartApps = new Map();
-let timer = null;
-let pollBusy = false;
+let watcher = null;
+let watcherBuffer = "";
+let watcherRestart = null;
 let activeProcess = "";
 let activeKind = "generic";
-let lastPoll = 0;
+let boundSocket = null;
 
 function imageData(rel) {
   try {
@@ -107,14 +109,6 @@ function commandFor(settings = {}) {
   const kind = mode === "smart" ? activeKind : (MAPS[mode] ? mode : "generic");
   return (MAPS[kind] || MAPS.generic)[slot - 1];
 }
-
-async function foregroundProcess() {
-  if (process.env.PACKRAT_CONTEXT_PROCESS) return String(process.env.PACKRAT_CONTEXT_PROCESS);
-  if (process.env.PACKRAT_CONTEXT_MOCK === "1") return "chrome";
-  const script = `Add-Type @'\nusing System;using System.Runtime.InteropServices;public static class PRCtx{[DllImport("user32.dll")]public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll")]public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);}\n'@;$h=[PRCtx]::GetForegroundWindow();if($h-eq[IntPtr]::Zero){'';exit};[uint32]$procId=0;[PRCtx]::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;if($procId){(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}`;
-  return String(await sys.runPS(script, 3500)).trim();
-}
-
 function renderContext(ws, ctx, inst) {
   const cmd = commandFor(inst.settings);
   if (cmd) setImage(ws, ctx, `imgs/keys/${cmd.image}.png`);
@@ -131,25 +125,41 @@ function renderAll(ws) {
   for (const [ctx, inst] of contexts) renderContext(ws, ctx, inst);
   for (const [ctx, inst] of smartApps) renderSmartApp(ws, ctx, inst);
 }
-async function poll(ws, force = false) {
-  if (pollBusy || (!contexts.size && !smartApps.size)) return;
-  if (!force && Date.now() - lastPoll < 500) return;
-  pollBusy = true;
-  try {
-    const p = await foregroundProcess();
-    const k = classifyProcess(p);
-    const changed = p.toLowerCase() !== activeProcess.toLowerCase() || k !== activeKind;
-    activeProcess = p; activeKind = k; lastPoll = Date.now();
-    if (changed || force) renderAll(ws);
-  } catch { activeProcess = ""; activeKind = "generic"; renderAll(ws); }
-  finally { pollBusy = false; }
+function applyForeground(ws, processName, force = false) {
+  const p = String(processName || "").trim();
+  const k = classifyProcess(p);
+  const changed = p.toLowerCase() !== activeProcess.toLowerCase() || k !== activeKind;
+  activeProcess = p; activeKind = k;
+  if (changed || force) renderAll(ws);
 }
-function ensurePolling(ws) {
-  if (!timer) timer = setInterval(() => poll(ws), 950);
-  setTimeout(() => poll(ws, true), 40);
+
+function watcherScript() {
+  return `Add-Type @'\nusing System;using System.Runtime.InteropServices;public static class PRCtx{[DllImport("user32.dll")]public static extern IntPtr GetForegroundWindow();[DllImport("user32.dll")]public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);}\n'@;$last='__packrat__';while($true){try{$h=[PRCtx]::GetForegroundWindow();$name='';if($h-ne[IntPtr]::Zero){[uint32]$procId=0;[PRCtx]::GetWindowThreadProcessId($h,[ref]$procId)|Out-Null;if($procId){$name=(Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName}};if($name-ne$last){[Console]::Out.WriteLine($name);[Console]::Out.Flush();$last=$name}}catch{};Start-Sleep -Milliseconds 350}`;
 }
-function maybeStopPolling() {
-  if (!contexts.size && !smartApps.size && timer) { clearInterval(timer); timer = null; }
+function startWatcher(ws) {
+  boundSocket = ws;
+  if (watcher || (!contexts.size && !smartApps.size)) return;
+  if (process.env.PACKRAT_CONTEXT_MOCK === "1" || process.env.PACKRAT_CONTEXT_PROCESS) {
+    applyForeground(ws, process.env.PACKRAT_CONTEXT_PROCESS || "chrome", true);
+    return;
+  }
+  if (process.platform !== "win32") { applyForeground(ws, "", true); return; }
+  watcherBuffer = "";
+  watcher = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", watcherScript()], { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+  watcher.stdout.on("data", chunk => {
+    watcherBuffer += String(chunk).replace(/\r/g, "");
+    const lines = watcherBuffer.split("\n"); watcherBuffer = lines.pop() || "";
+    for (const line of lines) applyForeground(ws, line);
+  });
+  watcher.on("exit", () => {
+    watcher = null;
+    if ((contexts.size || smartApps.size) && !watcherRestart) watcherRestart = setTimeout(() => { watcherRestart = null; startWatcher(boundSocket); }, 1200);
+  });
+}
+function stopWatcher() {
+  if (contexts.size || smartApps.size) return;
+  if (watcherRestart) { clearTimeout(watcherRestart); watcherRestart = null; }
+  if (watcher) { try { watcher.kill(); } catch {} watcher = null; }
 }
 
 async function executeCommand(cmd) {
@@ -173,9 +183,9 @@ function attach(ws) {
     if (action === UUID) {
       if (m.event === "willAppear" || m.event === "didReceiveSettings") {
         contexts.set(ctx, { settings: m.payload?.settings || {} });
-        ensurePolling(ws);
+        startWatcher(ws);
         setTimeout(() => { const inst = contexts.get(ctx); if (inst) renderContext(ws, ctx, inst); }, 25);
-      } else if (m.event === "willDisappear") { contexts.delete(ctx); maybeStopPolling(); }
+      } else if (m.event === "willDisappear") { contexts.delete(ctx); stopWatcher(); }
       else if (m.event === "keyUp") {
         const inst = contexts.get(ctx) || { settings: m.payload?.settings || {} };
         executeCommand(commandFor(inst.settings)).then(() => setTimeout(() => renderContext(ws, ctx, inst), 35)).catch(() => setImage(ws, ctx, "imgs/status/failed.png"));
@@ -185,13 +195,16 @@ function attach(ws) {
     if (action === "com.packrat.stream-deck-ultimate-bundle.smart-app") {
       if (m.event === "willAppear" || m.event === "didReceiveSettings") {
         smartApps.set(ctx, { settings: m.payload?.settings || {} });
-        ensurePolling(ws);
+        startWatcher(ws);
         setTimeout(() => { const inst = smartApps.get(ctx); if (inst) renderSmartApp(ws, ctx, inst); }, 35);
-      } else if (m.event === "willDisappear") { smartApps.delete(ctx); maybeStopPolling(); }
-      else if (m.event === "keyUp") setTimeout(() => poll(ws, true), 300);
+      } else if (m.event === "willDisappear") { smartApps.delete(ctx); stopWatcher(); }
+      else if (m.event === "keyUp") {
+        setTimeout(() => renderSmartApp(ws, ctx, smartApps.get(ctx) || { settings: m.payload?.settings || {} }), 300);
+        setTimeout(() => renderSmartApp(ws, ctx, smartApps.get(ctx) || { settings: m.payload?.settings || {} }), 1150);
+      }
     }
   });
-  ws.addEventListener("close", () => { contexts.clear(); smartApps.clear(); maybeStopPolling(); });
+  ws.addEventListener("close", () => { contexts.clear(); smartApps.clear(); stopWatcher(); });
 }
 
-module.exports = { attach, classifyProcess, roleMatchesProcess, commandFor, MAPS, combo };
+module.exports = { attach, classifyProcess, roleMatchesProcess, commandFor, MAPS, combo, applyForeground };
