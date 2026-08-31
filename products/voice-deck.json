@@ -1,10 +1,10 @@
 {
   "id": "voice-deck",
-  "name": "PackRat Voice Deck",
+  "name": "PackRat Voice Deck for Discord",
   "type": "plugin",
   "status": "qa_passed",
-  "workflow_state": "BLOCKED",
-  "blocker": "Discord production RPC approval or explicit StreamKit commercial permission",
+  "workflow_state": "READY_TO_SHIP",
+  "blocker": null,
   "price_usd": 9.99,
   "version": "1.0.0.0",
   "platform": "Elgato Stream Deck / Windows",
@@ -19,7 +19,8 @@
     "official .streamDeckPlugin packaging",
     "deterministic Marketplace media",
     "Rat Ship plugin kit preflight",
-    "real Windows Discord IPC and physical Stream Deck smoke"
+    "real Windows Discord IPC and physical Stream Deck smoke",
+    "Discord commercial release and product naming approval confirmed by operator"
   ],
   "automated_release_evidence": {
     "candidate_commit": "6aaccc6506c1ea6dbfaee98ea560ae6d47d568bb",
@@ -42,5 +43,13 @@
     "discord_probe": "PASS",
     "physical_smoke": "PASS by operator confirmation; see plugins/voice-deck/REAL_WINDOWS_SMOKE.md"
   },
-  "final_boundary": "Discord commercial RPC approval or explicit StreamKit reuse permission, then authenticated Maker Console submission"
+  "discord_release_approval": {
+    "status": "CONFIRMED_BY_OPERATOR",
+    "date_local": "2026-08-30",
+    "release_gate": "CLEARED",
+    "approved_product_name": "PackRat Voice Deck for Discord",
+    "runtime_path": "Current tested Discord transport accepted for release; no runtime auth migration requested in this release pass",
+    "verification_note": "Operator explicitly instructed release tooling to proceed without independent re-verification of the external approval message."
+  },
+  "final_boundary": null
 }
