@@ -10,6 +10,8 @@ test("manifest uses SDK v2 protocol with SDKVersion 3, Node 24 and twelve focuse
   assert.equal(manifest.SDKVersion, 3);
   assert.equal(manifest.Nodejs.Version, "24");
   assert.equal(manifest.UUID, "com.packrat.voice-deck");
+  assert.equal(manifest.Name, "PackRat Discord Voice Deck");
+  assert.equal(manifest.Category, "PackRat Discord Voice Deck");
   assert.equal(manifest.Actions.length, 12);
   assert.equal(new Set(manifest.Actions.map((a) => a.UUID)).size, 12);
   assert.equal(manifest.Profiles.length, 4);
