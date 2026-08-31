@@ -2,6 +2,10 @@
 const fs=require("fs"),path=require("path");
 const {spawn,execFileSync}=require("child_process");
 const pluginDir=path.resolve(process.argv[2]);
+const manifest=JSON.parse(fs.readFileSync(path.join(pluginDir,"manifest.json"),"utf8"));
+const codePath=path.join(pluginDir,...String(manifest.CodePath||"").split("/"));
+if(!manifest.CodePath||!fs.existsSync(codePath))throw new Error(`Manifest CodePath is missing: ${manifest.CodePath||"<none>"}`);
+if(!manifest.Actions?.some(a=>a.UUID==="com.packrat.stream-deck-ultimate-bundle.audio"))throw new Error("Premium audio action missing from manifest");
 const WebSocket=require(path.join(pluginDir,"node_modules","ws"));
 const {WebSocketServer}=WebSocket;
 const UUID="com.packrat.stream-deck-ultimate-bundle";
@@ -26,7 +30,7 @@ function cleanup(){try{child?.kill()}catch{};try{if(process.platform==="win32")e
 (async()=>{
  const server=new WebSocketServer({port:0,host:"127.0.0.1"});await new Promise(r=>server.once("listening",r));const port=server.address().port;
  const connection=new Promise(r=>server.once("connection",s=>{s.on("message",raw=>{try{messages.push(JSON.parse(raw.toString()))}catch{}});r(s)}));
- child=spawn(process.execPath,[path.join(pluginDir,"bin","plugin-v05.cjs"),"-port",String(port),"-pluginUUID",UUID,"-registerEvent","registerPlugin"],{stdio:["ignore","pipe","pipe"],env:{...process.env,APPDATA:path.join(pluginDir,".smoke-state"),PACKRAT_AUDIO_MOCK:"1"}});
+ child=spawn(process.execPath,[codePath,"-port",String(port),"-pluginUUID",UUID,"-registerEvent","registerPlugin"],{stdio:["ignore","pipe","pipe"],env:{...process.env,APPDATA:path.join(pluginDir,".smoke-state"),PACKRAT_AUDIO_MOCK:"1"}});
  let stderr="";child.stderr.on("data",d=>stderr+=d);const ws=await Promise.race([connection,new Promise((_,rej)=>setTimeout(()=>rej(new Error("No socket "+stderr)),5000))]);
  await waitFor(m=>m.event==="registerPlugin");
  let mark=messages.length;
@@ -55,6 +59,6 @@ function cleanup(){try{child?.kill()}catch{};try{if(process.platform==="win32")e
  mark=messages.length;ws.send(JSON.stringify({event:"keyUp",action:UUID+".setup",context:"setup",device:"d",payload:{controller:"Keypad",settings:{}}}));
  await waitFor(m=>m.event==="setImage"&&m.context==="setup",5000,mark);
 
- console.log("v0.5 smoke passed: registration, audio state, dial feedback, preset, routine, setup");
+ console.log(`v0.5 smoke passed through manifest CodePath ${manifest.CodePath}: registration, audio state, dial feedback, preset, routine, setup`);
  try{ws.terminate()}catch{};try{server.close()}catch{};cleanup();process.exit(0);
 })().catch(e=>{console.error(e.stack||e);cleanup();process.exit(1)});
