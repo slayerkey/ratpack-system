@@ -42,6 +42,7 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-precompiled-start.test.js
 
       - name: Parse experimental PowerShell wrappers and real-host harness
         shell: powershell
@@ -49,6 +50,7 @@ jobs:
           foreach ($file in @(
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/real-host-smoke.ps1'
           )) {
             $errors = $null
@@ -60,8 +62,24 @@ jobs:
       - name: Persistent mock worker protocol and behavior
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.test.js
 
-      - name: Persistent native worker loads real Core Audio interop
+      - name: Persistent native worker source fallback loads real Core Audio interop
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-native-start.test.js
+
+      - name: Build precompiled Core Audio helper assembly
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1'
+          if ($LASTEXITCODE -ne 0) { throw "Helper build exited $LASTEXITCODE" }
+          $build = $json | ConvertFrom-Json
+          if (-not $build.ok) { throw 'Precompiled helper build did not report ok' }
+          if (-not (Test-Path -LiteralPath $build.path)) { throw "Precompiled helper missing: $($build.path)" }
+          if ($build.type -ne 'PackRatAppAudio.Core') { throw "Unexpected helper type: $($build.type)" }
+          if ([string]::IsNullOrWhiteSpace([string]$build.sha256)) { throw 'Precompiled helper missing SHA256' }
+          "PACKRAT_APP_AUDIO_DLL=$($build.path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "precompiled helper built: $($build.sizeBytes) bytes sha256=$($build.sha256)"
+
+      - name: Persistent worker starts from precompiled helper without runtime C# compilation
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-precompiled-start.test.js
 
       - name: Compile Core Audio session COM interop under Windows PowerShell
         shell: powershell
