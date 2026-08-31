@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const INPUTS = [
   "src",
+  "static/THIRD_PARTY_NOTICES.txt",
   "static/ui/property-inspector.html",
   "static/ui/pi.js",
   "static/ui/diagnostics.js",
