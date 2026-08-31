@@ -122,13 +122,15 @@ jobs:
 
           $schema = Get-Content 'schemas/product-workflow-state.schema.json' -Raw | ConvertFrom-Json
           $allowedStates = @($schema.properties.workflow_state.enum)
-          foreach ($slug in @('discord-bridge', 'discord-panel')) {
-            $product = Get-Content "products/$slug.json" -Raw | ConvertFrom-Json
-            if ($product.workflow_state -notin $allowedStates) {
-              throw "$slug uses non-schema workflow_state '$($product.workflow_state)'."
+          foreach ($file in Get-ChildItem 'products' -Filter '*.json' -File) {
+            $product = Get-Content $file.FullName -Raw | ConvertFrom-Json
+            $state = if ($null -ne $product.workflow_state) { ([string]$product.workflow_state).Trim() } else { '' }
+            if ([string]::IsNullOrWhiteSpace($state)) { continue }
+            if ($state -notin $allowedStates) {
+              throw "$($file.Name) uses non-schema workflow_state '$state'."
             }
-            if ($product.workflow_state -eq 'BLOCKED' -and [string]::IsNullOrWhiteSpace([string]$product.blocker)) {
-              throw "$slug is BLOCKED but has no blocker field."
+            if ($state -eq 'BLOCKED' -and [string]::IsNullOrWhiteSpace([string]$product.blocker)) {
+              throw "$($file.Name) is BLOCKED but has no blocker field."
             }
           }
           Write-Host 'RELEASE STATE GUARD PASS'
