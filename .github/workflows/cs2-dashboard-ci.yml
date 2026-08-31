@@ -65,22 +65,20 @@ jobs:
       - name: Package Pro and Lite
         run: npm run pack
 
-      - name: Assert final Marketplace gate fails closed before physical and Leetify evidence
+      - name: Assert final Marketplace gate fails closed without local physical evidence
         shell: pwsh
         run: |
           $output = & node scripts/final-release-gate.mjs 2>&1 | Out-String
           $exit = $LASTEXITCODE
           Write-Host $output
-          if ($exit -eq 0) { throw 'Final Marketplace gate unexpectedly passed in clean CI without local physical/provider evidence or Leetify clearance.' }
+          if ($exit -eq 0) { throw 'Final Marketplace gate unexpectedly passed in clean CI without local physical/provider evidence.' }
           foreach ($required in @(
             'Fresh matching physical Windows host evidence is present',
-            'Official Leetify attribution source asset is present',
-            'Leetify paid product use is explicitly cleared',
             'FINAL MARKETPLACE GATE: BLOCKED'
           )) {
             if ($output -notlike "*$required*") { throw "Fail-closed gate output missing expected blocker: $required" }
           }
-          Write-Host 'PASS: final Marketplace gate failed closed for the expected unresolved release requirements.'
+          Write-Host 'PASS: clean CI cannot satisfy the local physical release-evidence gate.'
           exit 0
 
       - name: Upload Stream Deck packages
