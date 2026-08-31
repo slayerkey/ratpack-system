@@ -51,6 +51,7 @@ jobs:
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-host-bundle.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/real-host-smoke.ps1'
           )) {
             $errors = $null
@@ -81,13 +82,15 @@ jobs:
       - name: Persistent worker starts from precompiled helper without runtime C# compilation
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-precompiled-start.test.js
 
-      - name: Compile Core Audio session COM interop under Windows PowerShell
+      - name: Core Audio command wrapper loads helper
         shell: powershell
         run: |
           $result = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1' -Action Compile
           Write-Host $result
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($result -notmatch '"ok":true') { throw 'Compile probe did not return ok' }
+          $probe = $result | ConvertFrom-Json
+          if (-not $probe.ok -or $probe.type -ne 'PackRatAppAudio.Core') { throw 'Core Audio wrapper did not load helper' }
+          if ($probe.backend -ne 'assembly') { throw "Expected app-audio wrapper to prefer precompiled assembly, saw $($probe.backend)" }
 
       - name: Real-host harness emits structured read-only audit without requiring CI audio hardware
         shell: powershell
@@ -100,6 +103,31 @@ jobs:
           if ([string]::IsNullOrWhiteSpace([string]$report.status)) { throw 'Missing report status' }
           Write-Host "real-host audit structure passed; hosted runner status=$($report.status) endpointAvailable=$($report.endpointAvailable)"
 
+      - name: Prepare source-free real Windows host-test bundle
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-host-bundle.ps1' -AssemblyPath $env:PACKRAT_APP_AUDIO_DLL
+          if ($LASTEXITCODE -ne 0) { throw "Host bundle staging exited $LASTEXITCODE" }
+          $bundle = $json | ConvertFrom-Json
+          if (-not $bundle.ok -or $bundle.fileCount -ne 6) { throw "Unexpected host bundle result: $json" }
+          if ([string]::IsNullOrWhiteSpace([string]$bundle.helperSha256)) { throw 'Host bundle missing helper hash' }
+          $sourceFiles = @(Get-ChildItem -File -LiteralPath $bundle.outputDir | Where-Object { $_.Extension -eq '.cs' })
+          if ($sourceFiles.Count -ne 0) { throw 'Host bundle must not contain C# source' }
+          "PACKRAT_HOST_BUNDLE=$($bundle.outputDir)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "host bundle staged: $($bundle.fileCount) files helperSha256=$($bundle.helperSha256)"
+
+      - name: Source-free host bundle boots through packaged DLL
+        shell: powershell
+        run: |
+          $launcher = Join-Path $env:PACKRAT_HOST_BUNDLE 'run-host-test.cmd'
+          $json = & $launcher
+          if ($LASTEXITCODE -ne 0) { throw "Packaged host launcher exited $LASTEXITCODE" }
+          $report = $json | ConvertFrom-Json
+          if ($report.schema -ne 1) { throw 'Packaged host report schema mismatch' }
+          if ([string]::IsNullOrWhiteSpace([string]$report.status)) { throw 'Packaged host report missing status' }
+          if (Test-Path (Join-Path $env:PACKRAT_HOST_BUNDLE 'PackRatAppAudio.cs')) { throw 'Packaged host unexpectedly contains source' }
+          Write-Host "source-free host bundle boot passed; status=$($report.status) endpointAvailable=$($report.endpointAvailable)"
+
       - name: Probe session enumeration when Windows runner exposes an audio endpoint
         shell: powershell
         continue-on-error: true
@@ -110,3 +138,9 @@ jobs:
           } catch {
             Write-Host "Enumeration probe unavailable on hosted runner: $($_.Exception.Message)"
           }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-per-app-audio-host-test
+          path: products/stream-deck-ultimate-bundle/experiments/per-app-audio/host-test-dist/*
+          if-no-files-found: error
