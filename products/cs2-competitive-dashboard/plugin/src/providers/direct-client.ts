@@ -31,7 +31,7 @@ export class ProviderClient {
         ? this.fetchLeetify(steamId64, credentials.leetifyApiKey.trim(), signal)
         : Promise.resolve<LeetifyData>({
             status: "not_configured",
-            message: "Add your free Leetify API key in setup",
+            message: "Add your Leetify API key in setup",
             competitiveRanks: [],
             recentMatches: []
           }),
@@ -39,7 +39,7 @@ export class ProviderClient {
         ? this.fetchFaceit(steamId64, credentials.faceitApiKey.trim(), signal)
         : Promise.resolve<FaceitData>({
             status: "not_configured",
-            message: "Add your free FACEIT API key in setup",
+            message: "Add your FACEIT API key in setup",
             recentMatches: []
           })
     ]);
