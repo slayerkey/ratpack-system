@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const INPUTS = [
   "src",
@@ -39,6 +40,7 @@ export function releaseRuntimeFingerprint() {
   return hash.digest("hex");
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replaceAll("\\", "/")}`) {
+const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
+if (invokedPath && invokedPath === path.resolve(fileURLToPath(import.meta.url))) {
   console.log(releaseRuntimeFingerprint());
 }
