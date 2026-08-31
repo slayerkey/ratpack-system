@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $pluginUuid = "com.packrat.stream-deck-ultimate-app-volume-lab"
 $actionUuid = "$pluginUuid.app-audio"
+$acceptedActionUuid = "com.packrat.stream-deck-ultimate-bundle.app-audio"
 if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $PSScriptRoot "build\PackRatAppAudio.dll" }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $PSScriptRoot "shadow-plugin-dist" }
 if (-not [IO.Path]::IsPathRooted($AssemblyPath)) { $AssemblyPath = Join-Path (Get-Location) $AssemblyPath }
@@ -41,6 +42,14 @@ foreach ($name in $runtimeFiles) {
   if (-not (Test-Path -LiteralPath $source)) { throw "Shadow plugin input missing: $name" }
   Copy-Item -LiteralPath $source -Destination (Join-Path $pluginDir "bin\$name") -Force
 }
+# The shared experiment spec intentionally uses the future Ultimate action UUID. Rewrite only
+# the staged lab copy so the co-installable test artifact contains no dormant accepted-product UUID.
+$stagedActionSpec = Join-Path $pluginDir "bin\action-spec.js"
+$actionSpecText = [IO.File]::ReadAllText($stagedActionSpec)
+if (-not $actionSpecText.Contains($acceptedActionUuid)) { throw "Expected shared action UUID was not found in staged action-spec.js" }
+$actionSpecText = $actionSpecText.Replace($acceptedActionUuid,$actionUuid)
+[IO.File]::WriteAllText($stagedActionSpec,$actionSpecText,[Text.UTF8Encoding]::new($false))
+
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "shadow-plugin-entry.cjs") -Destination (Join-Path $pluginDir "bin\plugin.cjs") -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "property-inspector.html") -Destination (Join-Path $pluginDir "ui\property-inspector.html") -Force
 Copy-Item -LiteralPath $AssemblyPath -Destination (Join-Path $pluginDir "bin\PackRatAppAudio.dll") -Force
@@ -144,6 +153,7 @@ $info = [ordered]@{
 
 [pscustomobject]@{
   ok = $true
+  outputRoot = $OutputRoot
   pluginDir = $pluginDir
   pluginUuid = $pluginUuid
   actionUuid = $actionUuid
