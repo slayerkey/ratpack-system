@@ -15,6 +15,7 @@ Official references:
 * https://docs.discord.com/developers/topics/oauth2
 * https://docs.discord.com/developers/topics/rpc
 * https://support-dev.discord.com/hc/en-us/articles/8562894815383-Discord-Developer-Terms-of-Service
+* https://discord.com/branding
 
 Discord Developer Support request portal:
 
@@ -78,6 +79,14 @@ PackRat Voice Bridge, the free local XENEON companion
 
 Voice Deck and Voice Panel are separate paid products for different hardware. Voice Bridge is the free local companion required only by Voice Panel. Voice Deck connects directly to Discord Desktop and does not require Voice Bridge.
 
+Requested product-name branding permission:
+
+```text
+PackRat Voice Deck for Discord
+```
+
+Discord's Brand Guidelines say the Discord mark may not be incorporated into a product name without permission. Until Discord explicitly grants that permission, the Marketplace-safe product name remains `PackRat Voice Deck`. If permission is granted, PackRat would prefer the descriptive name `PackRat Voice Deck for Discord`, which identifies compatibility without implying that Discord publishes or endorses the product.
+
 ## Suggested request text
 
 ```text
@@ -118,6 +127,8 @@ Application ID: [PACKRAT APPLICATION ID THAT WILL SHIP]
 Application name: [PACKRAT DISCORD APPLICATION NAME]
 Product status: Release candidates are complete and are being held from public Marketplace submission pending this Discord approval.
 
+I also want to confirm product naming before release. Discord's Brand Guidelines state that the Discord mark may not be incorporated into a product name without permission. If permitted, I would like to market the Stream Deck product under the descriptive name "PackRat Voice Deck for Discord." This is intended only to identify compatibility, and the Marketplace listing will state that the product is independent and is not affiliated with, endorsed by, or sponsored by Discord Inc. If this naming is not permitted, I will keep the product name "PackRat Voice Deck" and use Discord only descriptively in compatibility text, tags, and the product description. Please confirm in writing whether "PackRat Voice Deck for Discord" is permitted.
+
 During development we also verified the same local voice flow using Discord StreamKit's public RPC client identity and streamkit.discord.com/overlay/token. Discord's Developer Terms say an assigned Application ID is to be used solely with the application it belongs to, so we are not assuming that StreamKit identity may be reused by PackRat. If Discord specifically permits third-party commercial software like these PackRat products to authenticate through the public StreamKit identity, please confirm that in writing; otherwise we will use the approved PackRat-owned application and production token exchange architecture you require.
 
 Thank you.
@@ -130,7 +141,9 @@ Do not clear the release gate based on a generic support acknowledgement. Retain
 1. The selected PackRat-owned application is approved for `rpc`, `rpc.voice.read`, and `rpc.voice.write`, including the required production authorization/token-exchange method; or
 2. Discord explicitly authorizes PackRat's third-party commercial Voice products to use the StreamKit application identity and token endpoint.
 
-Record the support request/ticket identifier, selected PackRat application ID/name, granted scopes, date, and any implementation requirements in release documentation. Do not commit Discord client secrets, access tokens, support-session cookies, or other confidential credentials.
+Separately retain Discord's written answer on whether `PackRat Voice Deck for Discord` is an approved product name. Branding permission is not a substitute for RPC approval, and RPC approval does not automatically imply branding permission.
+
+Record the support request/ticket identifier, selected PackRat application ID/name, granted scopes, date, any implementation requirements, and the product-name permission decision in release documentation. Do not commit Discord client secrets, access tokens, support-session cookies, or other confidential credentials.
 
 ## After Discord approval
 
@@ -142,9 +155,10 @@ When the production path is explicitly approved:
 4. Do not persist Discord access tokens in Stream Deck global settings.
 5. If Discord requires a Client Secret or another confidential credential for token exchange, keep that credential in minimal PackRat-controlled server infrastructure and expose only the minimum exchange endpoint needed by the local client.
 6. Keep the XENEON widget credential-free and continue passing only normalized local voice state over `127.0.0.1`.
-7. Rerun real Windows authorization, channel, roster, speaking, mute, deafen, restart, and packaged-plugin tests for Voice Deck.
-8. Rerun Discord Bridge Release QA.
-9. Rerun Discord Panel Deep QA.
-10. Record the approved application identity, granted scopes, production exchange architecture, and retained written approval in the release documentation.
-11. Move each product from `BLOCKED` to `READY_TO_SHIP` only after its approval and required real-host regressions are complete.
-12. Only then submit the applicable Voice products publicly through Rat Ship.
+7. If Discord grants product-name permission, change the Marketplace-facing Voice Deck name to `PackRat Voice Deck for Discord`; otherwise keep `PackRat Voice Deck`.
+8. Rerun real Windows authorization, channel, roster, speaking, mute, deafen, restart, and packaged-plugin tests for Voice Deck if the approved production identity/token path changes runtime behavior.
+9. Rerun Discord Bridge Release QA.
+10. Rerun Discord Panel Deep QA.
+11. Record the approved application identity, granted scopes, production exchange architecture, retained written approval, and branding decision in the release documentation.
+12. Move each product from `BLOCKED` to `READY_TO_SHIP` only after its approval and required real-host regressions are complete.
+13. Only then submit the applicable Voice products publicly through Rat Ship.
