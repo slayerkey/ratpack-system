@@ -158,22 +158,31 @@ try {
         render();
       });
       await page.waitForTimeout(980);
+
+      const stableOrder = await page.locator(".member-name").allTextContents();
+      assert.equal(stableOrder[0], "Member 1", "stable roster did not start in channel order");
+      assert.match(stableOrder[11], /Very Long Discord/, "stable roster lost the final member");
+
       await page.evaluate(() => {
         globalThis.__PACKRAT_DISCORD_TEST__.speaking("1012", true);
         render();
       });
-      assert.match(await page.locator(".member-row").first().innerText(), /Very Long Discord/, "speaker promotion failed");
+      assert.deepEqual(await page.locator(".member-name").allTextContents(), stableOrder, "speaking changed member slot order");
+      const activeSpeaker = page.locator(".member-row").filter({ hasText: "A Very Long Discord Display Name For Layout Stress" }).first();
+      assert.equal(await activeSpeaker.evaluate((node) => node.classList.contains("speaking")), true, "active speaker highlight missing");
+
       await page.evaluate(() => {
         globalThis.__PACKRAT_DISCORD_TEST__.speaking("1012", false);
         render();
       });
-      assert.match(await page.locator(".member-row").first().innerText(), /Very Long Discord/, "900ms speaker hold failed immediately");
+      assert.deepEqual(await page.locator(".member-name").allTextContents(), stableOrder, "speaker stop changed member slot order");
       await page.waitForTimeout(980);
-      assert.doesNotMatch(await page.locator(".member-row").first().innerText(), /Very Long Discord/, "speaker hold did not expire");
+      assert.deepEqual(await page.locator(".member-name").allTextContents(), stableOrder, "speaker hold expiry changed member slot order");
 
       const added = member(13, { nick: "Late Join" });
       await page.evaluate((value) => globalThis.__PACKRAT_DISCORD_TEST__.voiceState(value), added);
       assert.equal((await page.evaluate(() => globalThis.__PACKRAT_DISCORD_TEST__.getState())).members.length, 13, "voice-state join failed");
+      assert.equal((await page.locator(".member-name").allTextContents()).at(-1), "Late Join", "late join did not append to stable roster");
       await page.evaluate((value) => globalThis.__PACKRAT_DISCORD_TEST__.remove(value), added);
       assert.equal((await page.evaluate(() => globalThis.__PACKRAT_DISCORD_TEST__.getState())).members.length, 12, "voice-state leave failed");
 
@@ -228,4 +237,4 @@ try {
 }
 
 await fs.writeFile(path.join(artifactDir, "results.json"), JSON.stringify({ entry, results }, null, 2));
-console.log(`DISCORD PANEL VISUAL QA PASS: ${slots.length} XENEON compositions, runtime stability, overflow, touch targets, roster, speaking, details, joins/leaves, channel switching, voice state, failure states, and recovery`);
+console.log(`DISCORD PANEL VISUAL QA PASS: ${slots.length} XENEON compositions, stable member slots, runtime stability, overflow, touch targets, roster, speaking highlights, details, joins/leaves, channel switching, voice state, failure states, and recovery`);

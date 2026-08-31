@@ -8,6 +8,7 @@ const source = path.join(repo, "widgets", "_src", "discord-panel");
 const files = [
   "discord-panel-ui.js",
   "discord-panel-appearance.js",
+  "discord-panel-stable-roster.js",
   "discord-panel-rpc.js",
   "discord-panel.js",
 ];
@@ -30,7 +31,9 @@ assert.match(html, /content="backgroundColor"/);
 assert.match(html, /content="panelOpacity"/);
 assert.match(html, /content="fontFamily"/);
 assert.match(html, /discord-panel-fixes\.css/);
+assert.match(html, /discord-panel-roster\.css/);
 assert.match(html, /discord-panel-appearance\.js/);
+assert.match(html, /discord-panel-stable-roster\.js/);
 assert.match(html, /discord-panel-rpc\.js/);
 
 const fixes = fs.readFileSync(path.join(source, "discord-panel-fixes.css"), "utf8");
@@ -43,12 +46,27 @@ assert.match(fixes, /--font-ui/);
 assert.match(fixes, /\.member-states/);
 assert.match(fixes, /\.state-icon/);
 
+const rosterCss = fs.readFileSync(path.join(source, "discord-panel-roster.css"), "utf8");
+assert.match(rosterCss, /\.member-row\.speaking \.member-name/);
+assert.match(rosterCss, /background:\s*transparent/);
+assert.match(rosterCss, /--avatar:\s*34px/);
+assert.match(rosterCss, /--avatar:\s*40px/);
+assert.match(rosterCss, /--avatar:\s*44px/);
+assert.match(rosterCss, /--avatar:\s*46px/);
+assert.match(rosterCss, /column-gap:\s*12px/);
+
 const appearance = fs.readFileSync(path.join(source, "discord-panel-appearance.js"), "utf8");
 assert.match(appearance, /panelOpacity/);
 assert.match(appearance, /fontFamily/);
 assert.match(appearance, /--panel-top-alpha/);
 assert.match(appearance, /--font-display/);
 assert.match(appearance, /baseApplySettings/);
+
+const stableRoster = fs.readFileSync(path.join(source, "discord-panel-stable-roster.js"), "utf8");
+assert.match(stableRoster, /sortedMembers = function/);
+assert.match(stableRoster, /left\._order/);
+assert.match(stableRoster, /right\._order/);
+assert.equal(stableRoster.includes("speakerPriority"), false, "stable roster must not sort by speaking state");
 
 const transport = fs.readFileSync(path.join(source, "discord-panel-rpc.js"), "utf8");
 assert.match(transport, /ws:\/\/127\.0\.0\.1:17483/);
@@ -107,4 +125,4 @@ for (const forbidden of ["Discord Voice Panel", "PackRat Discord Bridge", "PackR
   assert.equal(publicCopy.includes(forbidden), false, `legacy marketplace product name remains: ${forbidden}`);
 }
 
-console.log("VOICE PANEL DEV QA PASS: syntax, hardened iCUE lifecycle, automatic loopback transport, contained live avatars, opacity/font settings, mute/deafen mapping, trademark-safe marketplace naming, no fixed-channel code, no delayed stale runtime calls, and no obsolete direct Discord OAuth/RPC prototype code");
+console.log("VOICE PANEL DEV QA PASS: syntax, hardened iCUE lifecycle, automatic loopback transport, contained compact avatars, stable member slots, separate name plates, opacity/font settings, mute/deafen mapping, trademark-safe marketplace naming, no fixed-channel code, no delayed stale runtime calls, and no obsolete direct Discord OAuth/RPC prototype code");
