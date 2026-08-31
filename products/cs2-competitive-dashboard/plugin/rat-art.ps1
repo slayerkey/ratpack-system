@@ -7,19 +7,26 @@ $ErrorActionPreference = "Stop"
 $PluginRoot = $PSScriptRoot
 $ProductRoot = (Resolve-Path (Join-Path $PluginRoot "..")).Path
 $RenderScript = Join-Path $ProductRoot "art\render.py"
+$ProfilesRenderScript = Join-Path $ProductRoot "art\render_profiles.py"
 $RenderOut = Join-Path $ProductRoot "art\out"
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python is required to generate CS2 Competitive Dashboard Rat Art."
 }
-if (-not (Test-Path $RenderScript)) {
-    throw "CS2 Rat Art renderer not found: $RenderScript"
+foreach ($script in @($RenderScript, $ProfilesRenderScript)) {
+    if (-not (Test-Path $script)) {
+        throw "CS2 Rat Art renderer not found: $script"
+    }
 }
 
 Write-Host "CS2 Rat Art: rendering deterministic Marketplace media..." -ForegroundColor DarkGray
 & python $RenderScript | Out-Host
 if ($LASTEXITCODE -ne 0) {
-    throw "CS2 Rat Art renderer failed with exit code $LASTEXITCODE."
+    throw "CS2 Rat Art base renderer failed with exit code $LASTEXITCODE."
+}
+& python $ProfilesRenderScript | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "CS2 Rat Art profiles renderer failed with exit code $LASTEXITCODE."
 }
 
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
