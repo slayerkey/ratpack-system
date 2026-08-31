@@ -9,6 +9,7 @@ on:
       - 'products/cs2-competitive-dashboard-pro.json'
       - 'products/cs2-competitive-dashboard-lite.json'
       - 'plugins/cs2-competitive-dashboard/**'
+      - 'tools/local/rat-ship-plugin.ps1'
       - '.github/workflows/cs2-dashboard-ci.yml'
   pull_request:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - 'products/cs2-competitive-dashboard-pro.json'
       - 'products/cs2-competitive-dashboard-lite.json'
       - 'plugins/cs2-competitive-dashboard/**'
+      - 'tools/local/rat-ship-plugin.ps1'
       - '.github/workflows/cs2-dashboard-ci.yml'
   workflow_dispatch:
 
@@ -40,6 +42,14 @@ jobs:
           cache: npm
           cache-dependency-path: products/cs2-competitive-dashboard/plugin/package-lock.json
 
+      - name: Set up Python 3.13 for Rat Art
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deterministic Rat Art dependency
+        run: python -m pip install --disable-pip-version-check pillow==11.3.0
+
       - name: Install locked dependencies
         run: npm ci
 
@@ -60,6 +70,40 @@ jobs:
         with:
           name: cs2-competitive-dashboard-streamdeck-packages
           path: products/cs2-competitive-dashboard/plugin/dist/*.streamDeckPlugin
+          if-no-files-found: error
+
+      - name: Build exact non-public Rat Ship Pro kit
+        shell: pwsh
+        run: |
+          $repo = (Resolve-Path '..\..\..').Path
+          $helper = Join-Path $repo 'tools\local\rat-ship-plugin.ps1'
+          $dest = Join-Path $repo 'out\ci-cs2-competitive-dashboard-pro-kit'
+          & $helper -PluginSlug 'cs2-competitive-dashboard-pro' -Destination $dest
+          if ($LASTEXITCODE -ne 0) { throw "Rat Ship helper failed with exit code $LASTEXITCODE" }
+          $required = @(
+            'cs2-competitive-dashboard-pro.streamDeckPlugin',
+            'submission.json',
+            'PASTE_description.txt',
+            'PASTE_release_notes.txt',
+            '01_search_icon.png',
+            '02_cover.png',
+            '03_gallery_01.png',
+            '04_gallery_02.png',
+            '05_gallery_03.png',
+            '06_gallery_04.png'
+          )
+          foreach ($name in $required) {
+            if (-not (Test-Path (Join-Path $dest $name) -PathType Leaf)) { throw "Rat Ship kit missing $name" }
+          }
+          $submission = Get-Content (Join-Path $dest 'submission.json') -Raw | ConvertFrom-Json
+          if ($submission.slug -ne 'cs2-competitive-dashboard-pro') { throw 'Rat Ship kit submission slug mismatch' }
+          if ([decimal]$submission.price_usd -ne [decimal]14.99) { throw 'Rat Ship kit price mismatch' }
+
+      - name: Upload exact Rat Ship Pro kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs2-competitive-dashboard-pro-rat-ship-kit
+          path: out/ci-cs2-competitive-dashboard-pro-kit/**
           if-no-files-found: error
 
   rat-dev-registration:
