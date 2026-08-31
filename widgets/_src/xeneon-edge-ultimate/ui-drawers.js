@@ -67,7 +67,7 @@ function openMetricDrawer(role) {
 }
 
 function escapeHtml(value) {
-  return String(value || "").replace(/[&<>"']/g,function(ch){return({"&":"&amp;","<":"&lt;"," >":"&gt;",'"':"&quot;","'":"&#39;"})[ch] || ch;});
+  return String(value || "").replace(/[&<>"']/g,function(ch){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[ch];});
 }
 
 function openAboutDrawer() {
