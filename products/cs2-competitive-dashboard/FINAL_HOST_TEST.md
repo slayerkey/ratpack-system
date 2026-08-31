@@ -242,24 +242,55 @@ After the physical evidence passes:
 2. Obtain written paid-use clearance and record `Status: CLEARED` in `LEETIFY_COMMERCIAL_CLEARANCE.md`.
 3. Commit those **non-runtime** release changes to the product branch.
 4. Run `rat dev cs2-competitive-dashboard` once more so the detached worktree receives the current product-branch release files. The ignored physical evidence remains in place.
-5. From the canonical RatPack root run:
+
+At this point you have two choices from the canonical RatPack root.
+
+### Verify only
+
+To prove every final Marketplace gate without changing Git state:
 
 ```powershell
 npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run release:final
 ```
 
+### Verify and promote in one command
+
+When you are ready to advance the actual release branch:
+
+```powershell
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run release:promote
+```
+
+`release:promote` is intentionally fail closed. It:
+
+1. fetches current `origin`;
+2. refuses immediately unless the tested worktree `HEAD` exactly matches current `origin/product/cs2-competitive-dashboard`;
+3. refuses if any tracked worktree changes already exist;
+4. reruns the complete `release:final` gate;
+5. changes only `products/cs2-competitive-dashboard-pro.json` from `BLOCKED` to `READY_TO_SHIP`;
+6. verifies that it is the only staged file;
+7. creates a normal promotion commit;
+8. pushes that commit to `product/cs2-competitive-dashboard` with a normal non-force push.
+
+If the remote product branch moved after your Rat Dev test, promotion refuses before changing release state and tells you to refresh the candidate. If the final push fails, the local promotion commit is preserved and the command prints the exact recovery information instead of force-pushing.
+
 The final Marketplace gate requires all of these together:
 
 * Pro registry price is $14.99
-* Lite Marketplace launch remains held
+* Lite Marketplace launch remains intentionally `BLOCKED` with `strategy_hold`
 * fresh physical host evidence is present and no more than 7 days old
 * host evidence runtime fingerprint matches the exact release candidate
 * real Leetify + FACEIT both-ready evidence is included in that host pass
 * the official unmodified Leetify attribution SVG is present and wired into the built Property Inspector
 * Leetify paid/commercial product use has written clearance recorded in `LEETIFY_COMMERCIAL_CLEARANCE.md`
 
-`rat ship` / `rat submit` also fail closed while the canonical Pro product workflow state is `BLOCKED`.
+After `release:promote` succeeds, PR #29 contains the `READY_TO_SHIP` transition. Merge PR #29 to `main`, run:
 
-Do **not** run repository promotion from the detached Rat Dev worktree. After `release:final` reports `FINAL MARKETPLACE GATE: PASS`, promote the actual `product/cs2-competitive-dashboard` branch to `READY_TO_SHIP`, merge PR #29 to main, run `rat main`, then ship from canonical main.
+```powershell
+rat main
+rat ship cs2-competitive-dashboard-pro
+```
+
+Rat Ship still ships committed canonical `main` only, so an unmerged release branch cannot be submitted accidentally.
 
 Once the physical evidence and final Marketplace gate pass, stop adding features and submit CS2 Competitive Dashboard Pro.
