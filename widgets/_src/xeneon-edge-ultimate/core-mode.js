@@ -1,5 +1,14 @@
-function applySettings(initial) {
-  var cfg = settings();
+function applySettings(initial, nextSettings) {
+  var cfg = nextSettings || settings();
+  var previous = state.appliedSettings;
+  var weatherChanged = !previous || cfg.weatherEnabled !== previous.weatherEnabled ||
+    cfg.weatherLatitude !== previous.weatherLatitude || cfg.weatherLongitude !== previous.weatherLongitude;
+  var calendarChanged = !previous || cfg.calendarUrl !== previous.calendarUrl;
+  var focusChanged = !!previous && cfg.focusMinutes !== previous.focusMinutes;
+  var modeSettingsChanged = !!previous && (
+    cfg.startMode !== previous.startMode || cfg.smartMode !== previous.smartMode || cfg.preset !== previous.preset
+  );
+
   document.documentElement.style.setProperty("--text", cfg.text);
   document.documentElement.style.setProperty("--accent", cfg.accent);
   document.documentElement.style.setProperty("--bg", cfg.background);
@@ -15,6 +24,8 @@ function applySettings(initial) {
       state.focus.running = false;
       state.focus.remainingMs = cfg.focusMinutes * 60000;
     }
+  } else if (focusChanged && !state.focus.running) {
+    state.focus.remainingMs = cfg.focusMinutes * 60000;
   } else if (!state.focus.running && (!state.focus.remainingMs || state.focus.remainingMs > 90 * 60000)) {
     state.focus.remainingMs = cfg.focusMinutes * 60000;
   }
@@ -26,11 +37,44 @@ function applySettings(initial) {
     else if (cfg.preset === "gaming") setMode("performance", false);
     else if (cfg.preset === "work") setMode("today", false);
     else setMode("home", false);
+  } else if (previous && cfg.startMode !== previous.startMode && cfg.startMode !== "auto") {
+    state.manualHoldUntil = 0;
+    setMode(cfg.startMode, false);
   }
 
-  refreshWeather(false);
-  refreshCalendar(false);
+  state.appliedSettings = Object.assign({}, cfg);
+  state.settingsFingerprint = settingsFingerprint(cfg);
+
+  if (cfg.smartMode && cfg.startMode === "auto") {
+    if (!state.manualHoldUntil || Date.now() >= state.manualHoldUntil) {
+      document.body.setAttribute("data-auto", "auto");
+      setText("autoLabel", "AUTO");
+    }
+  } else {
+    state.manualHoldUntil = 0;
+    document.body.setAttribute("data-auto", "manual");
+    setText("autoLabel", "MANUAL");
+  }
+
+  if (weatherChanged) refreshWeather(!initial);
+  if (calendarChanged) refreshCalendar(!initial);
+  updateClock();
   renderAll();
+
+  if (!initial && modeSettingsChanged && cfg.smartMode && cfg.startMode === "auto") {
+    state.manualHoldUntil = 0;
+    state.fps.activeStreak = 0;
+    state.fps.inactiveStreak = 0;
+    resumeAuto();
+  }
+}
+
+function syncSettings(force) {
+  var cfg = settings();
+  var fingerprint = settingsFingerprint(cfg);
+  if (!force && fingerprint === state.settingsFingerprint) return false;
+  applySettings(false, cfg);
+  return true;
 }
 
 function formatTime(date, includeSeconds) {
@@ -91,7 +135,13 @@ function setMode(mode, manual) {
 }
 
 function resumeAuto() {
+  var cfg = settings();
   state.manualHoldUntil = 0;
+  if (!cfg.smartMode || cfg.startMode !== "auto") {
+    document.body.setAttribute("data-auto", "manual");
+    setText("autoLabel", "MANUAL");
+    return;
+  }
   document.body.setAttribute("data-auto", "auto");
   setText("autoLabel", "AUTO");
   maybeSmartMode(true);
@@ -101,7 +151,11 @@ function maybeSmartMode(force) {
   var cfg = settings();
   if (!cfg.smartMode || cfg.startMode !== "auto") return;
   if (!force && Date.now() < state.manualHoldUntil) return;
-  if (state.manualHoldUntil && Date.now() >= state.manualHoldUntil) resumeAuto();
+  if (state.manualHoldUntil && Date.now() >= state.manualHoldUntil) {
+    state.manualHoldUntil = 0;
+    document.body.setAttribute("data-auto", "auto");
+    setText("autoLabel", "AUTO");
+  }
 
   var gameActive = state.fps.available && finite(state.fps.value) !== null && state.fps.value > 0 && !!state.fps.process;
   if (gameActive) {
