@@ -26,8 +26,8 @@ jobs:
         working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
-      - name: Premium runtime smoke test
-        run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v5.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+      - name: v0.6 runtime, safety, layout and Windows workspace smoke test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - name: PowerShell helper parses
         shell: pwsh
@@ -51,7 +51,7 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Generate v0.5 premium art, hardware profiles, and previews
+      - name: Generate proven hardware art, profiles, and previews
         working-directory: products/stream-deck-ultimate-bundle/prototype
         run: |
           python -m pip install -r requirements.txt
@@ -67,15 +67,17 @@ jobs:
 
       - name: JavaScript and Python syntax checks
         run: |
-          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v05.js
-          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v05.cjs
-          node --check products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v5.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v06.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v06.cjs
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-config.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-system.js
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js
           python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v5.py
 
-      - name: Premium runtime smoke test against generated assets
+      - name: v0.6 manifest CodePath smoke test against generated assets
         env:
           PACKRAT_AUDIO_MOCK: '1'
-        run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v5.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - name: Verify complete hardware profile bundle
         run: |
@@ -98,7 +100,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stream-deck-ultimate-bundle-v0.5-premium-beta
+          name: stream-deck-ultimate-bundle-v0.6-beta
           path: |
             products/stream-deck-ultimate-bundle/prototype/dist/*.streamDeckPlugin
             products/stream-deck-ultimate-bundle/prototype/previews/*.png
