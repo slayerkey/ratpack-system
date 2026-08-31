@@ -26,6 +26,9 @@ jobs:
         working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
+      - name: v0.6 product logic test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
       - name: v0.6 runtime, safety, layout and Windows workspace smoke test
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
@@ -71,8 +74,13 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v06.cjs
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-config.js
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-system.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-workspace.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js
           python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v5.py
+
+      - name: v0.6 product logic test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - name: v0.6 manifest CodePath smoke test against generated assets
         env:
@@ -86,6 +94,7 @@ jobs:
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - Plus.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - XL.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - Neo.streamDeckProfile'
+          test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/imgs/keys/setup-needed.png'
 
       - name: Install current Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
