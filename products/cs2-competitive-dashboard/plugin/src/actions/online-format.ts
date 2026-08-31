@@ -39,6 +39,13 @@ function cleanMap(map?: string): string {
   return (value || "--").replace(/^de_/, "").replaceAll("_", " ").toUpperCase();
 }
 
+function mapAndScore(mapName?: string, score?: string): string | undefined {
+  const map = mapName?.trim();
+  if (map && score) return `${cleanMap(map)} ${score}`;
+  if (map) return cleanMap(map);
+  return score || undefined;
+}
+
 function sourceState(source: string, status: OnlineSourceStatus, message?: string): DisplayValue | undefined {
   switch (status) {
     case "ready": return undefined;
@@ -90,7 +97,7 @@ export function competitiveDisplay(metric: CompetitiveMetric, online: OnlineProf
     case "recent-result": {
       const match = source.recentMatches[0];
       return match
-        ? { label: "RECENT", value: (match.outcome ?? "--").toUpperCase(), subtitle: `${cleanMap(match.mapName)}${match.score ? ` ${match.score}` : ""}` }
+        ? { label: "RECENT", value: (match.outcome ?? "--").toUpperCase(), subtitle: mapAndScore(match.mapName, match.score) }
         : { label: "RECENT", value: "NO MATCHES", tone: "muted" };
     }
     case "win-rate":
@@ -126,7 +133,7 @@ export function faceitDisplay(metric: FaceitMetric, online: OnlineProfileSnapsho
     case "recent-match": {
       const match = source.recentMatches[0];
       return match
-        ? { label: "FACEIT RECENT", value: (match.outcome ?? "--").toUpperCase(), subtitle: `${cleanMap(match.mapName)}${match.score ? ` ${match.score}` : ""}` }
+        ? { label: "FACEIT RECENT", value: (match.outcome ?? "--").toUpperCase(), subtitle: mapAndScore(match.mapName, match.score) }
         : { label: "FACEIT RECENT", value: "NO MATCHES", tone: "muted" };
     }
   }
