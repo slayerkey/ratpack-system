@@ -20,6 +20,9 @@ if (-not (Test-Path $Worktree -PathType Container)) {
 
 function Get-GitValue {
     param([string[]]$Arguments)
+    $gitMarker = Join-Path $Worktree ".git"
+    if (-not (Test-Path $gitMarker)) { return "unknown" }
+
     $previous = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
