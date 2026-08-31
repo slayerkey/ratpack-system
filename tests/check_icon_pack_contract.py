@@ -10,6 +10,7 @@ PRODUCT = ROOT / "products" / "ultimate-rgb.json"
 ROUTER = ROOT / "tools" / "local" / "rat-marketplace.ps1"
 HELPER = ROOT / "tools" / "local" / "rat-ship-icon-pack.ps1"
 RENDERER = ROOT / "tools" / "art" / "rat_art_icon_pack.py"
+FINALIZER = ROOT / "tools" / "art" / "finalize_icon_pack_release.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -18,7 +19,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    for path in (PRODUCT, ROUTER, HELPER, RENDERER):
+    for path in (PRODUCT, ROUTER, HELPER, RENDERER, FINALIZER):
         require(path.is_file(), f"missing icon-pack contract file: {path}")
 
     product = json.loads(PRODUCT.read_text(encoding="utf-8"))
@@ -32,6 +33,9 @@ def main() -> None:
     require(product.get("expected_static_icons") == 627, "Ultimate RGB static-count guard drifted")
     require(product.get("expected_animated_icons") == 96, "Ultimate RGB animation-count guard drifted")
     require(product.get("expected_picker_entries") == 723, "Ultimate RGB picker-count guard drifted")
+    require(product.get("expected_unique_glyphs") == 507, "Ultimate RGB distinct-glyph guard drifted")
+    require(product.get("expected_reuse_groups") == 75, "Ultimate RGB structural-reuse guard drifted")
+    require(product.get("expected_exact_visual_duplicate_groups") == 0, "Ultimate RGB exact-visual-duplicate guard drifted")
 
     router = ROUTER.read_text(encoding="utf-8")
     require('$product.type -eq "icon_pack"' in router, "Marketplace router does not recognize icon_pack")
@@ -46,13 +50,30 @@ def main() -> None:
         "Static icon count drift",
         "Animated icon count drift",
         "Picker-entry count drift",
+        "Distinct glyph count drift",
+        "Structural reuse group drift",
         "duplicate picker names or paths",
         "does not match RatPack product marketplace_id",
+        "audit_structural_reuse.py",
+        "finalize_icon_pack_release.py",
+        "FACTORY-RELEASE-AUDIT.json",
         "ICON_PACK_MAN_NEXT.txt",
         "PHYSICAL-TEST.txt",
         "SOURCE-IDENTITY.json",
     ):
         require(needle in helper, f"icon-pack helper lost required fail-closed contract: {needle}")
+
+    finalizer = FINALIZER.read_text(encoding="utf-8")
+    compile(finalizer, str(FINALIZER), "exec")
+    for needle in (
+        "exact_visual_duplicate_groups",
+        "structural-reuse-report.json",
+        "staged icon.svg does not match the pinned product source icon.svg",
+        "resvg_py.svg_to_bytes",
+        "FACTORY-RELEASE-AUDIT.json",
+        '"source": "package-staging/icon.svg"',
+    ):
+        require(needle in finalizer, f"icon-pack release finalizer lost required contract: {needle}")
 
     print("Icon-pack Rat kit contract PASS")
 
