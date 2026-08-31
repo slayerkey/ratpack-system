@@ -113,5 +113,5 @@ When a PackRat application is approved:
 8. Rerun Discord Bridge Release QA.
 9. Rerun Discord Panel Deep QA.
 10. Record the approved application identity, granted scopes, and production exchange architecture in the release documentation.
-11. Remove `BLOCKED_EXTERNAL_APPROVAL` only after the approval and required real-host regressions are complete.
+11. Move each product from `BLOCKED` to `READY_TO_SHIP` only after its approval and required real-host regressions are complete.
 12. Only then submit the paid Voice Deck and Voice Panel products publicly.
