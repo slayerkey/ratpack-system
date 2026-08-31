@@ -30,14 +30,17 @@ test("dynamic member rendering escapes hostile display text", () => {
   assert.equal(svg.includes("&lt;script&gt;"), true);
 });
 
-test("member avatars stay circular and the speaking ring is a separate layer", () => {
+test("member avatar and speaking ring share one exact center", () => {
   const avatarData = "data:image/png;base64,AAAA";
   const svg = decode(renderKey("member-slot", ready, { slotIndex: 1 }, { now: 100, avatarData, pulsePhase: true }));
+
   assert.equal(svg.includes("clipPath"), false);
-  assert.match(svg, /<pattern id="avatarPattern"/);
-  assert.match(svg, /<circle cx="72" cy="59" r="35"[^>]*stroke-width="8"/);
-  assert.match(svg, /<circle cx="72" cy="59" r="31" fill="url\(#avatarPattern\)"\/>/);
-  assert.ok(svg.indexOf('r="35"') < svg.indexOf('fill="url(#avatarPattern)"'));
+  assert.equal(svg.includes("<pattern"), false);
+  assert.match(svg, /<image[^>]*x="41" y="28" width="62" height="62"[^>]*preserveAspectRatio="xMidYMid slice"/);
+  assert.match(svg, /<circle cx="72" cy="59" r="31" fill="#151A24"\/>/);
+  assert.match(svg, /<circle cx="72" cy="59" r="35" fill="none"[^>]*stroke-width="8"\/>/);
+  assert.match(svg, /fill-rule="evenodd"/);
+  assert.ok(svg.indexOf("<image") < svg.lastIndexOf('r="35"'));
 });
 
 test("mute and deafen state changes alter rendered image immediately", () => {
