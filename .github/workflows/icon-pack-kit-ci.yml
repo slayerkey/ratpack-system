@@ -1,0 +1,92 @@
+name: Stream Deck Icon Pack Kit CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/icon-pack-kit-ci.yml'
+      - 'products/ultimate-rgb.json'
+      - 'tools/art/rat_art_icon_pack.py'
+      - 'tools/local/rat-marketplace.ps1'
+      - 'tools/local/rat-ship-icon-pack.ps1'
+      - 'tests/check_icon_pack_contract.py'
+      - 'tests/check_icon_pack_rat_art.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: icon-pack-kit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ultimate-rgb-kit:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout RatPack candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Build exact Ultimate RGB review kit
+        shell: pwsh
+        run: |
+          ./tools/local/rat-ship-icon-pack.ps1 -IconPackSlug ultimate-rgb -Destination (Join-Path $PWD 'out/ship/ultimate-rgb')
+
+      - name: Verify kit identity and outputs
+        shell: pwsh
+        run: |
+          $kit = Join-Path $PWD 'out/ship/ultimate-rgb'
+          $identity = Get-Content (Join-Path $kit 'SOURCE-IDENTITY.json') -Raw | ConvertFrom-Json
+          if ($identity.factory_commit -ne '79086f4f9c09b877b08556a5accb1811bc2ed76c') { throw "Unexpected factory commit: $($identity.factory_commit)" }
+          if ($identity.verified_factory_head -ne $identity.factory_commit) { throw 'Factory source identity was not exact.' }
+          if ($identity.marketplace_id -ne 'com.packrat.ultimate-rgb') { throw "Unexpected marketplace id: $($identity.marketplace_id)" }
+          if ($identity.static_icons -ne 627 -or $identity.animated_icons -ne 96 -or $identity.picker_entries -ne 723) { throw 'Validated icon counts drifted.' }
+          if ($identity.qa_failures -ne 0 -or $identity.qa_warnings -ne 0) { throw 'Kit QA is not clean.' }
+
+          $required = @(
+            '01_search_icon.png',
+            '02_cover.png',
+            '03_gallery_01.png',
+            '04_gallery_02.png',
+            '05_gallery_03.png',
+            '06_gallery_04.png',
+            'submission.json',
+            'SOURCE-IDENTITY.json',
+            'ICON_PACK_MAN_NEXT.txt',
+            'PHYSICAL-TEST.txt',
+            'package-staging/icons.json'
+          )
+          foreach ($relative in $required) {
+            if (-not (Test-Path (Join-Path $kit $relative))) { throw "Missing kit output: $relative" }
+          }
+          $dev = @(Get-ChildItem $kit -File -Filter '*-DEV.streamDeckIconPack')
+          $audit = @(Get-ChildItem $kit -File -Filter '*-iconpack-audit.zip')
+          if ($dev.Count -ne 1) { throw "Expected one development installer, found $($dev.Count)." }
+          if ($audit.Count -ne 1) { throw "Expected one audit ZIP, found $($audit.Count)." }
+          Write-Host "Icon pack Rat kit PASS: 627 static + 96 animated = 723 picker entries"
+
+      - name: Upload compact review evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ultimate-rgb-rat-kit-evidence
+          path: |
+            out/ship/ultimate-rgb/01_search_icon.png
+            out/ship/ultimate-rgb/02_cover.png
+            out/ship/ultimate-rgb/03_gallery_01.png
+            out/ship/ultimate-rgb/04_gallery_02.png
+            out/ship/ultimate-rgb/05_gallery_03.png
+            out/ship/ultimate-rgb/06_gallery_04.png
+            out/ship/ultimate-rgb/SOURCE-IDENTITY.json
+            out/ship/ultimate-rgb/submission.json
+            out/ship/ultimate-rgb/ICON_PACK_MAN_NEXT.txt
+            out/ship/ultimate-rgb/PHYSICAL-TEST.txt
+            out/ship/ultimate-rgb/*-DEV.streamDeckIconPack
+          if-no-files-found: error
+          retention-days: 14
