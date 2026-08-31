@@ -19,8 +19,7 @@ async function exists(file) {
 }
 
 function clearanceField(text, name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return text.match(new RegExp(`^${escaped}:\\s*(.+?)\\s*$`, "im"))?.[1]?.trim();
+  return text.match(new RegExp(`^${name}:\\s*(.+?)\\s*$`, "im"))?.[1]?.trim();
 }
 
 function requireClearanceField(text, name) {
