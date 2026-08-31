@@ -16,7 +16,7 @@ assert(ctx.roleMatchesProcess("browser", "chrome"));
 assert(ctx.roleMatchesProcess("discord", "Discord"));
 assert(ctx.roleMatchesProcess("spotify", "Spotify"));
 assert(ctx.roleMatchesProcess("vscode", "Code"));
-assert(ctx.roleMatchesProcess("custom", "notepad", "C:\\Windows\\System32\\notepad.exe"));
+assert(ctx.roleMatchesProcess("custom", "notepad", path.join(path.sep, "tmp", "notepad.exe")));
 assert(!ctx.roleMatchesProcess("discord", "chrome"));
 
 ctx.applyForeground(null, "chrome", true);
