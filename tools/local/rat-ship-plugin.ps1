@@ -25,6 +25,61 @@ function Invoke-Step {
     }
 }
 
+function Assert-CleanPluginSource {
+    param([string]$RelativeSource)
+
+    $dirty = (& git -C $RepoRoot status --porcelain -- $RelativeSource 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect Stream Deck plugin source state for '$RelativeSource'."
+    }
+    if ($dirty) {
+        throw "Stream Deck Rat Ship will not overwrite local plugin source changes.`n$dirty"
+    }
+}
+
+function Restore-CanonicalPluginSource {
+    param([string]$RelativeSource)
+
+    if (-not $RelativeSource) { return }
+
+    Write-Host "Local Rat Ship plugin: restoring canonical plugin source tree..." -ForegroundColor DarkGray
+
+    & git -C $RepoRoot restore --worktree --staged -- $RelativeSource *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Rat Ship could not restore tracked files under '$RelativeSource'. Run: git restore --worktree --staged -- $RelativeSource"
+    }
+
+    & git -C $RepoRoot clean -fd -- $RelativeSource *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Rat Ship could not remove generated untracked files under '$RelativeSource'. Run: git clean -fd -- $RelativeSource"
+    }
+}
+
+function Invoke-RatArtUtf8Safe {
+    param(
+        [string]$ArtScript,
+        [string]$ArtDestination,
+        [string]$SourceDirectory
+    )
+
+    $runtimeArtScript = Join-Path $SourceDirectory ".rat-art-runtime.ps1"
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    $artText = [System.IO.File]::ReadAllText($ArtScript, [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText($runtimeArtScript, $artText, $utf8Bom)
+
+    try {
+        & $runtimeArtScript -Destination $ArtDestination
+        if ($LASTEXITCODE -ne 0) {
+            throw "Product Rat Art failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        if (Test-Path $runtimeArtScript) {
+            Remove-Item $runtimeArtScript -Force
+        }
+    }
+}
+
 function Resolve-PluginDirectory {
     param(
         [object]$Product,
@@ -70,7 +125,8 @@ if (-not $product.source) {
     throw "Product '$PluginSlug' does not declare a canonical source path."
 }
 
-$sourceDir = Join-Path $RepoRoot ([string]$product.source -replace '/', '\')
+$sourceRelative = ([string]$product.source -replace '/', '\')
+$sourceDir = Join-Path $RepoRoot $sourceRelative
 $submissionPath = Join-Path $sourceDir "submission.json"
 $packageJson = Join-Path $sourceDir "package.json"
 $packageLock = Join-Path $sourceDir "package-lock.json"
@@ -89,67 +145,73 @@ if ($product.version -and $submission.version -and ([string]$submission.version)
     throw "submission.json version ($($submission.version)) does not match products/$PluginSlug.json ($($product.version))."
 }
 
+Require-Command "git" "Install Git for Windows first."
 Require-Command "node" "Install Node.js 24 or newer."
 Require-Command "npm" "Install Node.js 24 or newer."
 Require-Command "npx" "Install Node.js 24 or newer."
+Assert-CleanPluginSource -RelativeSource $sourceRelative
 
 if (Test-Path $Destination) { Remove-Item $Destination -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 $packageOut = Join-Path $Destination "package"
 New-Item -ItemType Directory -Force -Path $packageOut | Out-Null
 
-Push-Location $sourceDir
 try {
-    if (Test-Path $packageLock) {
-        Invoke-Step "install locked dependencies" { & npm ci --no-fund --no-audit }
+    Push-Location $sourceDir
+    try {
+        if (Test-Path $packageLock) {
+            Invoke-Step "install locked dependencies" { & npm ci --no-fund --no-audit }
+        }
+        else {
+            Invoke-Step "install dependencies" { & npm install --no-fund --no-audit }
+        }
+        Invoke-Step "build plugin and bundled assets" { & npm run build }
+        Invoke-Step "run plugin tests" { & npm test }
+
+        $pluginDir = Resolve-PluginDirectory -Product $product -SourceDir $sourceDir
+        Write-Host "Local Rat Ship plugin: selected bundle $pluginDir" -ForegroundColor DarkGray
+        Invoke-Step "official Elgato validation" { & npx streamdeck validate $pluginDir --no-update-check }
+        Invoke-Step "official Elgato package" { & npx streamdeck pack $pluginDir --output $packageOut --force --no-update-check --no-file-list }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $pluginPackages = @(Get-ChildItem -Path $packageOut -File -Filter *.streamDeckPlugin)
+    if ($pluginPackages.Count -ne 1) {
+        throw "Official Elgato package command completed but expected exactly one .streamDeckPlugin file; found $($pluginPackages.Count)."
+    }
+    $canonicalPackage = Join-Path $Destination "$PluginSlug.streamDeckPlugin"
+    Copy-Item $pluginPackages[0].FullName $canonicalPackage -Force
+    Remove-Item $packageOut -Recurse -Force
+
+    Copy-Item $submissionPath (Join-Path $Destination "submission.json") -Force
+    Set-Content -Path (Join-Path $Destination "PASTE_description.txt") -Value ([string]$submission.description).Trim() -Encoding UTF8
+    Set-Content -Path (Join-Path $Destination "PASTE_release_notes.txt") -Value ([string]$submission.release_notes).Trim() -Encoding UTF8
+
+    $artScript = Join-Path $sourceDir "rat-art.ps1"
+    if (Test-Path $artScript) {
+        Invoke-RatArtUtf8Safe -ArtScript $artScript -ArtDestination $Destination -SourceDirectory $sourceDir
     }
     else {
-        Invoke-Step "install dependencies" { & npm install --no-fund --no-audit }
+        Write-Host "Local Rat Ship plugin: no product rat-art.ps1 yet; package kit created without Marketplace media." -ForegroundColor Yellow
     }
-    Invoke-Step "build plugin and bundled assets" { & npm run build }
-    Invoke-Step "run plugin tests" { & npm test }
 
-    $pluginDir = Resolve-PluginDirectory -Product $product -SourceDir $sourceDir
-    Write-Host "Local Rat Ship plugin: selected bundle $pluginDir" -ForegroundColor DarkGray
-    Invoke-Step "official Elgato validation" { & npx streamdeck validate $pluginDir --no-update-check }
-    Invoke-Step "official Elgato package" { & npx streamdeck pack $pluginDir --output $packageOut --force --no-update-check --no-file-list }
+    $requiredMedia = @("01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png", "06_gallery_04.png")
+    $missingMedia = @($requiredMedia | Where-Object { -not (Test-Path (Join-Path $Destination $_)) })
+    if ($missingMedia.Count) {
+        Write-Host "Plugin kit package is valid, but Marketplace media is incomplete: $($missingMedia -join ', ')" -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "Plugin kit media preflight passed." -ForegroundColor Green
+    }
+
+    if ($null -eq $submission.price_usd) {
+        Write-Host "Plugin kit is ready, but Maker Console staging/submission is intentionally blocked until submission.price_usd is explicitly set." -ForegroundColor Yellow
+    }
+
+    Write-Host "Stream Deck plugin ship kit ready at:`n$Destination" -ForegroundColor Green
 }
 finally {
-    Pop-Location
+    Restore-CanonicalPluginSource -RelativeSource $sourceRelative
 }
-
-$pluginPackages = @(Get-ChildItem -Path $packageOut -File -Filter *.streamDeckPlugin)
-if ($pluginPackages.Count -ne 1) {
-    throw "Official Elgato package command completed but expected exactly one .streamDeckPlugin file; found $($pluginPackages.Count)."
-}
-$canonicalPackage = Join-Path $Destination "$PluginSlug.streamDeckPlugin"
-Copy-Item $pluginPackages[0].FullName $canonicalPackage -Force
-Remove-Item $packageOut -Recurse -Force
-
-Copy-Item $submissionPath (Join-Path $Destination "submission.json") -Force
-Set-Content -Path (Join-Path $Destination "PASTE_description.txt") -Value ([string]$submission.description).Trim() -Encoding UTF8
-Set-Content -Path (Join-Path $Destination "PASTE_release_notes.txt") -Value ([string]$submission.release_notes).Trim() -Encoding UTF8
-
-$artScript = Join-Path $sourceDir "rat-art.ps1"
-if (Test-Path $artScript) {
-    & $artScript -Destination $Destination
-    if ($LASTEXITCODE -ne 0) { throw "Product Rat Art failed with exit code $LASTEXITCODE." }
-}
-else {
-    Write-Host "Local Rat Ship plugin: no product rat-art.ps1 yet; package kit created without Marketplace media." -ForegroundColor Yellow
-}
-
-$requiredMedia = @("01_search_icon.png", "02_cover.png", "03_gallery_01.png", "04_gallery_02.png", "05_gallery_03.png", "06_gallery_04.png")
-$missingMedia = @($requiredMedia | Where-Object { -not (Test-Path (Join-Path $Destination $_)) })
-if ($missingMedia.Count) {
-    Write-Host "Plugin kit package is valid, but Marketplace media is incomplete: $($missingMedia -join ', ')" -ForegroundColor Yellow
-}
-else {
-    Write-Host "Plugin kit media preflight passed." -ForegroundColor Green
-}
-
-if ($null -eq $submission.price_usd) {
-    Write-Host "Plugin kit is ready, but Maker Console staging/submission is intentionally blocked until submission.price_usd is explicitly set." -ForegroundColor Yellow
-}
-
-Write-Host "Stream Deck plugin ship kit ready at:`n$Destination" -ForegroundColor Green
