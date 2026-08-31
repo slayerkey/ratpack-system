@@ -25,7 +25,7 @@ rat audit voice-deck
 
 `rat dev` fetches the canonical product source, installs locked dependencies when needed, builds, tests, runs official Elgato validation, links the validated development plugin, and restarts it.
 
-`rat audit` then resolves the exact active Rat Dev source, checks the local Voice Deck build, manifest, profiles, Discord Desktop process, Discord IPC named pipes, Stream Deck process, plugin logs, and Stream Deck host logs. It saves `HOST_AUDIT_LATEST.txt` inside the Voice Deck product root. Keep that file if anything is wrong. Do not uninstall first because uninstalling a Stream Deck plugin also removes its plugin logs.
+`rat audit` then resolves the exact active Rat Dev source, checks the local Voice Deck build, manifest, profiles, Discord Desktop process, Discord IPC named pipes, Stream Deck process, plugin logs, and Stream Deck host logs. It also records the Windows, Discord Desktop, and Stream Deck software versions when they can be read from the host. It saves `HOST_AUDIT_LATEST.txt` inside the Voice Deck product root. Keep that file if anything is wrong. Do not uninstall first because uninstalling a Stream Deck plugin also removes its plugin logs.
 
 If Discord authorization or live voice state is the unclear layer, run:
 
@@ -70,9 +70,9 @@ After checks 1 through 12 pass in Rat Dev, install the exact packaged `.streamDe
 
 When complete, replace `Status: NOT RUN` with `Status: PASS` and record:
 
-* Windows version
-* Discord Desktop version
-* Stream Deck software version
+* Windows version from `HOST_AUDIT_LATEST.txt`
+* Discord Desktop version from `HOST_AUDIT_LATEST.txt`
+* Stream Deck software version from `HOST_AUDIT_LATEST.txt`
 * Stream Deck hardware tested
 * exact Rat Dev source commit
 * packaged plugin SHA256
