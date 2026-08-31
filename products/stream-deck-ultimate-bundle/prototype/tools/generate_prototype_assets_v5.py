@@ -76,6 +76,7 @@ def extra_icons(plugin):
       "meeting":("meeting","MEET"),
       "gaming":("gaming","GAME"),
       "setup":("setup","SETUP"),
+      "setup-needed":("setup","START"),
     }
     for name,(symbol,label) in specs.items():
         for size,sfx in ((72,""),(144,"@2x")): save(premium_key(symbol,label,size),plugin/"imgs"/"keys"/f"{name}{sfx}.png")
@@ -137,9 +138,9 @@ def xl_spec():
       ("routine",{"mode":"work"},"work","WORK"),("smart-app",{"role":"browser"},"web","WEB"),("smart-app",{"role":"discord"},"discord","DISCORD"),("smart-app",{"role":"spotify"},"spotify","SPOTIFY"),("capture",{"mode":"region"},"shot","SHOT"),("clipboard",{"mode":"slot","slot":1},"clip1","CLIP 1"),("media",{"mode":"play-pause"},"play","PLAY"),("setup",{},"setup","SETUP"),
       ("routine",{"mode":"focus"},"focus","FOCUS"),("routine",{"mode":"meeting"},"meeting","MEET"),("audio",{"mode":"mic-toggle"},"mic-live","MIC"),("audio",{"mode":"output-cycle"},"output","OUTPUT"),("audio",{"mode":"input-cycle"},"input","INPUT"),("audio-preset",{"mode":"work"},"mode-work","WORK MODE"),("audio-preset",{"mode":"meeting"},"mode-meeting","MEET MODE"),("audio-preset",{"mode":"gaming"},"mode-gaming","GAME MODE"),
       ("window",{"mode":"left"},"left","LEFT"),("window",{"mode":"right"},"right","RIGHT"),("window",{"mode":"maximize"},"max","MAX"),("window",{"mode":"restore"},"restore","RESTORE"),("window",{"mode":"center"},"center","CENTER"),("window",{"mode":"next-monitor"},"screen","SCREEN"),("window",{"mode":"minimize"},"minimize","MIN"),("window",{"mode":"topmost"},"topmost","PIN"),
-      ("clipboard",{"mode":"slot","slot":2},"clip2","CLIP 2"),("clipboard",{"mode":"slot","slot":3},"clip3","CLIP 3"),("clipboard",{"mode":"slot","slot":4},"clip4","CLIP 4"),("clipboard",{"mode":"clear"},"clip-clear","CLEAR"),("snippet",{"text":"","restoreClipboard":True},"snippet","SNIP"),("system",{"mode":"desktop"},"desktop","DESKTOP"),("system",{"mode":"task"},"task","TASK"),("system",{"mode":"settings"},"settings","SETTINGS")
+      ("clipboard",{"mode":"slot","slot":2},"clip2","CLIP 2"),("snippet",{"text":"","restoreClipboard":True},"snippet","SNIP"),("capture",{"mode":"full"},"shot-full","FULL"),("capture",{"mode":"window"},"shot-window","WINDOW"),("media",{"mode":"previous"},"previous","PREV"),("media",{"mode":"next"},"next","NEXT"),("system",{"mode":"desktop"},"desktop","DESKTOP"),("system",{"mode":"task"},"task","TASKS")
     ]
-    for i,(slug,settings,img,name) in enumerate(entries): s[f"{i%8},{i//8}"]=act(slug,settings,img,name)
+    for i,e in enumerate(entries): s[f"{i%8},{i//8}"]=act(*e)
     return ("Stream Deck Ultimate - XL",s,8,4,2)
 
 def plus_spec():
@@ -147,63 +148,51 @@ def plus_spec():
       "0,0":act("routine",{"mode":"work"},"work","Work"),"1,0":act("routine",{"mode":"focus"},"focus","Focus"),"2,0":act("routine",{"mode":"meeting"},"meeting","Meeting"),"3,0":act("audio",{"mode":"mic-toggle"},"mic-live","Mic"),
       "0,1":act("smart-app",{"role":"browser"},"web","Web"),"1,1":act("clipboard",{"mode":"slot","slot":1},"clip1","Clipboard"),"2,1":act("capture",{"mode":"region"},"shot","Capture"),"3,1":act("setup",{},"setup","Setup")
     }
-    encoders={
-      "0,0":enc("audio",{"mode":"volume-dial"},"Master Volume"),
-      "1,0":enc("audio",{"mode":"output-cycle"},"Output Device"),
-      "2,0":enc("audio",{"mode":"input-cycle"},"Input Device"),
-      "3,0":enc("audio",{"mode":"mic-volume-dial"},"Mic Level"),
-    }
-    return ("Stream Deck Ultimate - Plus",keys,4,2,7,encoders)
+    encs={"0,0":enc("audio",{"mode":"volume-dial"},"Master Volume"),"1,0":enc("audio",{"mode":"output-cycle"},"Output Device"),"2,0":enc("audio",{"mode":"input-cycle"},"Input Device"),"3,0":enc("audio",{"mode":"mic-volume-dial"},"Mic Level")}
+    return ("Stream Deck Ultimate - Plus",keys,4,2,7,encs)
 
 def neo_spec():
-    keys={
+    s={
       "0,0":act("routine",{"mode":"work"},"work","Work"),"1,0":act("routine",{"mode":"focus"},"focus","Focus"),"2,0":act("routine",{"mode":"meeting"},"meeting","Meeting"),"3,0":act("audio",{"mode":"mic-toggle"},"mic-live","Mic"),
       "0,1":act("smart-app",{"role":"browser"},"web","Web"),"1,1":act("audio",{"mode":"output-cycle"},"output","Output"),"2,1":act("clipboard",{"mode":"slot","slot":1},"clip1","Clipboard"),"3,1":act("setup",{},"setup","Setup")
     }
-    return ("Stream Deck Ultimate - Neo",keys,4,2,9)
+    return ("Stream Deck Ultimate - Neo",s,4,2,9)
 
-def build_profile(plugin,name,key_spec,cols,rows,device_type,encoder_spec=None):
-    root_id=str(uuid.uuid4()).upper();page_id=str(uuid.uuid4());folder_id=v4.profile_folder_id(page_id);root=f"{root_id}.sdProfile"
-    key_actions={};images={}
-    for coord,item in key_spec.items():
-        item=dict(item);image=item.pop("_image");key_actions[coord]=item;images[coord]=Image.open(plugin/"imgs"/"keys"/f"{image}.png").convert("RGBA")
-    controllers=[{"Actions":key_actions,"Type":"Keypad"}]
-    if encoder_spec: controllers.append({"Actions":encoder_spec,"Type":"Encoder"})
-    top={"Name":name,"Pages":{"Current":page_id,"Pages":[page_id]},"Version":"2.0"}
-    page={"Controllers":controllers}
-    target=plugin/"profiles"/f"{name}.streamDeckProfile"
+def build_profile(plugin,name,spec,cols,rows,device_type,encoders=None):
+    root_id=str(uuid.uuid4()).upper();page_id=str(uuid.uuid4());folder_id=v4.profile_folder_id(page_id);root=f"{root_id}.sdProfile";actions={};images={}
+    for coord,item in spec.items():
+        item=dict(item);image=item.pop("_image");actions[coord]=item;images[("Keypad",coord)]=Image.open(plugin/"imgs"/"keys"/f"{image}.png").convert("RGBA")
+    controllers=[{"Actions":actions,"Type":"Keypad"}]
+    if encoders: controllers.append({"Actions":encoders,"Type":"Encoder"})
+    top={"Name":name,"Pages":{"Current":page_id,"Pages":[page_id]},"Version":"2.0"};page={"Controllers":controllers};target=plugin/"profiles"/f"{name}.streamDeckProfile"
     with zipfile.ZipFile(target,"w",zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{root}/manifest.json",json.dumps(top,separators=(",",":")))
-        z.writestr(f"{root}/Profiles/{folder_id}/manifest.json",json.dumps(page,separators=(",",":")))
-        for coord,im in images.items():
+        z.writestr(f"{root}/manifest.json",json.dumps(top,separators=(",",":")));z.writestr(f"{root}/Profiles/{folder_id}/manifest.json",json.dumps(page,separators=(",",":")))
+        for (controller,coord),im in images.items():
             b=io.BytesIO();im.save(b,"PNG");z.writestr(f"{root}/Profiles/{folder_id}/{coord}/CustomImages/state0.png",b.getvalue())
-    validate(target,page_id,folder_id,len(key_spec),len(encoder_spec or {}))
+    validate_profile(target,page_id,folder_id,len(spec),bool(encoders))
     return target
 
-def validate(target,page_id,folder_id,key_count,encoder_count=0):
+def validate_profile(target,page_id,folder_id,key_count,has_encoders=False):
     with zipfile.ZipFile(target) as z:
-        names=z.namelist();root=next(iter({n.split("/")[0] for n in names if "/" in n}))
-        top=json.loads(z.read(f"{root}/manifest.json"));assert top["Pages"]["Current"]==page_id and top["Version"]=="2.0"
-        page=json.loads(z.read(f"{root}/Profiles/{folder_id}/manifest.json"));kp=next(c for c in page["Controllers"] if c["Type"]=="Keypad");assert len(kp["Actions"])==key_count
-        if encoder_count: en=next(c for c in page["Controllers"] if c["Type"]=="Encoder");assert len(en["Actions"])==encoder_count
-        for coord in kp["Actions"]: assert f"{root}/Profiles/{folder_id}/{coord}/CustomImages/state0.png" in names
+        names=z.namelist();roots={n.split("/")[0] for n in names if "/" in n};assert len(roots)==1;root=next(iter(roots));top=json.loads(z.read(f"{root}/manifest.json"));assert top["Version"]=="2.0" and "Device" not in top and top["Pages"]["Current"]==page_id
+        page=json.loads(z.read(f"{root}/Profiles/{folder_id}/manifest.json"));keypad=next(c for c in page["Controllers"] if c["Type"]=="Keypad");assert len(keypad["Actions"])==key_count
+        if has_encoders: assert any(c["Type"]=="Encoder" and len(c["Actions"])==4 for c in page["Controllers"])
+        for coord,a in keypad["Actions"].items(): assert a["States"][0]["ShowTitle"] is False and f"{root}/Profiles/{folder_id}/{coord}/CustomImages/state0.png" in names
 
 def preview(plugin,name,spec,cols,rows,out):
-    gap=12;cell=144;canvas=Image.new("RGBA",(cols*cell+(cols-1)*gap,rows*cell+(rows-1)*gap),(24,26,30,255))
+    cell=170;canvas=Image.new("RGB",(cols*cell,rows*cell),(31,33,37));d=ImageDraw.Draw(canvas)
     for coord,item in spec.items():
-        x,y=map(int,coord.split(","));img=Image.open(plugin/"imgs"/"keys"/f"{item['_image']}.png").convert("RGBA").resize((cell,cell),Image.Resampling.LANCZOS);canvas.alpha_composite(img,(x*(cell+gap),y*(cell+gap)))
+        x,y=map(int,coord.split(","));im=Image.open(plugin/"imgs"/"keys"/f"{item['_image']}.png").convert("RGBA").resize((144,144),Image.Resampling.LANCZOS);ox=x*cell+13;oy=y*cell+13;canvas.paste(im,(ox,oy),im)
     out.parent.mkdir(parents=True,exist_ok=True);canvas.save(out)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument("plugin",type=Path);ns=ap.parse_args();plugin=ns.plugin.resolve()
-    v4.generate_icons(plugin);extra_icons(plugin)
-    profiles=plugin/"profiles";shutil.rmtree(profiles,ignore_errors=True);profiles.mkdir(parents=True,exist_ok=True)
-    prev=plugin.parent/"previews";shutil.rmtree(prev,ignore_errors=True);prev.mkdir(parents=True,exist_ok=True)
-    all_specs=list(standard_specs())+[xl_spec(),plus_spec(),neo_spec()]
-    for spec in all_specs:
-        name,key_spec,cols,rows,device_type,*rest=spec;encoders=rest[0] if rest else None
-        build_profile(plugin,name,key_spec,cols,rows,device_type,encoders)
-        preview(plugin,name,key_spec,cols,rows,prev/(name.lower().replace(" ","-").replace("&","and")+".png"))
-    print(f"generated {len(all_specs)} premium profiles: standard x4, XL, Plus, Neo")
+    ap=argparse.ArgumentParser();ap.add_argument("plugin",type=Path);ns=ap.parse_args();plugin=ns.plugin.resolve();v4.generate_icons(plugin);extra_icons(plugin)
+    profiles=plugin/"profiles";shutil.rmtree(profiles,ignore_errors=True);profiles.mkdir(parents=True,exist_ok=True);prev=plugin.parent/"previews";shutil.rmtree(prev,ignore_errors=True);prev.mkdir(parents=True,exist_ok=True)
+    specs=standard_specs()+[xl_spec(),plus_spec(),neo_spec()]
+    for entry in specs:
+        if len(entry)==5:name,spec,cols,rows,device=entry;encoders=None
+        else:name,spec,cols,rows,device,encoders=entry
+        build_profile(plugin,name,spec,cols,rows,device,encoders);preview(plugin,name,spec,cols,rows,prev/(name.lower().replace(" ","-").replace("&","and")+".png"))
+    print("generated 7 premium hardware profiles, semantic key art, setup states, dials, and previews")
 
 if __name__=="__main__":main()
