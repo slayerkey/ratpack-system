@@ -57,8 +57,8 @@ function cleanup() {
 
 (async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(pluginDir, "manifest.json"), "utf8"));
-  if (!["bin/plugin-v07.cjs", "bin/plugin-v071.cjs"].includes(manifest.CodePath)) {
-    throw new Error("Smoke must launch a supported v0.7 Context manifest CodePath, saw " + manifest.CodePath);
+  if (!["bin/plugin-v07.cjs", "bin/plugin-v071.cjs", "bin/plugin-v08.cjs"].includes(manifest.CodePath)) {
+    throw new Error("Smoke must launch a supported Context multiplexed manifest CodePath, saw " + manifest.CodePath);
   }
 
   const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
@@ -80,6 +80,7 @@ function cleanup() {
         ...process.env,
         APPDATA: path.join(pluginDir, ".context-smoke-state"),
         PACKRAT_AUDIO_MOCK: "1",
+        PACKRAT_APP_AUDIO_MOCK: "1",
         PACKRAT_CONTEXT_MOCK: "1",
         PACKRAT_CONTEXT_PROCESS: "chrome"
       }
