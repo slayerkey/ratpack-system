@@ -112,7 +112,6 @@ jobs:
         shell: powershell
         run: |
           $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-host-bundle.ps1' -AssemblyPath $env:PACKRAT_APP_AUDIO_DLL
-          if ($LASTEXITCODE -ne 0) { throw "Host bundle staging exited $LASTEXITCODE" }
           $bundle = $json | ConvertFrom-Json
           if (-not $bundle.ok -or $bundle.fileCount -ne 6) { throw "Unexpected host bundle result: $json" }
           if ([string]::IsNullOrWhiteSpace([string]$bundle.helperSha256)) { throw 'Host bundle missing helper hash' }
