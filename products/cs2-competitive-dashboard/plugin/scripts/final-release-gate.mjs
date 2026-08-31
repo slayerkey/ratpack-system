@@ -27,7 +27,13 @@ await check("Pro registry price is $14.99", async () => {
 await check("Lite Marketplace launch remains held", async () => {
   const value = JSON.parse(await readFile("../../cs2-competitive-dashboard-lite.json", "utf8"));
   if (value.marketplace_launch !== "held") throw new Error(`marketplace_launch=${value.marketplace_launch ?? "missing"}`);
-  if (!String(value.workflow_state ?? "").startsWith("BLOCKED_")) throw new Error(`Lite workflow_state=${value.workflow_state ?? "missing"}; held products must fail closed`);
+  const state = String(value.workflow_state ?? "").trim().toUpperCase();
+  if (!(state === "BLOCKED" || state.startsWith("BLOCKED_"))) {
+    throw new Error(`Lite workflow_state=${value.workflow_state ?? "missing"}; held products must fail closed`);
+  }
+  if (value.blocker_kind !== "strategy_hold") {
+    throw new Error(`Lite blocker_kind=${value.blocker_kind ?? "missing"}; expected strategy_hold`);
+  }
   return value.marketplace_hold_reason ?? "held";
 });
 
