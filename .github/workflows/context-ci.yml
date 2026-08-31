@@ -62,3 +62,7 @@ jobs:
       - name: Validate external Rat Dev lifecycle
         shell: pwsh
         run: ./tests/check_rat_dev_external.ps1
+
+      - name: Validate Rat Audit lifecycle
+        shell: pwsh
+        run: ./tests/check_rat_audit.ps1
