@@ -22,3 +22,10 @@ export function providersReadyTogether(session) {
     .filter((line) => line.includes("provider refresh completed"))
     .some((line) => /"leetifyStatus":"ready"/.test(line) && /"faceitStatus":"ready"/.test(line));
 }
+
+export function processRuntimeFingerprint(session) {
+  const line = logLines(session).find((entry) => entry.includes("plugin process started"));
+  if (!line) return undefined;
+  const match = line.match(/"runtimeFingerprint":"([a-f0-9]{64})"/i);
+  return match?.[1]?.toLowerCase();
+}
