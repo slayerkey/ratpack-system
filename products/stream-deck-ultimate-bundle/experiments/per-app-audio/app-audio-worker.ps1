@@ -1,13 +1,25 @@
 param(
-  [switch]$Mock
+  [switch]$Mock,
+  [string]$AssemblyPath = ""
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+$backend = if ($Mock) { "mock" } else { "source" }
 
 if (-not $Mock) {
-  $source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
-  if (-not ("PackRatAppAudio.Core" -as [type])) { Add-Type -Path $source }
+  if (-not [string]::IsNullOrWhiteSpace($AssemblyPath)) {
+    if (-not [IO.Path]::IsPathRooted($AssemblyPath)) { $AssemblyPath = Join-Path (Get-Location) $AssemblyPath }
+    $AssemblyPath = [IO.Path]::GetFullPath($AssemblyPath)
+    if (-not (Test-Path -LiteralPath $AssemblyPath)) { throw "Precompiled app-audio assembly not found: $AssemblyPath" }
+    Add-Type -Path $AssemblyPath
+    $backend = "assembly"
+  } else {
+    $source = Join-Path $PSScriptRoot "PackRatAppAudio.cs"
+    Add-Type -Path $source
+    $backend = "source"
+  }
+  if (-not ("PackRatAppAudio.Core" -as [type])) { throw "PackRatAppAudio.Core failed to load" }
 }
 
 $mockSessions = @(
@@ -61,17 +73,17 @@ function Invoke-MockWrite([string]$action, [string]$match, [int]$value) {
 function Invoke-NativeExact([string]$action, [string]$match, [int]$value) {
   $targets = @(Resolve-Exact $match)
   if ($targets.Count -eq 0) { return [pscustomobject]@{ changed = 0; missing = $true; match = $match } }
-  $pids = @($targets | ForEach-Object { [int]$_.pid } | Where-Object { $_ -gt 0 } | Select-Object -Unique)
+  $processIds = @($targets | ForEach-Object { [int]$_.pid } | Where-Object { $_ -gt 0 } | Select-Object -Unique)
   $changed = 0
-  foreach ($pid in $pids) {
-    $selector = [string]$pid
+  foreach ($processId in $processIds) {
+    $selector = [string]$processId
     if ($action -eq 'SetVolume') { $changed += [PackRatAppAudio.Core]::SetVolume($selector,$value) }
     elseif ($action -eq 'AdjustVolume') { $changed += [PackRatAppAudio.Core]::AdjustVolume($selector,$value) }
     elseif ($action -eq 'Mute') { $changed += [PackRatAppAudio.Core]::SetMute($selector,$true) }
     elseif ($action -eq 'Unmute') { $changed += [PackRatAppAudio.Core]::SetMute($selector,$false) }
     elseif ($action -eq 'ToggleMute') { $changed += [PackRatAppAudio.Core]::ToggleMute($selector) }
   }
-  return [pscustomobject]@{ changed = $changed; missing = ($changed -eq 0); match = $match; pidCount = $pids.Count }
+  return [pscustomobject]@{ changed = $changed; missing = ($changed -eq 0); match = $match; pidCount = $processIds.Count }
 }
 
 function Invoke-ExactWrite([string]$action, [string]$match, [int]$value) {
@@ -94,7 +106,7 @@ while ($true) {
       Write-Response $id $true ([pscustomobject]@{ quitting = $true })
       break
     } elseif ($action -eq 'Ping') {
-      Write-Response $id $true ([pscustomobject]@{ ready = $true; mock = [bool]$Mock; type = if ($Mock) { 'mock' } else { 'PackRatAppAudio.Core' } })
+      Write-Response $id $true ([pscustomobject]@{ ready = $true; mock = [bool]$Mock; type = if ($Mock) { 'mock' } else { 'PackRatAppAudio.Core' }; backend = $backend })
     } elseif ($action -eq 'List') {
       Write-Response $id $true @(Get-Sessions)
     } elseif ($action -eq 'FindExact') {
