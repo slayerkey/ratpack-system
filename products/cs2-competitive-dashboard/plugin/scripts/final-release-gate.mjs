@@ -18,6 +18,17 @@ async function exists(file) {
   try { await access(file); return true; } catch { return false; }
 }
 
+function clearanceField(text, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.match(new RegExp(`^${escaped}:\\s*(.+?)\\s*$`, "im"))?.[1]?.trim();
+}
+
+function requireClearanceField(text, name) {
+  const value = clearanceField(text, name);
+  if (!value || /^(?:PENDING|TBD|TODO|N\/A)$/i.test(value)) throw new Error(`${name} is missing or still a placeholder`);
+  return value;
+}
+
 await check("Pro registry price is $14.99", async () => {
   const value = JSON.parse(await readFile("../../cs2-competitive-dashboard-pro.json", "utf8"));
   if (value.price_usd !== 14.99) throw new Error(`found ${value.price_usd}`);
@@ -96,11 +107,27 @@ await check("Built Pro uses the official Leetify attribution image", async () =>
   return "official badge + View on Leetify surface present";
 });
 
-await check("Leetify paid product use is explicitly cleared", async () => {
+await check("Leetify paid product use has complete written clearance evidence", async () => {
   const file = "../LEETIFY_COMMERCIAL_CLEARANCE.md";
   const text = await readFile(file, "utf8");
   if (!/^Status:\s*CLEARED\s*$/im.test(text)) throw new Error(`commercial clearance is still pending in ${file}`);
-  return "Status: CLEARED";
+
+  const approvalDate = requireClearanceField(text, "Approval-Date");
+  const approvalChannel = requireClearanceField(text, "Approval-Channel");
+  const approvalScope = requireClearanceField(text, "Approval-Scope");
+  const approvalReference = requireClearanceField(text, "Approval-Reference");
+  const assetSource = requireClearanceField(text, "Attribution-Asset-Source");
+  requireClearanceField(text, "Additional-Conditions");
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(approvalDate)) throw new Error("Approval-Date must use YYYY-MM-DD");
+  if (!/14\.99/.test(approvalScope) || !/customer.?owned/i.test(approvalScope) || !/api.?key/i.test(approvalScope)) {
+    throw new Error("Approval-Scope must explicitly cover the $14.99 one-time product and customer-owned API-key model");
+  }
+  if (approvalReference.length < 3) throw new Error("Approval-Reference is too short to identify written approval evidence");
+  if (approvalChannel.length < 2) throw new Error("Approval-Channel is too short to identify the Leetify approval source");
+  if (!/(leetify|drive\.google\.com)/i.test(assetSource)) throw new Error("Attribution-Asset-Source must identify the official Leetify source/package");
+
+  return `written approval recorded ${approvalDate} via ${approvalChannel}`;
 });
 
 console.log("CS2 COMPETITIVE DASHBOARD PRO — FINAL MARKETPLACE GATE\n");
@@ -116,5 +143,5 @@ if (blocked.length) {
   process.exitCode = 1;
 } else {
   console.log("\nFINAL MARKETPLACE GATE: PASS");
-  console.log("Physical host evidence, exact running/source fingerprint, provider smoke, attribution, commercial clearance, pricing, and Lite hold policy are all satisfied.");
+  console.log("Physical host evidence, exact running/source fingerprint, provider smoke, official attribution, documented commercial clearance, pricing, and Lite hold policy are all satisfied.");
 }
