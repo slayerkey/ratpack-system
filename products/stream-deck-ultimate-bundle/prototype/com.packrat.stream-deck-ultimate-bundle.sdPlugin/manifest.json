@@ -14,13 +14,14 @@
     {"Controllers":["Keypad","Encoder"],"Icon":"imgs/actions/audio/icon","Name":"Smart Audio","States":[{"Image":"imgs/actions/audio/key"}],"Tooltip":"Switch audio devices, control microphone state, restore previous audio, or use Stream Deck+ audio dials.","Encoder":{"Icon":"imgs/actions/audio/key","layout":"$B1","TriggerDescription":{"Push":"Toggle microphone mute","Rotate":"Adjust or switch audio","Touch":"Audio control"}},"UUID":"com.packrat.stream-deck-ultimate-bundle.audio"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/audio-preset/icon","Name":"Audio Preset","States":[{"Image":"imgs/actions/audio-preset/key"}],"Tooltip":"Apply your Work, Focus, Meeting, or Gaming audio setup with explicit mic safety.","UUID":"com.packrat.stream-deck-ultimate-bundle.audio-preset"},
     {"Controllers":["Keypad"],"Icon":"imgs/actions/routine/icon","Name":"Routine","States":[{"Image":"imgs/actions/routine/key"}],"Tooltip":"Run a one-press Work, Focus, Meeting, or Gaming routine with workspace and audio together.","UUID":"com.packrat.stream-deck-ultimate-bundle.routine"},
-    {"Controllers":["Keypad"],"Icon":"imgs/actions/setup/icon","Name":"Ultimate Setup","States":[{"Image":"imgs/actions/setup/key"}],"Tooltip":"Open the local Ultimate onboarding wizard for detected apps, audio, presets, and workspaces.","UUID":"com.packrat.stream-deck-ultimate-bundle.setup"}
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/setup/icon","Name":"Ultimate Setup","States":[{"Image":"imgs/actions/setup/key"}],"Tooltip":"Open the local Ultimate onboarding wizard for detected apps, audio, presets, and workspaces.","UUID":"com.packrat.stream-deck-ultimate-bundle.setup"},
+    {"Controllers":["Keypad"],"Icon":"imgs/actions/diagnostics/icon","Name":"Diagnostics Report","States":[{"Image":"imgs/actions/diagnostics/key"}],"Tooltip":"Create a privacy-safe local support report without clipboard contents, snippet text, workspace URLs, raw logs, or full custom paths.","UUID":"com.packrat.stream-deck-ultimate-bundle.diagnostics"}
   ],
   "Author":"Packrat",
   "Category":"Stream Deck Ultimate Bundle",
   "CategoryIcon":"imgs/plugin/category",
-  "CodePath":"bin/plugin-v07.cjs",
-  "Description":"A ready-to-use Windows control system for apps, adaptive context controls, workspaces, windows, clipboard, audio devices, microphone, routines, capture, media and everyday system controls.",
+  "CodePath":"bin/plugin-v071.cjs",
+  "Description":"A ready-to-use Windows control system for apps, adaptive context controls, workspaces, windows, clipboard, audio devices, microphone, routines, capture, media and everyday system controls, with privacy-safe diagnostics for support.",
   "Icon":"imgs/plugin/marketplace",
   "Name":"Stream Deck Ultimate Bundle",
   "Nodejs":{"Version":"20"},
@@ -39,5 +40,5 @@
   "SDKVersion":2,
   "Software":{"MinimumVersion":"6.6"},
   "UUID":"com.packrat.stream-deck-ultimate-bundle",
-  "Version":"0.7.0.0"
+  "Version":"0.7.1.0"
 }
