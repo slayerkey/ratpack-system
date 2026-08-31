@@ -1,0 +1,30 @@
+{
+  "slug": "xeneon-edge-ultimate",
+  "name": "XENEON EDGE Ultimate",
+  "type": "widget",
+  "price_usd": 34.99,
+  "version": "1.0.0",
+  "marketplace_category": [
+    "Utilities",
+    "Productivity"
+  ],
+  "marketplace_dashboard_sizes": [
+    "Extra large",
+    "Large",
+    "Medium",
+    "Small"
+  ],
+  "marketplace_language": [
+    "English"
+  ],
+  "marketplace_auto_publish": false,
+  "description": "XENEON EDGE Ultimate turns the CORSAIR XENEON EDGE into one finished dashboard instead of a collection of disconnected widgets.\n\nHOME keeps time, weather, PC health, your next event, media and connection status glanceable without becoming a telemetry wall.\n\nPERFORMANCE uses iCUE's native FPS and sensor providers to record rolling FPS, GPU and CPU history, with an adjacent connection-quality view so you can tell whether a bad moment looks more like the PC or the network.\n\nTODAY combines your next event, an ICS agenda, a focus timer and one pinned note.\n\nAMBIENT keeps the display clean when you want less information.\n\nSmart Mode can automatically enter Performance when iCUE reports an active FPS session, then return to the normal dashboard afterward. Manual screen changes are respected before Auto resumes.\n\nWeather is fetched directly from Open-Meteo after you add latitude and longitude. Calendar accepts an optional ICS URL. Some calendar providers block direct browser access and may require a future PackRat Bridge transport.\n\nNo PackRat cloud account is required for the core dashboard.\n\nPart of the PackRat 🐀 collection for CORSAIR XENEON EDGE.",
+  "release_notes": [
+    "Four integrated modes: Home, Performance, Today and Ambient.",
+    "Native iCUE FPS, foreground-process detection and automatic CPU/GPU sensor discovery.",
+    "Rolling performance history plus HTTPS response-timing history for connection diagnosis.",
+    "Optional Open-Meteo weather, ICS agenda, focus timer, pinned note and system media controls.",
+    "Smart Mode can enter Performance for active FPS sessions while respecting manual overrides.",
+    "Local-first state and cached daily data with no PackRat cloud account required."
+  ]
+}

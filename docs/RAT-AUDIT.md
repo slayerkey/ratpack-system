@@ -41,6 +41,10 @@ It does not reinstall, delete logs, switch product source, or change the active 
 
 For Voice Deck specifically, preserve `HOST_AUDIT_LATEST.txt` and the plugin/Stream Deck logs before changing or uninstalling anything. The canonical physical checklist remains `plugins/voice-deck/REAL_WINDOWS_SMOKE.md`.
 
-## Source freshness
+## Source freshness and dirty checkouts
 
-`audit` is part of the RatPack bootstrap command set. The top-level command refreshes canonical RatPack tooling before dispatching, matching the normal `rat dev` and `rat ship` freshness behavior.
+`rat audit` is intentionally read-only and does not bootstrap, switch, pull, restore, clean, or otherwise mutate the canonical RatPack checkout before it runs. This allows diagnostics to inspect the already activated Rat Dev build even when an unrelated product has local source changes or generated output in the main checkout.
+
+The audit still prints the exact active source commit and path it is inspecting, so its evidence remains attributable. `rat dev`, `rat kit`, `rat stage`, `rat ship`, and other mutating/release commands keep the normal self-updating clean-checkout protection.
+
+If Rat Audit itself is missing or an operator intentionally needs the newest shared command implementation, clean or preserve the canonical checkout first and run `rat main`, then rerun the audit.

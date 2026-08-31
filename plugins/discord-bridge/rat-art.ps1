@@ -22,6 +22,12 @@ $muted = [System.Drawing.Color]::FromArgb(166, 176, 192)
 $accent = [System.Drawing.Color]::FromArgb(43, 232, 106)
 $voice = [System.Drawing.Color]::FromArgb(77, 163, 255)
 
+# Keep this script source ASCII-safe for Windows PowerShell 5 while preserving
+# the intended glyphs in generated Marketplace media.
+$bullet = [string][char]0x2022
+$arrow = [string][char]0x2192
+$check = [string][char]0x2713
+
 function New-Font([float]$size, [System.Drawing.FontStyle]$style = [System.Drawing.FontStyle]::Regular) {
     return New-Object System.Drawing.Font("Segoe UI", $size, $style, [System.Drawing.GraphicsUnit]::Pixel)
 }
@@ -98,7 +104,7 @@ $c = New-Canvas 1920 960
 Draw-Pill $c[1] "FREE STREAM DECK COMPANION" 110 92 620 $accent $bg
 Draw-Text $c[1] "PackRat Voice Bridge" 110 185 76 $white $true 1030
 Draw-Text $c[1] "Connect PackRat Voice Panel to your current Discord voice channel." 112 300 38 $muted $false 1030
-Draw-Text $c[1] "Local voice roster  •  speaking state  •  mute + deafen" 112 395 30 $white $false 1000
+Draw-Text $c[1] "Local voice roster  $bullet  speaking state  $bullet  mute + deafen" 112 395 30 $white $false 1000
 Draw-Panel $c[1] 1260 160 470 470 $panel
 Draw-Icon $c[1] 1335 235 320
 Draw-Pill $c[1] "DISCORD READY" 1325 655 340 $voice $white
@@ -136,9 +142,9 @@ foreach ($item in $items) {
     Draw-Text $c[1] $item.title ($item.x + 34) 405 31 $white $true 360
     Draw-Text $c[1] $item.sub ($item.x + 34) 475 25 $white $false 360
 }
-Draw-Text $c[1] "→" 565 425 70 $muted $true 80
-Draw-Text $c[1] "→" 1115 425 70 $muted $true 80
-Draw-Pill $c[1] "NO CLOUD SYNC   •   NO USER TOKEN   •   MEMORY ONLY CREDENTIALS" 360 690 1200 $panel2 $white
+Draw-Text $c[1] $arrow 565 425 70 $muted $true 80
+Draw-Text $c[1] $arrow 1115 425 70 $muted $true 80
+Draw-Pill $c[1] "NO CLOUD SYNC   $bullet   NO USER TOKEN   $bullet   MEMORY ONLY CREDENTIALS" 360 690 1200 $panel2 $white
 Draw-Footer $c[1]
 Save-Canvas $c "04_gallery_02.png"
 
@@ -155,7 +161,7 @@ $features = @(
 $y = 315
 foreach ($feature in $features) {
     Draw-Panel $c[1] 190 $y 1540 90 $panel
-    Draw-Text $c[1] "✓" 230 ($y + 13) 38 $accent $true 60
+    Draw-Text $c[1] $check 230 ($y + 13) 38 $accent $true 60
     Draw-Text $c[1] $feature 310 ($y + 18) 30 $white $false 1320
     $y += 108
 }

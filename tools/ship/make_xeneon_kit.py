@@ -11,6 +11,20 @@ def fail(msg):
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+def release_notes_text(value):
+    """Normalize current bullet-list metadata and legacy prose for paste files."""
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            fail("submission.json release_notes cannot be blank")
+        return text
+    if isinstance(value, list):
+        items = [str(item).strip() for item in value if str(item).strip()]
+        if not items:
+            fail("submission.json release_notes cannot be an empty list")
+        return "\n".join(f"• {item}" for item in items)
+    fail("submission.json release_notes must be a string or list of bullet items")
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("slug")
@@ -69,7 +83,7 @@ def main():
         by_hash[value] = name
 
     (out / "PASTE_description.txt").write_text(meta["description"].strip() + "\n", encoding="utf-8")
-    (out / "PASTE_release_notes.txt").write_text(meta["release_notes"].strip() + "\n", encoding="utf-8")
+    (out / "PASTE_release_notes.txt").write_text(release_notes_text(meta["release_notes"]) + "\n", encoding="utf-8")
     public = {k: v for k, v in meta.items() if k not in ("description", "release_notes")}
     (out / "submission.json").write_text(json.dumps(public, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     orientation = meta.get("marketplace_recommended_orientation")

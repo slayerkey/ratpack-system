@@ -1,0 +1,34 @@
+name: XENEON EDGE Ultimate Full Gate Trigger
+
+on:
+  push:
+    branches:
+      - product/xeneon-edge-ultimate
+    paths:
+      - 'widgets/_src/xeneon-edge-ultimate/**'
+      - 'widgets/xeneon-edge-ultimate/**'
+      - '.github/workflows/xeneon-edge-ultimate-trigger.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch canonical XENEON exact-package gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run xeneon-widget-ci.yml --repo ${{ github.repository }} --ref product/xeneon-edge-ultimate -f slug=xeneon-edge-ultimate
+
+      - name: Dispatch deterministic Rat Art gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run rat-art-xeneon.yml --repo ${{ github.repository }} --ref product/xeneon-edge-ultimate -f slug=xeneon-edge-ultimate
+
+      - name: Dispatch candidate Rat Ship kit gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run rat-ship-xeneon.yml --repo ${{ github.repository }} --ref product/xeneon-edge-ultimate -f slug=xeneon-edge-ultimate

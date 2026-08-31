@@ -3,17 +3,48 @@ param(
     [string]$WidgetSlug,
 
     [Parameter(Mandatory = $true)]
-    [string]$Destination
+    [string]$Destination,
+
+    [switch]$IsolatedBuild,
+
+    [string]$DependencyToolsRoot
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+if (-not [System.IO.Path]::IsPathRooted($Destination)) {
+    $Destination = Join-Path $RepoRoot $Destination
+}
+
+# Public entry point: canonical main is control-plane only. The real XENEON
+# build/validate/package/art pipeline runs in a disposable detached worktree.
+if (-not $IsolatedBuild) {
+    $worktreeTools = Join-Path $PSScriptRoot "rat-worktree.ps1"
+    if (-not (Test-Path $worktreeTools)) { throw "Rat worktree helper missing: $worktreeTools" }
+    . $worktreeTools
+
+    $canonicalRoot = $RepoRoot
+    $sharedTools = Join-Path $canonicalRoot "tools"
+    $worktree = New-RatDisposableWorktree -RepoRoot $canonicalRoot -Label "ship-xeneon-$WidgetSlug"
+    try {
+        $helper = Join-Path $worktree "tools\local\rat-ship-local.ps1"
+        if (-not (Test-Path $helper)) { throw "Isolated XENEON ship helper missing: $helper" }
+        & $helper -WidgetSlug $WidgetSlug -Destination $Destination -IsolatedBuild -DependencyToolsRoot $sharedTools
+    }
+    finally {
+        Remove-RatDisposableWorktree -RepoRoot $canonicalRoot -WorktreeRoot $worktree
+        Assert-RatCanonicalClean -RepoRoot $canonicalRoot -Context "XENEON Rat Ship"
+    }
+    return
+}
+
 $ToolsRoot = Join-Path $RepoRoot "tools"
+if (-not $DependencyToolsRoot) { $DependencyToolsRoot = $ToolsRoot }
 $ShipToolRoot = Join-Path $ToolsRoot "ship"
 $WorkRoot = Join-Path $RepoRoot "out\ship-local\$WidgetSlug"
-$PlaywrightModule = Join-Path $ToolsRoot "node_modules\playwright"
-$PlaywrightCmd = Join-Path $ToolsRoot "node_modules\.bin\playwright.cmd"
-$LocalIcueWidgetCliCmd = Join-Path $ToolsRoot "node_modules\.bin\icuewidget.cmd"
+$PlaywrightModule = Join-Path $DependencyToolsRoot "node_modules\playwright"
+$PlaywrightCmd = Join-Path $DependencyToolsRoot "node_modules\.bin\playwright.cmd"
+$LocalIcueWidgetCliCmd = Join-Path $DependencyToolsRoot "node_modules\.bin\icuewidget.cmd"
 $IcueWidgetCliCmd = $null
 
 function Require-LocalCommand {
@@ -105,20 +136,18 @@ function Ensure-LocalDependencies {
         $packages += "playwright@1.62.1"
     }
 
-    # Prefer the canonical cached 0.4.47 CLI even when an older system CLI exists.
-    # This keeps local Rat Ship aligned with the version used by canonical shipping.
     if (-not (Test-Path $LocalIcueWidgetCliCmd)) {
         $packages += "icuewidget-cli@0.4.47"
     }
 
     if ($packages.Count) {
         Invoke-LocalStep "install missing shared Rat Ship Node tools" {
-            & npm install --prefix $ToolsRoot --no-save --package-lock=false --no-fund --no-audit @packages
+            & npm install --prefix $DependencyToolsRoot --no-save --package-lock=false --no-fund --no-audit @packages
         }
     }
 
     if (-not (Test-Path $PlaywrightModule) -or -not (Test-Path $PlaywrightCmd)) {
-        throw "Playwright installed without its expected module/command under $ToolsRoot"
+        throw "Playwright installed without its expected module/command under $DependencyToolsRoot"
     }
 
     Resolve-IcueWidgetCli
@@ -133,7 +162,7 @@ function Ensure-LocalDependencies {
         Write-Host "Local Rat Ship: using installed CORSAIR CLI at $IcueWidgetCliCmd" -ForegroundColor DarkGray
     }
 
-    Push-Location $ToolsRoot
+    Push-Location $DependencyToolsRoot
     try {
         & node -e "import('playwright').then(({chromium})=>process.exit(require('fs').existsSync(chromium.executablePath())?0:2)).catch(()=>process.exit(3))" *> $null
         if ($LASTEXITCODE -ne 0) {
@@ -146,6 +175,19 @@ function Ensure-LocalDependencies {
 
     $env:RATPACK_LOCAL_SHIP_DEPS_READY = "1"
     Write-Host "Local Rat Ship: shared Pillow, Playwright, Chromium, and CORSAIR CLI are ready for the rest of this queue." -ForegroundColor DarkGray
+}
+
+function Connect-SharedNodeDependencies {
+    if ((Resolve-Path $DependencyToolsRoot).Path -eq (Resolve-Path $ToolsRoot).Path) { return }
+
+    $sharedNodeModules = Join-Path $DependencyToolsRoot "node_modules"
+    if (-not (Test-Path $sharedNodeModules)) {
+        throw "Shared Rat Ship node_modules cache is missing after dependency setup: $sharedNodeModules"
+    }
+
+    $worktreeTools = Join-Path $PSScriptRoot "rat-worktree.ps1"
+    . $worktreeTools
+    Add-RatSharedNodeModulesJunction -WorktreeRoot $RepoRoot -SharedNodeModules $sharedNodeModules | Out-Null
 }
 
 function Remove-GeneratedWidgetOutputs {
@@ -175,7 +217,7 @@ function Write-LocalFailureRecovery {
     Set-Content -Path (Join-Path $logDir "local-pipeline-context.txt") -Value @(
         "slug=$WidgetSlug",
         "destination=$Destination",
-        "repo=$RepoRoot",
+        "isolated_repo=$RepoRoot",
         "time=$([DateTime]::Now.ToString('o'))",
         "icuewidget=$IcueWidgetCliCmd"
     ) -Encoding UTF8
@@ -196,11 +238,12 @@ $sourceDir = Join-Path $RepoRoot "widgets\_src\$WidgetSlug"
 $shippingDir = Join-Path $RepoRoot "widgets\$WidgetSlug"
 $submissionSource = Join-Path $sourceDir "submission.json"
 if (-not (Test-Path $sourceDir) -or -not (Test-Path $shippingDir) -or -not (Test-Path $submissionSource)) {
-    throw "Local Rat Ship cannot find the canonical source/shipping files for '$WidgetSlug'."
+    throw "Local Rat Ship cannot find the isolated source/shipping files for '$WidgetSlug'."
 }
 
 try {
     Ensure-LocalDependencies
+    Connect-SharedNodeDependencies
     Remove-GeneratedWidgetOutputs
 
     if (Test-Path $WorkRoot) { Remove-Item $WorkRoot -Recurse -Force }
@@ -215,11 +258,11 @@ try {
 
     Push-Location $RepoRoot
     try {
-        Invoke-LocalStep "build canonical shipping widget" { & python tools/xeneon/inline.py $WidgetSlug }
+        Invoke-LocalStep "build isolated canonical shipping widget" { & python tools/xeneon/inline.py $WidgetSlug }
 
         $trackedDrift = (& git -C $RepoRoot diff --name-only -- "widgets/$WidgetSlug" 2>$null)
         if ($trackedDrift) {
-            throw "Canonical local build changed tracked widgets/$WidgetSlug files. Commit the generated shipping output before Rat Ship so the local fallback cannot ship uncommitted drift."
+            throw "Canonical generated widget output is stale for '$WidgetSlug'. Commit the generated shipping output before Rat Ship; the isolated candidate detected tracked drift."
         }
 
         Invoke-LocalStep "official CORSAIR validation" { Invoke-IcueWidgetCliUtf8 @("validate", "widgets/$WidgetSlug") }

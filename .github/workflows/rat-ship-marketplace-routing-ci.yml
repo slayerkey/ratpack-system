@@ -6,10 +6,13 @@ on:
     paths:
       - 'rat.cmd'
       - 'products/*.json'
+      - 'plugins/*/submission.json'
       - 'schemas/product-workflow-state.schema.json'
       - 'tools/local/rat-marketplace.ps1'
       - 'tools/local/rat-maker-console.ps1'
       - 'tools/local/rat-ship-plugin.ps1'
+      - 'tools/local/rat-ship-local.ps1'
+      - 'tools/local/rat-worktree.ps1'
       - 'tools/ship/maker_console.mjs'
       - 'tools/ship/maker_console_core.mjs'
       - 'tools/ship/maker_console_runtime_patch*.mjs'
@@ -20,10 +23,13 @@ on:
     paths:
       - 'rat.cmd'
       - 'products/*.json'
+      - 'plugins/*/submission.json'
       - 'schemas/product-workflow-state.schema.json'
       - 'tools/local/rat-marketplace.ps1'
       - 'tools/local/rat-maker-console.ps1'
       - 'tools/local/rat-ship-plugin.ps1'
+      - 'tools/local/rat-ship-local.ps1'
+      - 'tools/local/rat-worktree.ps1'
       - 'tools/ship/maker_console.mjs'
       - 'tools/ship/maker_console_core.mjs'
       - 'tools/ship/maker_console_runtime_patch*.mjs'
@@ -55,7 +61,9 @@ jobs:
           $files = @(
             'tools/local/rat-marketplace.ps1',
             'tools/local/rat-maker-console.ps1',
-            'tools/local/rat-ship-plugin.ps1'
+            'tools/local/rat-ship-plugin.ps1',
+            'tools/local/rat-ship-local.ps1',
+            'tools/local/rat-worktree.ps1'
           )
           foreach ($file in $files) {
             $tokens = $null
@@ -67,6 +75,34 @@ jobs:
             }
             Write-Host "POWERSHELL PASS: $file"
           }
+
+      - name: Exercise disposable worktree isolation
+        shell: pwsh
+        run: |
+          . ./tools/local/rat-worktree.ps1
+          $repo = (Resolve-Path '.').Path
+          Assert-RatCanonicalClean -RepoRoot $repo -Context 'CI preflight'
+
+          foreach ($shipScript in @('tools/local/rat-ship-plugin.ps1', 'tools/local/rat-ship-local.ps1')) {
+            $raw = Get-Content $shipScript -Raw
+            if ($raw -notmatch 'New-RatDisposableWorktree' -or $raw -notmatch 'IsolatedBuild') {
+              throw "$shipScript is not routed through disposable worktree isolation."
+            }
+          }
+
+          $worktree = New-RatDisposableWorktree -RepoRoot $repo -Label 'ci-isolation'
+          try {
+            Add-Content -Path (Join-Path $worktree 'RAT-COMMANDS.md') -Value "`nCI isolated mutation"
+            Set-Content -Path (Join-Path $worktree 'CI_UNTRACKED_SENTINEL.txt') -Value 'isolated only'
+            Assert-RatCanonicalClean -RepoRoot $repo -Context 'Mutation inside disposable worktree'
+          }
+          finally {
+            Remove-RatDisposableWorktree -RepoRoot $repo -WorktreeRoot $worktree
+          }
+
+          if (Test-Path $worktree) { throw "Disposable worktree was not removed: $worktree" }
+          Assert-RatCanonicalClean -RepoRoot $repo -Context 'CI post-cleanup'
+          Write-Host 'RAT SHIP ISOLATION PASS'
 
       - name: Exercise release-state guard
         shell: pwsh
@@ -134,6 +170,38 @@ jobs:
             }
           }
           Write-Host 'RELEASE STATE GUARD PASS'
+
+      - name: Exercise pinned external Stream Deck release artifact
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dest = Join-Path (Resolve-Path '.').Path 'out\ci-valorant-tracker'
+          ./tools/local/rat-ship-plugin.ps1 -PluginSlug 'valorant-tracker' -Destination $dest -IsolatedBuild
+
+          $expected = @(
+            'valorant-tracker.streamDeckPlugin',
+            'submission.json',
+            'PASTE_description.txt',
+            'PASTE_release_notes.txt',
+            '01_search_icon.png',
+            '02_cover.png',
+            '03_gallery_01.png',
+            '04_gallery_02.png',
+            '05_gallery_03.png',
+            '06_gallery_04.png'
+          )
+          foreach ($name in $expected) {
+            if (-not (Test-Path (Join-Path $dest $name) -PathType Leaf)) {
+              throw "External release artifact kit is missing $name"
+            }
+          }
+
+          $submission = Get-Content (Join-Path $dest 'submission.json') -Raw | ConvertFrom-Json
+          if ($submission.slug -ne 'valorant-tracker' -or [decimal]$submission.price_usd -ne [decimal]7.99) {
+            throw 'Valorant submission metadata did not survive the external artifact shipping path.'
+          }
+          Write-Host 'EXTERNAL STREAM DECK RELEASE ARTIFACT PASS'
 
       - name: Exercise rat.cmd help path
         shell: cmd
