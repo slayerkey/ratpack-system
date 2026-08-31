@@ -2,4 +2,5 @@ node_modules/
 out/
 dist/
 .test-build/
+.release-evidence/
 *.streamDeckPlugin
