@@ -148,12 +148,14 @@ function renderChannel(snapshot, accent, settings) {
 function renderAvatar(member, avatarData, accent, speaking, pulsePhase, showAvatar = true, fallbackInitials = true) {
   const ringWidth = speaking ? (pulsePhase ? 8 : 6) : 3;
   const ringColor = speaking ? accent : "#343B49";
-  const circle = `<circle cx="72" cy="59" r="35" fill="#151A24" stroke="${ringColor}" stroke-width="${ringWidth}"/>`;
+  const ring = `<circle cx="72" cy="59" r="35" fill="#151A24" stroke="${ringColor}" stroke-width="${ringWidth}"/>`;
   if (showAvatar && avatarData) {
-    return `${circle}<defs><clipPath id="avatarClip"><circle cx="72" cy="59" r="31"/></clipPath></defs><image href="${esc(avatarData)}" x="41" y="28" width="62" height="62" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip)"/>`;
+    const patternId = "avatarPattern";
+    const avatar = `<defs><pattern id="${patternId}" patternUnits="userSpaceOnUse" x="40" y="27" width="64" height="64"><image href="${esc(avatarData)}" x="40" y="27" width="64" height="64" preserveAspectRatio="xMidYMid slice"/></pattern></defs><circle cx="72" cy="59" r="31" fill="url(#${patternId})"/>`;
+    return `${ring}${avatar}`;
   }
   const label = fallbackInitials ? initials(member?.displayName) : "•";
-  return `${circle}${text(72, 68, label, 23, { fill: speaking ? FG : MUTED })}`;
+  return `${ring}${text(72, 68, label, 23, { fill: speaking ? FG : MUTED })}`;
 }
 
 function renderMember(kind, snapshot, settings, accent, avatarData, now, pulsePhase) {
