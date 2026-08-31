@@ -26,7 +26,8 @@ const files = [
 ];
 for (const rel of files) { const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, tiny); }
 for (const rel of ["ui/onboarding-v06.html", "bin/audio.ps1"]) { const p = path.join(pluginDir, rel); fs.mkdirSync(path.dirname(p), { recursive: true }); if (!fs.existsSync(p)) fs.writeFileSync(p, rel.endsWith(".html") ? "<html>ok</html>" : "param()"); }
-function waitFor(pred, timeout = 8000, from = 0) { return new Promise((resolve, reject) => { const start = Date.now(); const t = setInterval(() => { const v = messages.slice(from).find(pred); if (v) { clearInterval(t); resolve(v); } else if (Date.now() - start > timeout) { clearInterval(t); reject(new Error("Timed out. Seen: " + JSON.stringify(messages.slice(from)))); } }, 35); }); }
+function image(rel) { return "data:image/png;base64," + fs.readFileSync(path.join(pluginDir, rel)).toString("base64"); }
+function waitFor(pred, timeout = 8000, from = 0, label = "event") { return new Promise((resolve, reject) => { const start = Date.now(); const t = setInterval(() => { const v = messages.slice(from).find(pred); if (v) { clearInterval(t); resolve(v); } else if (Date.now() - start > timeout) { clearInterval(t); reject(new Error(`Timed out waiting for ${label}. Seen: ` + JSON.stringify(messages.slice(from).map(x => ({ event: x.event, context: x.context, value: x.payload?.value })))); } }, 35); }); }
 function cleanup() { try { child?.kill(); } catch {} try { if (process.platform === "win32") execFileSync("taskkill", ["/IM", "notepad.exe", "/F"], { stdio: "ignore", timeout: 2000 }); } catch {} }
 (async () => {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "packrat-ultimate-v6-"));
@@ -34,31 +35,48 @@ function cleanup() { try { child?.kill(); } catch {} try { if (process.platform 
   const connection = new Promise(r => server.once("connection", s => { s.on("message", raw => { try { messages.push(JSON.parse(raw.toString())); } catch {} }); r(s); }));
   child = spawn(process.execPath, [codePath, "-port", String(port), "-pluginUUID", UUID, "-registerEvent", "registerPlugin"], { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, APPDATA: stateDir, PACKRAT_AUDIO_MOCK: "1" } });
   let stderr = ""; child.stderr.on("data", d => stderr += d); const ws = await Promise.race([connection, new Promise((_, rej) => setTimeout(() => rej(new Error("No socket " + stderr)), 5000))]);
-  await waitFor(m => m.event === "registerPlugin");
-  let mark = messages.length;
-  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio", context: "mic", device: "d", payload: { controller: "Keypad", settings: { mode: "mic-toggle" } } }));
-  await waitFor(m => m.event === "setImage" && m.context === "mic", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".audio", context: "mic", device: "d", payload: { controller: "Keypad", settings: { mode: "mic-toggle" } } }));
-  await waitFor(m => m.event === "setImage" && m.context === "mic", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio", context: "dial", device: "d", payload: { controller: "Encoder", settings: { mode: "volume-dial" } } }));
-  await waitFor(m => m.event === "setFeedback" && m.context === "dial", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "dialRotate", action: UUID + ".audio", context: "dial", device: "d", payload: { controller: "Encoder", settings: { mode: "volume-dial" }, ticks: 2 } }));
-  await waitFor(m => m.event === "setFeedback" && m.context === "dial", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio-preset", context: "preset", device: "d", payload: { controller: "Keypad", settings: { mode: "focus" } } }));
-  await waitFor(m => m.event === "setImage" && m.context === "preset", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".audio-preset", context: "preset", device: "d", payload: { controller: "Keypad", settings: { mode: "focus" } } }));
-  await waitFor(m => m.event === "setImage" && m.context === "preset", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".setup", context: "setup", device: "d", payload: { controller: "Keypad", settings: {} } }));
-  await waitFor(m => m.event === "setImage" && m.context === "setup", 5000, mark);
-  mark = messages.length; ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".setup", context: "setup", device: "d", payload: { controller: "Keypad", settings: {} } }));
-  await waitFor(m => m.event === "setImage" && m.context === "setup", 5000, mark);
+  await waitFor(m => m.event === "registerPlugin", 5000, 0, "plugin registration");
+
+  // Run the real Windows workspace proof before any audio keys appear. Audio keys intentionally start a periodic
+  // state poller, which should not be allowed to flood/race the workspace assertion in this regression harness.
   if (process.platform === "win32") {
     const notepad = path.join(process.env.WINDIR || "C:\\Windows", "System32", "notepad.exe");
-    mark = messages.length; ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".workspace", context: "workspace", device: "d", payload: { controller: "Keypad", settings: { apps: notepad, layout: "none" } } }));
-    await waitFor(m => m.event === "setImage" && m.context === "workspace", 5000, mark);
-    mark = messages.length; ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".workspace", context: "workspace", device: "d", payload: { controller: "Keypad", settings: { apps: notepad, layout: "none" } } }));
-    await waitFor(m => m.event === "setImage" && m.context === "workspace", 12000, mark);
+    let mark = messages.length;
+    ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".workspace", context: "workspace", device: "d", payload: { controller: "Keypad", settings: { apps: notepad, layout: "none" } } }));
+    await waitFor(m => m.event === "setImage" && m.context === "workspace" && m.payload?.image === image("imgs/keys/work.png"), 7000, mark, "workspace initial render");
+    mark = messages.length;
+    ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".workspace", context: "workspace", device: "d", payload: { controller: "Keypad", settings: { apps: notepad, layout: "none" } } }));
+    await waitFor(m => m.event === "setImage" && m.context === "workspace" && m.payload?.image === image("imgs/status/ready.png"), 16000, mark, "Windows workspace READY outcome");
   }
-  console.log(`v0.6 smoke passed through manifest CodePath ${manifest.CodePath}: config safety, layouts, audio, dial, setup${process.platform === "win32" ? ", Windows workspace" : ""}`);
+
+  let mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio", context: "mic", device: "d", payload: { controller: "Keypad", settings: { mode: "mic-toggle" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "mic", 5000, mark, "mic initial render");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".audio", context: "mic", device: "d", payload: { controller: "Keypad", settings: { mode: "mic-toggle" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "mic" && m.payload?.image === image("imgs/status/switched.png"), 5000, mark, "mic switched outcome");
+
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio", context: "dial", device: "d", payload: { controller: "Encoder", settings: { mode: "volume-dial" } } }));
+  await waitFor(m => m.event === "setFeedback" && m.context === "dial", 5000, mark, "dial initial feedback");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "dialRotate", action: UUID + ".audio", context: "dial", device: "d", payload: { controller: "Encoder", settings: { mode: "volume-dial" }, ticks: 2 } }));
+  await waitFor(m => m.event === "setFeedback" && m.context === "dial" && m.payload?.value === "54%", 5000, mark, "dial +4% feedback");
+
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".audio-preset", context: "preset", device: "d", payload: { controller: "Keypad", settings: { mode: "focus" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "preset", 5000, mark, "preset initial render");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".audio-preset", context: "preset", device: "d", payload: { controller: "Keypad", settings: { mode: "focus" } } }));
+  await waitFor(m => m.event === "setImage" && m.context === "preset" && m.payload?.image === image("imgs/status/applied.png"), 5000, mark, "preset APPLIED outcome");
+
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "willAppear", action: UUID + ".setup", context: "setup", device: "d", payload: { controller: "Keypad", settings: {} } }));
+  await waitFor(m => m.event === "setImage" && m.context === "setup", 5000, mark, "setup initial render");
+  mark = messages.length;
+  ws.send(JSON.stringify({ event: "keyUp", action: UUID + ".setup", context: "setup", device: "d", payload: { controller: "Keypad", settings: {} } }));
+  await waitFor(m => m.event === "setImage" && m.context === "setup" && m.payload?.image === image("imgs/status/opened.png"), 5000, mark, "setup OPENED outcome");
+
+  console.log(`v0.6 core smoke passed through manifest CodePath ${manifest.CodePath}: config safety, layouts${process.platform === "win32" ? ", Windows workspace READY" : ""}, exact audio action outcomes, dial feedback, setup`);
   try { ws.terminate(); } catch {} try { server.close(); } catch {} cleanup(); process.exit(0);
 })().catch(e => { console.error(e.stack || e); cleanup(); process.exit(1); });
