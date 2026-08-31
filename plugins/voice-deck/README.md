@@ -40,21 +40,21 @@ Voice Deck follows voice channel changes automatically.
 
 ## Real host diagnostics
 
-After `rat dev voice-deck`, run these from the Voice Deck source directory when validating a real Windows host:
+After `rat dev voice-deck`, run:
 
 ```text
-npm run host:audit
+rat audit voice-deck
 ```
 
-This writes one shareable `HOST_AUDIT_LATEST.txt` covering the active source identity, manifest, profiles, Discord Desktop, Discord IPC named pipes, Stream Deck, plugin logs, and Stream Deck host logs.
+This resolves the exact active Rat Dev source and writes one shareable `HOST_AUDIT_LATEST.txt` covering source identity, manifest, profiles, Windows version, Discord Desktop process/version, Discord IPC named pipes, Stream Deck process/version, plugin logs, and Stream Deck host logs.
 
 If the Discord transport itself is unclear, run:
 
 ```text
-npm run host:probe
+rat audit voice-deck --probe
 ```
 
-The probe exercises the same development Discord IPC/auth/channel/roster path as Voice Deck, prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
+The probe first runs the normal audit, then exercises the same development Discord IPC/auth/channel/roster path as Voice Deck. It prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
 
 Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. Neither diagnostic replaces the physical Stream Deck smoke.
 

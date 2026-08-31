@@ -41,6 +41,20 @@ function Find-LatestFile {
     return $files | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
 
+function Get-ProcessVersion {
+    param([System.Diagnostics.Process[]]$Processes)
+    foreach ($process in @($Processes)) {
+        try {
+            $info = $process.MainModule.FileVersionInfo
+            $version = [string]$info.ProductVersion
+            if (-not $version) { $version = [string]$info.FileVersion }
+            if ($version) { return $version.Trim() }
+        }
+        catch { }
+    }
+    return $null
+}
+
 if (-not (Test-Path $ManifestPath -PathType Leaf)) {
     throw "Voice Deck manifest not found: $ManifestPath"
 }
@@ -50,6 +64,11 @@ $commit = Get-GitValue @("rev-parse", "HEAD")
 $branch = Get-GitValue @("branch", "--show-current")
 if (-not $branch) { $branch = "detached" }
 $actionCount = @($manifest.Actions).Count
+$environment = [ordered]@{
+    windows = $null
+    discord = $null
+    stream_deck = $null
+}
 
 Add-Check "manifest UUID" $(if ($manifest.UUID -eq "com.packrat.voice-deck") { "PASS" } else { "FAIL" }) ([string]$manifest.UUID)
 Add-Check "manifest version" $(if ($manifest.Version -eq "1.0.0.0") { "PASS" } else { "WARN" }) ([string]$manifest.Version)
@@ -71,11 +90,28 @@ if (-not $StaticOnly) {
         Add-Check "Windows runtime" "FAIL" "Voice Deck host audit must run on Windows."
     }
     else {
+        try {
+            $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+            $environment.windows = ("{0} {1} (build {2})" -f ([string]$os.Caption).Trim(), ([string]$os.Version).Trim(), ([string]$os.BuildNumber).Trim()).Trim()
+        }
+        catch {
+            $environment.windows = [System.Environment]::OSVersion.VersionString
+        }
+        Add-Check "Windows version" "PASS" ([string]$environment.windows)
+
         $discord = @(Get-Process -Name Discord,DiscordCanary,DiscordPTB -ErrorAction SilentlyContinue)
         Add-Check "Discord Desktop process" $(if ($discord.Count) { "PASS" } else { "FAIL" }) $(if ($discord.Count) { ($discord.ProcessName | Sort-Object -Unique) -join ", " } else { "Discord Desktop not running" })
+        if ($discord.Count) {
+            $environment.discord = Get-ProcessVersion $discord
+            Add-Check "Discord Desktop version" $(if ($environment.discord) { "PASS" } else { "WARN" }) $(if ($environment.discord) { [string]$environment.discord } else { "Discord is running, but its executable version could not be read." })
+        }
 
         $streamDeck = @(Get-Process -Name StreamDeck -ErrorAction SilentlyContinue)
         Add-Check "Stream Deck process" $(if ($streamDeck.Count) { "PASS" } else { "FAIL" }) $(if ($streamDeck.Count) { "StreamDeck.exe running" } else { "StreamDeck.exe not running" })
+        if ($streamDeck.Count) {
+            $environment.stream_deck = Get-ProcessVersion $streamDeck
+            Add-Check "Stream Deck version" $(if ($environment.stream_deck) { "PASS" } else { "WARN" }) $(if ($environment.stream_deck) { [string]$environment.stream_deck } else { "Stream Deck is running, but its executable version could not be read." })
+        }
 
         $pipes = @()
         try {
@@ -132,6 +168,7 @@ $report = [PSCustomObject]@{
     branch = $branch
     plugin_uuid = [string]$manifest.UUID
     version = [string]$manifest.Version
+    environment = [PSCustomObject]$environment
     checks = @($script:results | ForEach-Object { $_ })
     manual_evidence = $manualEvidence
 }
@@ -147,9 +184,14 @@ else {
         "Commit: $commit",
         "Branch: $branch",
         "UUID: $($report.plugin_uuid)",
-        "Version: $($report.version)",
-        ""
+        "Version: $($report.version)"
     )
+    if (-not $StaticOnly) {
+        $lines += "Windows: $($report.environment.windows)"
+        $lines += "Discord: $($report.environment.discord)"
+        $lines += "Stream Deck: $($report.environment.stream_deck)"
+    }
+    $lines += ""
     foreach ($check in $script:results) {
         $lines += ("[{0}] {1}: {2}" -f $check.status, $check.name, $check.detail)
     }
