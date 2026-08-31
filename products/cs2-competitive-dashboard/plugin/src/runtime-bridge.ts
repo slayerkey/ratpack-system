@@ -1,4 +1,5 @@
 import type { RawGsiPayload, RuntimeStatus } from "./core/types.js";
+import { hostDiagnostics } from "./diagnostics/host.js";
 import type { DashboardRuntime } from "./runtime.js";
 
 /**
@@ -31,16 +32,35 @@ export function patchRuntimeStatus(runtime: DashboardRuntime, patch: Partial<Run
 export function applyRuntimeUserSettings(runtime: DashboardRuntime, settings: object): void {
   const source = settings as Record<string, unknown>;
   const target = internal(runtime);
+  const steamProfile = typeof source.steamProfile === "string" && source.steamProfile.trim() ? source.steamProfile.trim() : undefined;
+  const faceitApiKey = typeof source.faceitApiKey === "string" && source.faceitApiKey.trim() ? source.faceitApiKey.trim() : undefined;
+  const leetifyApiKey = typeof source.leetifyApiKey === "string" && source.leetifyApiKey.trim() ? source.leetifyApiKey.trim() : undefined;
+
   target.globals = {
     ...target.globals,
-    steamProfile: typeof source.steamProfile === "string" && source.steamProfile.trim() ? source.steamProfile.trim() : undefined,
-    faceitApiKey: typeof source.faceitApiKey === "string" && source.faceitApiKey.trim() ? source.faceitApiKey.trim() : undefined,
-    leetifyApiKey: typeof source.leetifyApiKey === "string" && source.leetifyApiKey.trim() ? source.leetifyApiKey.trim() : undefined
+    steamProfile,
+    faceitApiKey,
+    leetifyApiKey
   };
+
+  hostDiagnostics.event("provider settings applied", {
+    steamProfileConfigured: Boolean(steamProfile),
+    faceitKeyConfigured: Boolean(faceitApiKey),
+    leetifyKeyConfigured: Boolean(leetifyApiKey)
+  });
 }
 
 export async function refreshRuntimeOnline(runtime: DashboardRuntime, force: boolean): Promise<void> {
   await internal(runtime).refreshOnline(force);
+  const online = runtime.snapshot().online;
+  hostDiagnostics.event("provider refresh completed", {
+    force,
+    leetifyStatus: online.leetify.status,
+    faceitStatus: online.faceit.status,
+    leetifyProfileAvailable: Boolean(online.leetify.profileUrl),
+    faceitProfileAvailable: Boolean(online.faceit.profileUrl),
+    providerSnapshotUpdated: Boolean(online.updatedAt)
+  });
 }
 
 export function resetRuntimeSession(runtime: DashboardRuntime): void {
