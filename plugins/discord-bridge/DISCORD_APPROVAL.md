@@ -22,9 +22,36 @@ Discord Developer Support request portal:
 
 The OAuth documentation says access to approved-partner-only scopes should be discussed with the application's Discord account representative. If PackRat does not have an assigned representative, submit a Developer Support request and ask the team to route the request to the correct RPC or partner review channel.
 
-## PackRat request
+## Why StreamKit is not the default production identity
 
-Use the PackRat-owned Discord application that will actually ship. Do not submit a temporary or unrelated application ID.
+Development feasibility is proven with Discord StreamKit's public RPC identity and public overlay token exchange. That proves the transport works; it does not by itself grant PackRat commercial permission to ship under StreamKit's application identity.
+
+Discord's Developer Terms require accurate application identity and state that developer credentials, explicitly including an Application ID, must be used solely with the application they were assigned to and must not be enabled for another application. Discord's RPC documentation separately restricts unapproved applications to their tester list.
+
+Therefore the production default is a PackRat-owned Discord application approved for the required RPC scopes. StreamKit reuse is only an acceptable production path if Discord gives PackRat explicit written permission for that specific third-party commercial use.
+
+Do not remove the release blocker because another third-party project happens to use StreamKit. Technical/community precedent is not the same as Discord permission.
+
+## Production application decision
+
+Use the PackRat-owned Discord application that will actually ship. Do not submit a temporary, proof-of-concept, or unrelated application ID.
+
+Historical PackRat-owned IDs seen during development:
+
+```text
+1540927508302536724
+Old proof-of-concept application. Do not select it for production merely because old probes reference it.
+
+1539767359596662875
+Later PackRat application seen in the Developer Portal. It was used during an abandoned browser OAuth experiment and had this redirect URI configured:
+https://oauth2-redirect.elgato.com/streamdeck/plugins/message/com.packrat.discord-bridge/auth
+```
+
+Neither historical ID is automatically the production choice. Before filing the request, inspect the current Discord Developer Portal and deliberately choose or create the PackRat application that should represent the Voice product family long term. Record the selected application ID and application name in this file and in the approval request.
+
+Do not change the runtime from StreamKit development identity to a historical PackRat ID before Discord approves the production path; doing so would only replace a working feasibility identity with an unapproved one.
+
+## PackRat request
 
 Requested scopes:
 
@@ -84,26 +111,25 @@ Application ID: [PACKRAT APPLICATION ID THAT WILL SHIP]
 Application name: [PACKRAT DISCORD APPLICATION NAME]
 Product website / marketplace listing: [ADD WHEN AVAILABLE]
 
+During development we also verified the same local voice flow using Discord StreamKit's public RPC client identity and streamkit.discord.com/overlay/token. Discord's Developer Terms say an assigned Application ID is to be used solely with the application it belongs to, so we are not assuming that StreamKit identity may be reused by PackRat. If Discord specifically permits third-party commercial software like these PackRat products to authenticate through the public StreamKit identity, please confirm that in writing; otherwise we will use the approved PackRat-owned application and production token exchange architecture you require.
+
 Thank you.
 ```
 
-## Optional StreamKit clarification
+## Approval evidence to retain
 
-Development feasibility was also proven using Discord StreamKit's public RPC identity and public overlay token endpoint. Do not rely on that path for commercial release without explicit written permission from Discord.
+Do not clear the release gate based on a generic support acknowledgement. Retain the Discord response that explicitly establishes one of these production paths:
 
-Add this question to the support request if useful:
+1. The selected PackRat-owned application is approved for `rpc`, `rpc.voice.read`, and `rpc.voice.write`, including the required production authorization/token-exchange method; or
+2. Discord explicitly authorizes PackRat's third-party commercial Voice products to use the StreamKit application identity and token endpoint.
 
-```text
-During development we verified the same local voice flow using Discord StreamKit's public RPC client identity and streamkit.discord.com/overlay/token. Is third-party commercial desktop software permitted to authenticate through that public StreamKit identity, or must we receive RPC approval and use our own application identity for production? We will follow whichever production path Discord requires.
-```
-
-Treat anything short of explicit written permission as a requirement to use a PackRat-owned approved application.
+Record the support request/ticket identifier, selected PackRat application ID/name, granted scopes, date, and any implementation requirements in release documentation. Do not commit Discord client secrets, access tokens, support-session cookies, or other confidential credentials.
 
 ## After Discord approval
 
-When a PackRat application is approved:
+When the production path is explicitly approved:
 
-1. Replace the StreamKit development client identity with the approved PackRat application ID where required.
+1. If Discord requires a PackRat-owned identity, replace the StreamKit development client identity with the approved PackRat application ID where required.
 2. Use only Discord's approved production token exchange mechanism for that application.
 3. Never embed the application Client Secret in a Stream Deck plugin or XENEON widget.
 4. Do not persist Discord access tokens in Stream Deck global settings.
@@ -112,6 +138,6 @@ When a PackRat application is approved:
 7. Rerun real Windows authorization, channel, roster, speaking, mute, deafen, restart, and packaged-plugin tests for Voice Deck.
 8. Rerun Discord Bridge Release QA.
 9. Rerun Discord Panel Deep QA.
-10. Record the approved application identity, granted scopes, and production exchange architecture in the release documentation.
+10. Record the approved application identity, granted scopes, production exchange architecture, and retained written approval in the release documentation.
 11. Move each product from `BLOCKED` to `READY_TO_SHIP` only after its approval and required real-host regressions are complete.
-12. Only then submit the paid Voice Deck and Voice Panel products publicly.
+12. Only then submit the applicable Voice products publicly through Rat Ship.
