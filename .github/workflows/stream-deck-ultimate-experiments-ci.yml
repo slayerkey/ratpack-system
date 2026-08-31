@@ -1,0 +1,50 @@
+name: Stream Deck Ultimate Experiments CI
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/experiments/**'
+      - '.github/workflows/stream-deck-ultimate-experiments-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  windows-per-app-audio:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse experimental PowerShell wrapper
+        shell: powershell
+        run: |
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1'),
+            [ref]$null,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          Write-Host 'per-app audio PowerShell syntax parsed'
+
+      - name: Compile Core Audio session COM interop under Windows PowerShell
+        shell: powershell
+        run: |
+          $result = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1' -Action Compile
+          Write-Host $result
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($result -notmatch '"ok":true') { throw 'Compile probe did not return ok' }
+
+      - name: Probe session enumeration when Windows runner exposes an audio endpoint
+        shell: powershell
+        continue-on-error: true
+        run: |
+          try {
+            $result = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio.ps1' -Action List
+            Write-Host $result
+          } catch {
+            Write-Host "Enumeration probe unavailable on hosted runner: $($_.Exception.Message)"
+          }
