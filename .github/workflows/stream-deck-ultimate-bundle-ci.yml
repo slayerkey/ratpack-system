@@ -26,11 +26,17 @@ jobs:
         working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 
-      - name: v0.6 product logic test
+      - name: v0.6 proven product logic regression test
         run: node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
-      - name: v0.6 runtime, safety, layout and Windows workspace smoke test
+      - name: v0.7 Smart Context pure logic test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_logic_test_v7.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: Proven core through v0.7 manifest CodePath
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: v0.7 multiplexed Context runtime smoke test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - name: PowerShell helper parses
         shell: pwsh
@@ -54,11 +60,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Generate proven hardware art, profiles, and previews
+      - name: Generate v0.7 art, Smart profile, hardware profiles, and previews
         working-directory: products/stream-deck-ultimate-bundle/prototype
         run: |
           python -m pip install -r requirements.txt
-          python tools/generate_prototype_assets_v5.py com.packrat.stream-deck-ultimate-bundle.sdPlugin
+          python tools/generate_prototype_assets_v7.py com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
       - uses: actions/setup-node@v4
         with:
@@ -71,30 +77,47 @@ jobs:
       - name: JavaScript and Python syntax checks
         run: |
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v06.js
-          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v06.cjs
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v07.cjs
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-config.js
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-system.js
           node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v06-workspace.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v07-context.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js
-          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v5.py
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/context_logic_test_v7.js
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js
+          python -m py_compile products/stream-deck-ultimate-bundle/prototype/tools/generate_prototype_assets_v7.py
 
-      - name: v0.6 product logic test
+      - name: Proven v0.6 product logic regression test
         run: node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
-      - name: v0.6 manifest CodePath smoke test against generated assets
+      - name: v0.7 Smart Context pure logic test
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_logic_test_v7.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: Proven core through v0.7 manifest CodePath
         env:
           PACKRAT_AUDIO_MOCK: '1'
         run: node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
 
-      - name: Verify complete hardware profile bundle
+      - name: v0.7 multiplexed Context runtime smoke test
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_CONTEXT_PROCESS: 'chrome'
+        run: node products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: Verify complete v0.7 profile and Context bundle
         run: |
-          test $(find products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles -name '*.streamDeckProfile' | wc -l) -eq 7
-          test $(find products/stream-deck-ultimate-bundle/prototype/previews -name '*.png' | wc -l) -eq 7
+          test $(find products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles -name '*.streamDeckProfile' | wc -l) -eq 8
+          test $(find products/stream-deck-ultimate-bundle/prototype/previews -name '*.png' | wc -l) -eq 8
+          test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - Smart.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - Plus.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - XL.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/profiles/Stream Deck Ultimate - Neo.streamDeckProfile'
           test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/imgs/keys/setup-needed.png'
+          test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/imgs/keys/ctx-back.png'
+          test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/imgs/keys/web-active.png'
+          test -f 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/imgs/actions/context/icon.png'
 
       - name: Install current Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
@@ -109,7 +132,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: stream-deck-ultimate-bundle-v0.6-beta
+          name: stream-deck-ultimate-bundle-v0.7-smart-beta
           path: |
             products/stream-deck-ultimate-bundle/prototype/dist/*.streamDeckPlugin
             products/stream-deck-ultimate-bundle/prototype/previews/*.png
