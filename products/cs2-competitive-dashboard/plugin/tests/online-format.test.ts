@@ -40,6 +40,7 @@ test("competitive actions use current GSI map and provider rank labels", () => {
   assert.equal(competitiveDisplay("current-map-rank", online, "de_mirage").value, "Master Guardian II");
   assert.equal(competitiveDisplay("best-map-rank", online).value, "Global Elite");
   assert.equal(competitiveDisplay("recent-result", online).value, "WIN");
+  assert.equal(competitiveDisplay("recent-result", online).subtitle, "MIRAGE 13-8");
   assert.equal(competitiveDisplay("win-rate", online).value, "54%");
   assert.equal(competitiveDisplay("leetify-rating", online).value, "0.41");
 });
@@ -51,7 +52,9 @@ test("FACEIT actions expose normalized provider metrics", () => {
   assert.equal(faceitDisplay("kd", online).value, "1.21");
   assert.equal(faceitDisplay("hs", online).value, "48%");
   assert.equal(faceitDisplay("recent-record", online).value, "3W 2L");
-  assert.equal(faceitDisplay("recent-match", online).subtitle, "-- 13-9");
+  // FACEIT's documented player-history payload does not expose map name.
+  // Do not render a fake "--" map placeholder when a valid score exists.
+  assert.equal(faceitDisplay("recent-match", online).subtitle, "13-9");
 });
 
 test("provider failures always render actionable nonblank states", () => {
