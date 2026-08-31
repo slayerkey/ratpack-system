@@ -10,6 +10,8 @@ on:
       - 'tools/local/rat-marketplace.ps1'
       - 'tools/local/rat-maker-console.ps1'
       - 'tools/local/rat-ship-plugin.ps1'
+      - 'tools/local/rat-ship-local.ps1'
+      - 'tools/local/rat-worktree.ps1'
       - 'tools/ship/maker_console.mjs'
       - 'tools/ship/maker_console_core.mjs'
       - 'tools/ship/maker_console_runtime_patch*.mjs'
@@ -24,6 +26,8 @@ on:
       - 'tools/local/rat-marketplace.ps1'
       - 'tools/local/rat-maker-console.ps1'
       - 'tools/local/rat-ship-plugin.ps1'
+      - 'tools/local/rat-ship-local.ps1'
+      - 'tools/local/rat-worktree.ps1'
       - 'tools/ship/maker_console.mjs'
       - 'tools/ship/maker_console_core.mjs'
       - 'tools/ship/maker_console_runtime_patch*.mjs'
@@ -55,7 +59,9 @@ jobs:
           $files = @(
             'tools/local/rat-marketplace.ps1',
             'tools/local/rat-maker-console.ps1',
-            'tools/local/rat-ship-plugin.ps1'
+            'tools/local/rat-ship-plugin.ps1',
+            'tools/local/rat-ship-local.ps1',
+            'tools/local/rat-worktree.ps1'
           )
           foreach ($file in $files) {
             $tokens = $null
@@ -67,6 +73,34 @@ jobs:
             }
             Write-Host "POWERSHELL PASS: $file"
           }
+
+      - name: Exercise disposable worktree isolation
+        shell: pwsh
+        run: |
+          . ./tools/local/rat-worktree.ps1
+          $repo = (Resolve-Path '.').Path
+          Assert-RatCanonicalClean -RepoRoot $repo -Context 'CI preflight'
+
+          foreach ($shipScript in @('tools/local/rat-ship-plugin.ps1', 'tools/local/rat-ship-local.ps1')) {
+            $raw = Get-Content $shipScript -Raw
+            if ($raw -notmatch 'New-RatDisposableWorktree' -or $raw -notmatch 'IsolatedBuild') {
+              throw "$shipScript is not routed through disposable worktree isolation."
+            }
+          }
+
+          $worktree = New-RatDisposableWorktree -RepoRoot $repo -Label 'ci-isolation'
+          try {
+            Add-Content -Path (Join-Path $worktree 'RAT-COMMANDS.md') -Value "`nCI isolated mutation"
+            Set-Content -Path (Join-Path $worktree 'CI_UNTRACKED_SENTINEL.txt') -Value 'isolated only'
+            Assert-RatCanonicalClean -RepoRoot $repo -Context 'Mutation inside disposable worktree'
+          }
+          finally {
+            Remove-RatDisposableWorktree -RepoRoot $repo -WorktreeRoot $worktree
+          }
+
+          if (Test-Path $worktree) { throw "Disposable worktree was not removed: $worktree" }
+          Assert-RatCanonicalClean -RepoRoot $repo -Context 'CI post-cleanup'
+          Write-Host 'RAT SHIP ISOLATION PASS'
 
       - name: Exercise release-state guard
         shell: pwsh
