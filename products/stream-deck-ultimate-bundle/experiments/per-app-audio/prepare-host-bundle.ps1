@@ -24,8 +24,10 @@ foreach ($name in @("HOST_TEST.md","run-host-test.cmd","real-host-smoke.ps1","ap
 $dllOut = Join-Path $OutputDir "PackRatAppAudio.dll"
 Copy-Item -LiteralPath $AssemblyPath -Destination $dllOut -Force
 $assembly = [Reflection.Assembly]::LoadFrom($dllOut)
-$type = $assembly.GetType("PackRatAppAudio.Core", $false)
-if ($null -eq $type) { throw "Staged helper does not contain PackRatAppAudio.Core" }
+$coreType = $assembly.GetType("PackRatAppAudio.Core", $false)
+$foregroundType = $assembly.GetType("PackRatAppAudio.Foreground", $false)
+if ($null -eq $coreType) { throw "Staged helper does not contain PackRatAppAudio.Core" }
+if ($null -eq $foregroundType) { throw "Staged helper does not contain PackRatAppAudio.Foreground" }
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $dllOut).Hash.ToLowerInvariant()
 $manifest = [ordered]@{
   schema = 1
@@ -37,7 +39,8 @@ $manifest = [ordered]@{
     file = "PackRatAppAudio.dll"
     sizeBytes = (Get-Item -LiteralPath $dllOut).Length
     sha256 = $hash
-    type = $type.FullName
+    type = $coreType.FullName
+    foregroundType = $foregroundType.FullName
   }
   entrypoint = "run-host-test.cmd"
 }
@@ -48,4 +51,5 @@ $manifest = [ordered]@{
   outputDir = $OutputDir
   fileCount = @(Get-ChildItem -File -LiteralPath $OutputDir).Count
   helperSha256 = $hash
+  foregroundType = $foregroundType.FullName
 } | ConvertTo-Json -Compress
