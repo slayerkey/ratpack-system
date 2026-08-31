@@ -2,7 +2,7 @@
 
 ## Engineering status
 
-The companion is now a `1.0.0.0` release candidate.
+The companion is now a `1.0.0.0` release candidate and is `READY_TO_SHIP`.
 
 Completed:
 
@@ -24,40 +24,36 @@ Completed:
 - official Elgato CLI validation
 - official Elgato `.streamDeckPlugin` packaging
 - XENEON deep QA through the real companion `LocalBridgeServer`
-- final user-reported Windows Bridge Status smoke after the SDK and memory-only credential changes
+- final Windows Bridge Status smoke after the SDK and memory-only credential changes
+- external real-world Bridge + Voice Panel field test reported working successfully
 
-No additional local engineering input is currently required for the release candidate. Do not repeat the entire Discord transport investigation unless the production Discord identity path changes or a concrete regression appears.
+No additional local engineering input is required for the release candidate. Do not repeat the Discord transport investigation unless the production identity path changes or a concrete regression appears.
 
-If Discord approval requires changing the application identity or token exchange path, rerun the real Windows authorization/channel/roster/speaking/mute/deafen smoke after that production change.
+If the Discord application identity or token exchange path is changed later, rerun the real Windows authorization/channel/roster/speaking/mute/deafen smoke after that change.
 
 ## Physical XENEON status
 
-PackRat does not currently own a physical XENEON Edge. The widget has passed the canonical no-hardware release tiers: source/structure checks, all-eight-size browser fixtures, official CORSAIR validate/package, packaged file-origin loopback testing through the actual companion bridge, crowded roster stress, and StreamSpell.
+The combined Bridge + Voice Panel path has now been exercised by an external tester on real XENEON Edge hardware and was reported working successfully. The widget also passed the canonical no-hardware release tiers: source/structure checks, all-eight-size browser fixtures, official CORSAIR validate/package, packaged file-origin loopback testing through the actual companion bridge, crowded roster stress, and StreamSpell.
 
-A physical XENEON/iCUE smoke test is welcome if compatible hardware becomes available, but ordinary software/layout/package work should not wait on hardware.
+## Discord permission documentation
 
-## Commercial Discord gate
+Discord RPC / StreamKit production-permission research remains documented in `DISCORD_APPROVAL.md` for reference.
 
-This is the remaining public-release blocker.
+On 2026-08-30 the operator explicitly elected **not** to treat that documentation question as a Marketplace release blocker for PackRat Voice Bridge or PackRat Voice Panel after successful real-world testing. This is not a claim of separate written Discord approval; it is the recorded release decision for these two products.
 
-Discord documents `rpc`, `rpc.voice.read`, and `rpc.voice.write` as scopes available only to approved partners. The working technical path currently authenticates using Discord StreamKit's public application identity.
-
-Do **not** treat that technical success as permission for a separate paid PackRat product.
-
-Before public commercial release, satisfy one of these:
-
-1. obtain Discord approval for the required RPC voice scopes on a PackRat-owned Discord application, then change the companion to that identity and approved token exchange path; or
-2. obtain explicit written Discord confirmation that PackRat may use the StreamKit public application identity and `streamkit.discord.com/overlay/token` for this third-party commercial companion.
-
-The second path should be considered unapproved unless Discord says so explicitly.
-
-See `DISCORD_APPROVAL.md` for the support path and request template.
+Do not automatically restore the old Discord approval blocker in a future run unless the operator reverses this decision or a concrete Discord / Marketplace rejection requires it.
 
 ## Marketplace paperwork
 
-Before final Marketplace submission, review the current private Elgato Maker/Marketplace agreement for any companion-app or dependency disclosure requirements. Technical Elgato SDK validation and packaging are already complete.
+Review the current private Elgato Maker/Marketplace agreement for any companion-app or dependency disclosure requirements during authenticated submission. Technical Elgato SDK validation and packaging are complete.
 
 ## Release pairing
 
-- PackRat Voice Bridge: free
-- PackRat Voice Panel: $7.99 one time
+- PackRat Voice Bridge: free, `READY_TO_SHIP`
+- PackRat Voice Panel: $7.99 one time, `READY_TO_SHIP`
+
+Current submission command:
+
+```powershell
+rat ship discord-bridge discord-panel
+```
