@@ -40,24 +40,25 @@ Voice Deck follows voice channel changes automatically.
 
 ## Real host diagnostics
 
-After `rat dev voice-deck`, run these from the Voice Deck source directory when validating a real Windows host:
+For a real Windows host, use the same top-level Rat workflow as development:
 
 ```text
-npm run host:audit
+rat dev voice-deck
+rat audit voice-deck
 ```
 
-This writes one shareable `HOST_AUDIT_LATEST.txt` covering the active source identity, manifest, profiles, Discord Desktop, Discord IPC named pipes, Stream Deck, plugin logs, and Stream Deck host logs.
+Rat Audit resolves the exact active Rat Dev source automatically and writes one shareable `HOST_AUDIT_LATEST.txt` covering source identity, manifest, profiles, Discord Desktop, Discord IPC named pipes, Stream Deck, plugin logs, and Stream Deck host logs.
 
 If the Discord transport itself is unclear, run:
 
 ```text
-npm run host:probe
+rat audit voice-deck --probe
 ```
 
-The probe exercises the same development Discord IPC/auth/channel/roster path as Voice Deck, prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
+The deep probe runs the normal host audit first and then exercises the same development Discord IPC/auth/channel/roster path as Voice Deck. It prints only redacted state, keeps session credentials in memory, never prints token values, and never toggles mute or deafen automatically.
 
 Use `REAL_WINDOWS_SMOKE.md` as the canonical physical release checklist. Neither diagnostic replaces the physical Stream Deck smoke.
 
 ## Release boundary
 
-Development uses the same proven Discord StreamKit RPC feasibility path as PackRat Voice Bridge. Public commercial release remains fail-closed until Discord grants the PackRat production application the required RPC scopes or explicitly permits the StreamKit production path. See `DISCORD_APPROVAL.md`.
+Development uses the same proven Discord StreamKit RPC feasibility path as PackRat Voice Bridge. Public commercial release remains fail closed until Discord grants the PackRat production application the required RPC scopes or explicitly permits the StreamKit production path. See `DISCORD_APPROVAL.md`.
