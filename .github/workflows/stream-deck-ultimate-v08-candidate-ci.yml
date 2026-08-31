@@ -30,6 +30,8 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js
+          node --check products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js
 
       - name: v0.8 staging PowerShell syntax
         shell: powershell
