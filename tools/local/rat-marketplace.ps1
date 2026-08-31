@@ -220,9 +220,22 @@ for ($i = 0; $i -lt $queue.Count; $i++) {
         $completed += $item
     }
     catch {
-        $failures += [PSCustomObject]@{ Slug = $item; Message = $_.Exception.Message }
-        Write-Host "Rat $Action failed for '$item'. Continuing the remaining queue." -ForegroundColor Red
-        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        $message = $_.Exception.Message
+        $isBlockedStop = $message -match "^Product '.+' is marked 'BLOCKED(?:_[^']*)?' on canonical main\."
+        $failures += [PSCustomObject]@{
+            Slug = $item
+            Message = $message
+            Kind = if ($isBlockedStop) { "BLOCKED" } else { "FAILED" }
+        }
+
+        if ($isBlockedStop) {
+            Write-Host "Rat $Action stopped for blocked product '$item'. Continuing the remaining queue." -ForegroundColor Yellow
+            Write-Host $message -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "Rat $Action failed for '$item'. Continuing the remaining queue." -ForegroundColor Red
+            Write-Host $message -ForegroundColor Yellow
+        }
     }
 }
 
@@ -230,9 +243,23 @@ Write-Host ""
 Write-Host "Rat $Action queue finished." -ForegroundColor Cyan
 if ($completed.Count) { Write-Host "Completed: $($completed -join ', ')" -ForegroundColor Green }
 if ($failures.Count) {
-    Write-Host "Failed:" -ForegroundColor Red
-    foreach ($failure in $failures) {
-        Write-Host "  $($failure.Slug): $($failure.Message)" -ForegroundColor Red
+    $blocked = @($failures | Where-Object { $_.Kind -eq "BLOCKED" })
+    $hardFailures = @($failures | Where-Object { $_.Kind -ne "BLOCKED" })
+
+    if ($blocked.Count) {
+        Write-Host "Blocked:" -ForegroundColor Yellow
+        foreach ($failure in $blocked) {
+            Write-Host "  $($failure.Slug): $($failure.Message)" -ForegroundColor Yellow
+        }
     }
-    throw "Rat $Action finished with $($failures.Count) failed product(s)."
+
+    if ($hardFailures.Count) {
+        Write-Host "Failed:" -ForegroundColor Red
+        foreach ($failure in $hardFailures) {
+            Write-Host "  $($failure.Slug): $($failure.Message)" -ForegroundColor Red
+        }
+    }
+
+    Write-Host "Rat $Action finished without submission for $($failures.Count) product(s)." -ForegroundColor Yellow
+    exit 1
 }
