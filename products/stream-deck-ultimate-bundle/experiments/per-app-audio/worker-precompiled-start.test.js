@@ -17,7 +17,10 @@ const { AppAudioWorkerClient } = require("./worker-client.js");
     assert.equal(ping.type, "PackRatAppAudio.Core");
     assert.equal(ping.backend, "assembly");
     assert(Number.isInteger(c.pid) && c.pid > 0);
-    console.log(`precompiled app-audio worker startup passed: DLL backend ready in ${elapsedMs}ms without runtime C# compilation`);
+    const foreground = await c.foreground();
+    assert(Number.isInteger(Number(foreground.pid)) && Number(foreground.pid) >= 0);
+    assert.equal(typeof foreground.process, "string");
+    console.log(`precompiled app-audio worker startup passed: DLL backend ready in ${elapsedMs}ms without runtime C# compilation; foreground pid=${foreground.pid} process=${foreground.process || "<none>"}`);
   } finally {
     await c.close();
   }
