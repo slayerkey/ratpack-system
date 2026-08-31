@@ -43,6 +43,7 @@ await check("Fresh matching physical Windows host evidence is present", async ()
     throw new Error(`missing ${file}; run npm run host:audit:release -- --hs-ok --labels-ok --restart-ok after the final physical Windows pass`);
   }
   const evidence = JSON.parse(await readFile(file, "utf8"));
+  if (evidence.schema !== 2) throw new Error(`host evidence schema ${evidence.schema ?? "missing"} is obsolete; repeat the final physical pass with the fingerprint-aware release audit`);
   if (evidence.product !== "cs2-competitive-dashboard-pro" || evidence.version !== "0.1.0.0") {
     throw new Error("host evidence belongs to a different product/version");
   }
@@ -56,7 +57,10 @@ await check("Fresh matching physical Windows host evidence is present", async ()
   }
   const automated = evidence.automated ?? {};
   const human = evidence.human ?? {};
+  if (automated.sourceRuntimeFingerprint !== expectedFingerprint) throw new Error("host evidence source fingerprint does not match the current release source");
+  if (automated.runningRuntimeFingerprint !== expectedFingerprint) throw new Error("host evidence running Stream Deck fingerprint does not match the current release source");
   for (const [label, value] of [
+    ["running runtime/source fingerprint match", automated.runtimeFingerprintMatched],
     ["core host audit", automated.coreHostAuditPassed],
     ["sustained live GSI", automated.sustainedLivePass],
     ["Open Log Folder", automated.openLogPass],
@@ -69,7 +73,7 @@ await check("Fresh matching physical Windows host evidence is present", async ()
   ]) {
     if (value !== true) throw new Error(`host evidence missing PASS: ${label}`);
   }
-  return `${file} (${Math.round(age / 60000)} minutes old, runtime fingerprint matched)`;
+  return `${file} (${Math.round(age / 60000)} minutes old, running + source fingerprint matched)`;
 });
 
 await check("Official Leetify attribution source asset is present", async () => {
@@ -112,5 +116,5 @@ if (blocked.length) {
   process.exitCode = 1;
 } else {
   console.log("\nFINAL MARKETPLACE GATE: PASS");
-  console.log("Physical host evidence, provider smoke, attribution, commercial clearance, pricing, and Lite hold policy are all satisfied for this runtime fingerprint.");
+  console.log("Physical host evidence, exact running/source fingerprint, provider smoke, attribution, commercial clearance, pricing, and Lite hold policy are all satisfied.");
 }
