@@ -80,6 +80,8 @@ jobs:
           )) {
             if ($output -notlike "*$required*") { throw "Fail-closed gate output missing expected blocker: $required" }
           }
+          Write-Host 'PASS: final Marketplace gate failed closed for the expected unresolved release requirements.'
+          exit 0
 
       - name: Upload Stream Deck packages
         uses: actions/upload-artifact@v4
