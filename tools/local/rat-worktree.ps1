@@ -26,6 +26,18 @@ function Invoke-RatWorktreeGit {
     return @($output)
 }
 
+function Assert-RatCanonicalClean {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string]$Context = "Rat operation"
+    )
+
+    $dirty = ((Invoke-RatWorktreeGit -RepoRoot $RepoRoot -Arguments @("status", "--porcelain") -Quiet) -join "`n").Trim()
+    if ($dirty) {
+        throw "$Context changed the canonical RatPack checkout. Isolated build invariant violated.`n$dirty"
+    }
+}
+
 function New-RatDisposableWorktree {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -35,6 +47,8 @@ function New-RatDisposableWorktree {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
         throw "Git is required for isolated Rat builds."
     }
+
+    Assert-RatCanonicalClean -RepoRoot $RepoRoot -Context "Isolated Rat build preflight"
 
     $safeLabel = ($Label -replace '[^A-Za-z0-9._-]+', '-').Trim('-')
     if (-not $safeLabel) { $safeLabel = "build" }
