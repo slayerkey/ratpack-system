@@ -154,7 +154,7 @@ export async function ready(page, context) {
     setMode(mode, false);
     renderAll();
   }, { mode });
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(360);
 }
 
 export async function assert(page, context) {
