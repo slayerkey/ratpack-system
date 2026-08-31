@@ -32,19 +32,24 @@ rat main
 rat dev cs2-competitive-dashboard
 ```
 
-Perform the Deathmatch, provider, diagnostics, long-label, and restart checks in `FINAL_HOST_TEST.md`. Then, while Stream Deck/plugin is still running, record the final physical evidence with:
+Rat Dev keeps the canonical checkout on `main` and builds the product branch in:
+
+```text
+out\dev\worktrees\cs2-competitive-dashboard
+```
+
+Perform the Deathmatch, provider, diagnostics, long-label, and restart checks in `FINAL_HOST_TEST.md`. Then, while Stream Deck/plugin is still running, record the final physical evidence from the canonical RatPack root with:
 
 ```powershell
-cd products\cs2-competitive-dashboard\plugin
-npm run host:audit:release -- --hs-ok --labels-ok --restart-ok
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run host:audit:release -- --hs-ok --labels-ok --restart-ok
 ```
 
 Only use an attestation flag when that human-visible check genuinely passed.
 
-A successful run writes the local gitignored:
+A successful run writes the local gitignored worktree evidence:
 
 ```text
-.release-evidence/host-pass.json
+out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin\.release-evidence\host-pass.json
 ```
 
 That evidence includes the exact runtime/build fingerprint, sustained GSI evidence, Open Log Folder evidence, live localhost diagnostics, one provider refresh with both Leetify and FACEIT ready, and the three explicit human checks.
@@ -54,33 +59,48 @@ That evidence includes the exact runtime/build fingerprint, sustained GSI eviden
 After the official Leetify dark-background SVG is installed at:
 
 ```text
-plugin/static/ui/leetify-provided-dark.svg
+products/cs2-competitive-dashboard/plugin/static/ui/leetify-provided-dark.svg
 ```
 
-and `LEETIFY_COMMERCIAL_CLEARANCE.md` records `Status: CLEARED`, run:
+and `LEETIFY_COMMERCIAL_CLEARANCE.md` records `Status: CLEARED`:
+
+1. commit those non-runtime release changes to `product/cs2-competitive-dashboard`;
+2. run `rat dev cs2-competitive-dashboard` again so the detached worktree receives them while preserving ignored physical evidence;
+3. optionally verify without mutation using:
 
 ```powershell
-npm run release:final
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run release:final
 ```
 
-`release:final` refuses to pass if the physical evidence is missing, older than seven days, or belongs to different runtime/build inputs.
-
-When the final gate passes, promote the canonical registry without hand-editing JSON:
+4. when ready to advance the actual branch, use:
 
 ```powershell
-npm run release:promote
+npm --prefix .\out\dev\worktrees\cs2-competitive-dashboard\products\cs2-competitive-dashboard\plugin run release:promote
 ```
 
-That changes Pro from `BLOCKED` to `READY_TO_SHIP`. Review/commit the registry promotion, merge the release candidate to `main`, then run Rat Ship from canonical main.
+`release:promote` reruns the complete final gate, fetches current `origin`, refuses if the tested worktree is stale or dirty, changes only the Pro registry to `READY_TO_SHIP`, creates one normal commit, and pushes it to `product/cs2-competitive-dashboard` without force. If the remote branch moved, it refuses before promotion.
+
+After promotion succeeds, merge PR #29 to `main`, then:
+
+```powershell
+rat main
+rat ship cs2-competitive-dashboard-pro
+```
 
 ## Rat Ship state
 
-The shared Rat Ship helper now supports this product's deterministic multi-flavor build through Pro's explicit:
+The shared Rat Ship helper supports this product's deterministic multi-flavor build through Pro's explicit:
 
 ```text
 ship_plugin_dir = out/com.packrat.cs2-competitive-dashboard-pro.sdPlugin
 ```
 
 Windows CI exercises the real helper end to end and verifies a non-public Pro kit containing the `.streamDeckPlugin`, `submission.json`, description/release-note paste files, search icon, cover, and four gallery images.
+
+The plugin manifest and registry use the canonical PackRat Marketplace maker URL:
+
+```text
+https://marketplace.elgato.com/maker/packrat
+```
 
 Once the physical evidence and final Marketplace gate pass, stop adding features and ship Pro.
