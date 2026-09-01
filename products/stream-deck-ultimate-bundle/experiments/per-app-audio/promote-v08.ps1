@@ -2,6 +2,7 @@ param(
   [Parameter(Mandatory = $true)][string]$ApprovalPath,
   [string]$AssemblyPath = "",
   [string]$OutputRoot = "",
+  [string]$CanonicalDir = "",
   [switch]$Apply
 )
 
@@ -11,7 +12,14 @@ $expectedAcceptedVersion = "0.7.1.0"
 $expectedTargetVersion = "0.8.0.0"
 $expectedPrepromotionCommit = "15cc99c96bf243dfccb0b18774e859882c97684b"
 $expectedPackedSha = "a3790e672ce18bc9887d1b8b2f0175c663c548a4d4bad19c287f1cf2003d9497"
-$acceptedDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\prototype\com.packrat.stream-deck-ultimate-bundle.sdPlugin"))
+$defaultCanonicalDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\prototype\com.packrat.stream-deck-ultimate-bundle.sdPlugin"))
+if ([string]::IsNullOrWhiteSpace($CanonicalDir)) {
+  $acceptedDir = $defaultCanonicalDir
+} else {
+  if (-not [IO.Path]::IsPathRooted($CanonicalDir)) { $CanonicalDir = Join-Path (Get-Location) $CanonicalDir }
+  $acceptedDir = [IO.Path]::GetFullPath($CanonicalDir)
+}
+$usingCanonicalOverride = ($acceptedDir -ne $defaultCanonicalDir)
 $repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null).Trim()
 if ([string]::IsNullOrWhiteSpace($repoRoot)) { throw "Could not resolve ratpack-system git root" }
 $repoRoot = [IO.Path]::GetFullPath($repoRoot)
@@ -100,6 +108,7 @@ $plan = [ordered]@{
   mode = $(if ($Apply) { "apply" } else { "plan" })
   approval = $ApprovalPath
   acceptedDir = $acceptedDir
+  canonicalOverride = $usingCanonicalOverride
   acceptedVersion = $expectedAcceptedVersion
   targetVersion = $expectedTargetVersion
   prepromotionSourceCommit = $expectedPrepromotionCommit
