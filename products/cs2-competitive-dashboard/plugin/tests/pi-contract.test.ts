@@ -181,6 +181,8 @@ test("Property Inspector makes provider ownership explicit with approved Leetify
 test("provider setup copy never promises that external API keys are free", () => {
   const customerFacingProviderSource = `${html}\n${pi}\n${runtime}\n${directClient}`;
   assert.doesNotMatch(customerFacingProviderSource, /free\s+(?:Leetify|FACEIT)\s+(?:App\/)?API key/i);
+  // Provider key pricing is set by Leetify and FACEIT, so the setup copy must not promise any key is free.
+  assert.doesNotMatch(customerFacingProviderSource, /free\s+(?:App\s+)?(?:API\s+)?key/i);
 });
 
 test("Property Inspector keeps a manual bundled profile fallback for Rat Dev", () => {
