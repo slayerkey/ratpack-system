@@ -15,7 +15,7 @@ if (-not (Test-Path -LiteralPath $AssemblyPath)) { throw "Precompiled helper mis
 if (Test-Path -LiteralPath $OutputDir) { Remove-Item -Recurse -Force -LiteralPath $OutputDir }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
-foreach ($name in @("HOST_TEST.md","run-host-test.cmd","real-host-smoke.ps1","app-audio.ps1")) {
+foreach ($name in @("HOST_TEST.md","run-host-test.cmd","run-host-test-and-save.cmd","real-host-smoke.ps1","app-audio.ps1")) {
   $source = Join-Path $PSScriptRoot $name
   if (-not (Test-Path -LiteralPath $source)) { throw "Host bundle input missing: $name" }
   Copy-Item -LiteralPath $source -Destination (Join-Path $OutputDir $name) -Force
@@ -42,7 +42,9 @@ $manifest = [ordered]@{
     type = $coreType.FullName
     foregroundType = $foregroundType.FullName
   }
-  entrypoint = "run-host-test.cmd"
+  entrypoint = "run-host-test-and-save.cmd"
+  legacyEntrypoint = "run-host-test.cmd"
+  resultFile = "host-test-result.json"
 }
 [IO.File]::WriteAllText((Join-Path $OutputDir "BUNDLE_INFO.json"),($manifest | ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
 
@@ -52,4 +54,6 @@ $manifest = [ordered]@{
   fileCount = @(Get-ChildItem -File -LiteralPath $OutputDir).Count
   helperSha256 = $hash
   foregroundType = $foregroundType.FullName
+  entrypoint = "run-host-test-and-save.cmd"
+  resultFile = "host-test-result.json"
 } | ConvertTo-Json -Compress
