@@ -305,7 +305,7 @@ export class DashboardRuntime {
       );
       this.trace("Stream Deck global settings saved.");
 
-      this.setSetupStage("checking-cs2", onProgress, "enable-gsi", "Checking whether cs2.exe is already running…");
+      this.setSetupStage("checking-cs2", onProgress, "enable-gsi", "Checking whether cs2.exe is already running…\");
       const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
       const alreadyConnected = this.store.get().status.gsiConnected;
 
@@ -503,14 +503,15 @@ export class DashboardRuntime {
 
     const current = this.store.get().online;
     if (!force && current.updatedAt && Date.now() - current.updatedAt < ONLINE_PROFILE_REFRESH_MS) return;
-    if (this.onlineRefresh) return this.onlineRefresh;
+    if (this.onlineRefresh && !force) return this.onlineRefresh;
 
     this.onlineAbort?.abort();
     const controller = new AbortController();
     this.onlineAbort = controller;
     this.publish({ online: { ...current, requestedIdentity: identity, refreshing: true, error: undefined } });
 
-    this.onlineRefresh = (async () => {
+    let refresh!: Promise<void>;
+    refresh = (async () => {
       try {
         const result = await this.providerClient.getProfile(identity, {
           faceitApiKey: this.globals.faceitApiKey,
@@ -529,11 +530,13 @@ export class DashboardRuntime {
         failed.faceit.message = this.globals.faceitApiKey ? message : "Add your FACEIT API key in setup";
         this.publish({ online: failed });
       } finally {
-        this.onlineRefresh = undefined;
+        if (this.onlineRefresh === refresh) this.onlineRefresh = undefined;
+        if (this.onlineAbort === controller) this.onlineAbort = undefined;
       }
     })();
 
-    return this.onlineRefresh;
+    this.onlineRefresh = refresh;
+    return refresh;
   }
 
   private checkConnectionFreshness(): void {
