@@ -4,6 +4,7 @@ const LEETIFY_BASE = "https://api-public.cs-prod.leetify.com";
 const FACEIT_BASE = "https://open.faceit.com/data/v4";
 const STEAM_COMMUNITY_BASE = "https://steamcommunity.com";
 const STEAM64_RE = /^7656119\d{10}$/;
+const PROVIDER_PROFILE_TIMEOUT_MS = 9_000;
 
 const COMPETITIVE_RANKS = [
   undefined,
@@ -19,40 +20,58 @@ export interface ProviderCredentials {
 }
 
 export class ProviderClient {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly profileTimeoutMs = PROVIDER_PROFILE_TIMEOUT_MS
+  ) {}
 
   async getProfile(identityInput: string, credentials: ProviderCredentials, signal?: AbortSignal): Promise<OnlineProfileSnapshot> {
     const identity = identityInput.trim();
     if (!identity) return emptyOnlineSnapshot();
 
-    const steamId64 = await this.resolveSteamIdentity(identity, signal);
-    const [leetify, faceit] = await Promise.all([
-      credentials.leetifyApiKey?.trim()
-        ? this.fetchLeetify(steamId64, credentials.leetifyApiKey.trim(), signal)
-        : Promise.resolve<LeetifyData>({
-            status: "not_configured",
-            message: "Add your Leetify API key in setup",
-            competitiveRanks: [],
-            recentMatches: []
-          }),
-      credentials.faceitApiKey?.trim()
-        ? this.fetchFaceit(steamId64, credentials.faceitApiKey.trim(), signal)
-        : Promise.resolve<FaceitData>({
-            status: "not_configured",
-            message: "Add your FACEIT API key in setup",
-            recentMatches: []
-          })
-    ]);
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort(signal?.reason);
+    if (signal?.aborted) abortFromCaller();
+    else signal?.addEventListener("abort", abortFromCaller, { once: true });
+    const timer = setTimeout(
+      () => controller.abort(new Error(`Provider refresh timed out after ${this.profileTimeoutMs}ms`)),
+      Math.max(1, this.profileTimeoutMs)
+    );
 
-    return {
-      requestedIdentity: identity,
-      steamId64,
-      displayName: faceit.nickname,
-      updatedAt: Date.now(),
-      refreshing: false,
-      leetify,
-      faceit
-    };
+    try {
+      const requestSignal = controller.signal;
+      const steamId64 = await this.resolveSteamIdentity(identity, requestSignal);
+      const [leetify, faceit] = await Promise.all([
+        credentials.leetifyApiKey?.trim()
+          ? this.fetchLeetify(steamId64, credentials.leetifyApiKey.trim(), requestSignal)
+          : Promise.resolve<LeetifyData>({
+              status: "not_configured",
+              message: "Add your Leetify API key in setup",
+              competitiveRanks: [],
+              recentMatches: []
+            }),
+        credentials.faceitApiKey?.trim()
+          ? this.fetchFaceit(steamId64, credentials.faceitApiKey.trim(), requestSignal)
+          : Promise.resolve<FaceitData>({
+              status: "not_configured",
+              message: "Add your FACEIT API key in setup",
+              recentMatches: []
+            })
+      ]);
+
+      return {
+        requestedIdentity: identity,
+        steamId64,
+        displayName: faceit.nickname,
+        updatedAt: Date.now(),
+        refreshing: false,
+        leetify,
+        faceit
+      };
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abortFromCaller);
+    }
   }
 
   async validateLeetifyKey(apiKey: string, signal?: AbortSignal): Promise<boolean> {
