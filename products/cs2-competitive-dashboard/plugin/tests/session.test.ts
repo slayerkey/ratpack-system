@@ -134,3 +134,47 @@ test("finalizes a match once and starts a new match afterward", () => {
   assert.equal(metrics.matches, 1);
   assert.equal(metrics.inMatch, true);
 });
+
+test("Deathmatch HS% stays accurate when a life reset is never observed", () => {
+  const session = new SessionTracker();
+
+  // Life 1: two kills, both headshots. Observed normally.
+  session.ingest(live({ roundKills: 1, roundHeadshotKills: 1, roundTotalDamage: 100, kills: 1, deaths: 0 }));
+  session.ingest(live({ roundKills: 2, roundHeadshotKills: 2, roundTotalDamage: 180, kills: 2, deaths: 0 }));
+
+  // The player dies and respawns, but GSI never delivers a packet while the
+  // per-life counters are back at zero. The next packet already shows a life
+  // that has overtaken the previous one, so no counter decrease is visible.
+  const metrics = session.ingest(live({
+    roundKills: 3,
+    roundHeadshotKills: 3,
+    roundTotalDamage: 300,
+    kills: 5,
+    deaths: 1
+  }));
+
+  // Match total kills stay authoritative for the KILLS key.
+  assert.equal(metrics.kills, 5);
+
+  // HS% must divide headshots by the kills from the same observed window.
+  // Mixing a reconstructed headshot count with the complete match kill total
+  // is what made the physical deck report 65% while CS2 showed 81%.
+  assert.equal(metrics.hsPercent, 100);
+});
+
+test("Deathmatch HS% reflects a genuine mix of headshot and body kills", () => {
+  const session = new SessionTracker();
+
+  // Life 1: two kills, one headshot.
+  session.ingest(live({ roundKills: 1, roundHeadshotKills: 1, roundTotalDamage: 100, kills: 1, deaths: 0 }));
+  session.ingest(live({ roundKills: 2, roundHeadshotKills: 1, roundTotalDamage: 190, kills: 2, deaths: 0 }));
+
+  // Respawn observed cleanly, then life 2: two kills, one headshot.
+  session.ingest(live({ roundKills: 0, roundHeadshotKills: 0, roundTotalDamage: 0, kills: 2, deaths: 1 }));
+  session.ingest(live({ roundKills: 1, roundHeadshotKills: 1, roundTotalDamage: 95, kills: 3, deaths: 1 }));
+  const metrics = session.ingest(live({ roundKills: 2, roundHeadshotKills: 1, roundTotalDamage: 200, kills: 4, deaths: 1 }));
+
+  assert.equal(metrics.kills, 4);
+  assert.equal(metrics.headshotKills, 2);
+  assert.equal(metrics.hsPercent, 50);
+});

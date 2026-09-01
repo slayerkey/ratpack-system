@@ -10,6 +10,8 @@ interface CompletedTotals {
   damage: number;
   rounds: number;
   headshotKills: number;
+  /** Kills seen inside observed lives, so HS% divides by the same window headshots came from. */
+  observedKills: number;
 }
 
 interface MatchAccumulator {
@@ -17,9 +19,11 @@ interface MatchAccumulator {
   roundNumber?: number;
   maxRoundDamage: number;
   maxRoundHeadshots: number;
+  maxRoundKills: number;
   committedDamage: number;
   committedRounds: number;
   committedHeadshots: number;
+  committedKills: number;
   lastRoundDamage: number;
   lastRoundHeadshots: number;
   lastRoundKills: number;
@@ -38,7 +42,8 @@ const emptyTotals = (): CompletedTotals => ({
   assists: 0,
   damage: 0,
   rounds: 0,
-  headshotKills: 0
+  headshotKills: 0,
+  observedKills: 0
 });
 
 export class SessionTracker {
@@ -80,8 +85,10 @@ export class SessionTracker {
     const assists = this.completed.assists + (current?.lastAssists ?? 0);
     const damage = this.completed.damage + currentDamage;
     const rounds = this.completed.rounds + currentRounds;
+    const currentObservedKills = current ? current.committedKills + current.maxRoundKills : 0;
+    const observedKills = this.completed.observedKills + currentObservedKills;
     const rawHeadshotKills = this.completed.headshotKills + currentHeadshots;
-    const headshotKills = Math.min(kills, rawHeadshotKills);
+    const headshotKills = Math.min(observedKills, rawHeadshotKills);
 
     return {
       matches: this.completed.matches,
@@ -95,7 +102,7 @@ export class SessionTracker {
       headshotKills,
       kd: deaths === 0 ? kills : kills / deaths,
       adr: rounds === 0 ? 0 : damage / rounds,
-      hsPercent: kills === 0 ? 0 : (headshotKills / kills) * 100,
+      hsPercent: observedKills === 0 ? 0 : (headshotKills / observedKills) * 100,
       inMatch: Boolean(current)
     };
   }
@@ -106,9 +113,11 @@ export class SessionTracker {
       roundNumber: live.roundNumber,
       maxRoundDamage: live.roundTotalDamage,
       maxRoundHeadshots: live.roundHeadshotKills,
+      maxRoundKills: live.roundKills,
       committedDamage: 0,
       committedRounds: 0,
       committedHeadshots: 0,
+      committedKills: 0,
       lastRoundDamage: live.roundTotalDamage,
       lastRoundHeadshots: live.roundHeadshotKills,
       lastRoundKills: live.roundKills,
@@ -134,6 +143,7 @@ export class SessionTracker {
       match.roundNumber = live.roundNumber;
       match.maxRoundDamage = live.roundTotalDamage;
       match.maxRoundHeadshots = live.roundHeadshotKills;
+      match.maxRoundKills = live.roundKills;
     } else {
       if (match.roundNumber === undefined && live.roundNumber !== undefined) {
         match.roundNumber = live.roundNumber;
@@ -150,13 +160,18 @@ export class SessionTracker {
         match.maxRoundDamage = 0;
         match.committedHeadshots += match.maxRoundHeadshots;
         match.maxRoundHeadshots = 0;
+        match.committedKills += match.maxRoundKills;
+        match.maxRoundKills = 0;
       } else if (live.roundHeadshotKills < match.lastRoundHeadshots) {
         match.committedHeadshots += match.maxRoundHeadshots;
         match.maxRoundHeadshots = 0;
+        match.committedKills += match.maxRoundKills;
+        match.maxRoundKills = 0;
       }
 
       match.maxRoundDamage = Math.max(match.maxRoundDamage, live.roundTotalDamage);
       match.maxRoundHeadshots = Math.max(match.maxRoundHeadshots, live.roundHeadshotKills);
+      match.maxRoundKills = Math.max(match.maxRoundKills, live.roundKills);
     }
 
     match.lastRoundDamage = live.roundTotalDamage;
@@ -170,6 +185,7 @@ export class SessionTracker {
   private commitRound(match: MatchAccumulator): void {
     match.committedDamage += match.maxRoundDamage;
     match.committedHeadshots += match.maxRoundHeadshots;
+    match.committedKills += match.maxRoundKills;
     match.committedRounds += 1;
   }
 
@@ -183,7 +199,8 @@ export class SessionTracker {
     this.completed.assists += match.lastAssists;
     this.completed.damage += match.committedDamage;
     this.completed.rounds += match.committedRounds;
-    this.completed.headshotKills += Math.min(match.lastKills, match.committedHeadshots);
+    this.completed.observedKills += match.committedKills;
+    this.completed.headshotKills += Math.min(match.committedKills, match.committedHeadshots);
 
     const winner = this.winnerFromScore(live);
     if (winner !== "UNKNOWN" && match.team !== "UNKNOWN") {
