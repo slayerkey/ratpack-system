@@ -180,6 +180,16 @@ try {
       await page.waitForFunction(() => document.getElementById('gpuTemp')?.textContent?.trim() === '67', { timeout: 2000 });
     }
 
+    // Mode changes intentionally cross-fade for 220ms. Wait for that visual state to
+    // settle before treating screen visibility as a responsive-layout invariant.
+    await page.waitForFunction(() => {
+      const screens = [...document.querySelectorAll('.screen')];
+      const visible = screens.filter(el => Number.parseFloat(getComputedStyle(el).opacity || '0') > 0.01);
+      const active = screens.filter(el => el.classList.contains('is-active'));
+      return visible.length === 1 && active.length === 1 && visible[0] === active[0] &&
+        Number.parseFloat(getComputedStyle(active[0]).opacity || '0') >= 0.99;
+    }, { timeout: 2000 });
+
     const geometry = await page.evaluate(() => {
       const doc = document.documentElement;
       const body = document.body;
