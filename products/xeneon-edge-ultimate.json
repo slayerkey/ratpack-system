@@ -2,8 +2,9 @@
   "id": "xeneon-edge-ultimate",
   "name": "XENEON EDGE Ultimate",
   "type": "widget",
-  "status": "qa_passed",
-  "workflow_state": "READY_TO_SHIP",
+  "status": "validated",
+  "workflow_state": "BLOCKED_HARDWARE_RETEST",
+  "blocker": "Physical XENEON EDGE 1.0.1 retest must confirm responsive touch/click navigation, live UI updates, telemetry population, settings propagation, Smart Mode and size/orientation changes after the provider-independent bootstrap fix.",
   "price_usd": 34.99,
   "version": "1.0.1",
   "platform": "CORSAIR iCUE / XENEON Edge",
@@ -11,24 +12,28 @@
   "package": "widgets/xeneon-edge-ultimate",
   "submission_metadata": "widgets/_src/xeneon-edge-ultimate/submission.json",
   "release_gate": [
-    "physical XENEON and real iCUE reviewer feedback resolved",
-    "desk-distance readability and live settings propagation regression coverage",
+    "desk-distance readability pass preserved",
+    "live settings propagation regression coverage",
     "Smart Mode immediate reevaluation regression coverage",
     "Previous, Play-Pause and Next media transport regression coverage",
     "runtime bootstrap remains interactive when optional iCUE providers initialize late or fail",
+    "stalled Sensors provider exact-package regression reaches READY before provider timeout",
     "official CORSAIR CLI validation and .icuewidget packaging",
     "Corsair Labs exact-package host/settings and real mode-click smoke",
     "StreamSpell exact-package preview",
     "all eight XENEON responsive layouts",
     "deterministic Rat Art",
-    "Rat Ship Maker Console kit preflight"
+    "Rat Ship Maker Console kit preflight",
+    "REQUIRED: physical XENEON EDGE 1.0.1 hardware retest"
   ],
   "automated_release_evidence": {
-    "candidate_commit": "5ea0a1b3aaa194f9c6c1265f0d17009ee6ef84c6",
-    "xeneon_widget_ci_run": 33349019202,
-    "rat_art_run": 33349020588,
-    "rat_ship_run": 33349022230
+    "candidate_commit": "c9eaf47715a6a877b18791e4576ed13d23313948",
+    "qa_record_commit": "5aec7b49c8c0bce7d276cd5a6f34eb9b438ac79c",
+    "xeneon_widget_ci_run": 33536936947,
+    "rat_art_run": 33536940027,
+    "rat_ship_run": 33536943438,
+    "stalled_provider_ready_ms": 345
   },
-  "final_boundary": "Authenticated Maker Console submission through rat ship xeneon-edge-ultimate",
-  "notes": "1.0.1 forces a clean iCUE candidate version after repeated 1.0.0 hardware installs and hardens startup so an optional native provider failure cannot strand the dashboard in a static non-interactive state. Marketplace auto-publish remains disabled in submission metadata."
+  "final_boundary": "Pass the physical XENEON EDGE 1.0.1 retest, move workflow_state back to READY_TO_SHIP, then perform authenticated Maker Console submission through rat ship xeneon-edge-ultimate.",
+  "notes": "The previous 1.0.0 physical test rendered a static shell but did not load data or respond to touch/click, screen changes or settings. 1.0.1 removes all native provider I/O from the blocking shell bootstrap and adds a permanent stalled-provider regression. Automated gates are green, but physical hardware confirmation is mandatory before release. Marketplace auto-publish remains disabled."
 }
