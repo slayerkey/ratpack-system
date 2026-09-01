@@ -1,0 +1,203 @@
+name: Apply Verified XENEON Lite Pro Links
+
+on:
+  push:
+    branches:
+      - audit/lite-pro-sync-2026-09-01
+    paths:
+      - .github/workflows/apply-xeneon-lite-pro-links.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/lite-pro-sync-2026-09-01
+          fetch-depth: 0
+
+      - name: Patch exact verified Marketplace URLs and metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, pathlib, re
+
+          ROOT = pathlib.Path('.')
+          exact = {
+            'better-hotkeys': ('https://marketplace.elgato.com/product/better-hotkeys-mouse-72b719b0-d0ce-4c0d-9d0e-a2a49cce735d','72b719b0-d0ce-4c0d-9d0e-a2a49cce735d'),
+            'better-hotkeys-pro': ('https://marketplace.elgato.com/product/better-hotkeys-mouse-pro-d1c3b3f3-1589-4884-b729-6d5eaa457c24','d1c3b3f3-1589-4884-b729-6d5eaa457c24'),
+            'davinci-resolve-lite': ('https://marketplace.elgato.com/product/davinci-resolve-lite-f76cfeae-614a-4381-ab7a-a8e8d6298285','f76cfeae-614a-4381-ab7a-a8e8d6298285'),
+            'davinci-resolve-pro': ('https://marketplace.elgato.com/product/davinci-resolve-pro-b703cfa1-1e25-4c62-b26d-30a70ab33933','b703cfa1-1e25-4c62-b26d-30a70ab33933'),
+            'window-manager': ('https://marketplace.elgato.com/product/window-manager-lite-a7693b4c-4afd-4dce-925a-262fd23b1f23','a7693b4c-4afd-4dce-925a-262fd23b1f23'),
+            'window-manager-pro': ('https://marketplace.elgato.com/product/window-manager-pro-f3ed6217-0282-419d-a71d-4b1548147b11','f3ed6217-0282-419d-a71d-4b1548147b11'),
+            'workflow-automation': ('https://marketplace.elgato.com/product/workflow-automation-lite-30b588ab-57c8-410a-834a-8e3367d0500e','30b588ab-57c8-410a-834a-8e3367d0500e'),
+            'workflow-automation-pro': ('https://marketplace.elgato.com/product/workflow-automation-pro-4da0b55c-edaa-4da3-a109-3f809bd48101','4da0b55c-edaa-4da3-a109-3f809bd48101'),
+            'calendar': ('https://marketplace.elgato.com/product/calendar-sync-lite-d6571598-f294-4187-bb2e-bdc64e398ca2','d6571598-f294-4187-bb2e-bdc64e398ca2'),
+            'calendar-pro': ('https://marketplace.elgato.com/product/calendar-sync-pro-d957868e-d1a0-4c3b-8fe4-8291951a5170','d957868e-d1a0-4c3b-8fe4-8291951a5170'),
+            'epic-pen': ('https://marketplace.elgato.com/product/epic-pen-profile-c3174c65-cf54-4f84-be2a-eb6f2f061def','c3174c65-cf54-4f84-be2a-eb6f2f061def'),
+            'epic-pen-pro': ('https://marketplace.elgato.com/product/epic-pen-pro-profile-083267a3-f437-4de6-9788-a6454b47f1af','083267a3-f437-4de6-9788-a6454b47f1af'),
+            'api-spend': ('https://marketplace.elgato.com/product/claude-codex-cost-lite-28b415aa-1f74-435a-ba57-d3dfc681af9b','28b415aa-1f74-435a-ba57-d3dfc681af9b'),
+            'api-spend-pro': ('https://marketplace.elgato.com/product/claude-codex-cost-pro-16445ae9-3baf-4967-bc0a-f142ae6894d3','16445ae9-3baf-4967-bc0a-f142ae6894d3'),
+            'weather-timeline': ('https://marketplace.elgato.com/product/weather-timeline-lite-418f836f-b5fb-4456-b412-9b7fe9295aa0','418f836f-b5fb-4456-b412-9b7fe9295aa0'),
+            'weather-timeline-pro': ('https://marketplace.elgato.com/product/weather-timeline-pro-160c8019-ce77-49d8-a306-8ef1764a70c5','160c8019-ce77-49d8-a306-8ef1764a70c5'),
+            'work-session-tracker': ('https://marketplace.elgato.com/product/work-session-tracker-lite-e11e003d-5ca3-4c2d-ba94-f37fca8dabc7','e11e003d-5ca3-4c2d-ba94-f37fca8dabc7'),
+            'work-session-tracker-pro': ('https://marketplace.elgato.com/product/work-session-tracker-pro-f8e12d94-4354-41ca-b6da-beb2297fb9e2','f8e12d94-4354-41ca-b6da-beb2297fb9e2'),
+            'desk-notes': ('https://marketplace.elgato.com/product/desk-notes-lite-3926a6a3-5860-4e11-a01b-7e90f8a4c900','3926a6a3-5860-4e11-a01b-7e90f8a4c900'),
+            'desk-notes-pro': ('https://marketplace.elgato.com/product/desk-notes-pro-3d7e3110-68be-4774-a351-755c12c95268','3d7e3110-68be-4774-a351-755c12c95268'),
+            'pc-power-meter': ('https://marketplace.elgato.com/product/pc-power-meter-lite-113488ed-3043-48b5-96d0-67c2130cc1ed','113488ed-3043-48b5-96d0-67c2130cc1ed'),
+            'pc-power-meter-pro': ('https://marketplace.elgato.com/product/pc-power-meter-pro-53e57034-588b-498f-9882-12b4a8837098','53e57034-588b-498f-9882-12b4a8837098'),
+            'clipboard-manager': ('https://marketplace.elgato.com/product/clipboard-manager-ad33db33-8278-42b0-ad81-c11b53ec41e7','ad33db33-8278-42b0-ad81-c11b53ec41e7'),
+            'clipboard-manager-pro': ('https://marketplace.elgato.com/product/clipboard-manager-pro-da242369-a59b-4cb5-b841-6d1ccb4dd2d0','da242369-a59b-4cb5-b841-6d1ccb4dd2d0'),
+          }
+
+          replacements = {
+            'widgets/_src/weather-timeline/index.html': (
+              "https://marketplace.elgato.com/search?q=Weather%20Timeline%20Pro",
+              exact['weather-timeline-pro'][0]),
+            'widgets/_shared/weather-timeline/weather-core-01.js': (
+              "https://marketplace.elgato.com/product/REPLACE_WITH_WEATHER_TIMELINE_PRO",
+              exact['weather-timeline-pro'][0]),
+            'widgets/_src/desk-notes/index.html': (
+              "https://marketplace.elgato.com/@packrat",
+              exact['desk-notes-pro'][0]),
+            'widgets/_src/work-session-tracker/session-core-1.js': (
+              "https://marketplace.elgato.com/icue",
+              exact['work-session-tracker-pro'][0]),
+            'widgets/_src/pc-power-meter/edition.js': (
+              "https://marketplace.elgato.com/search?q=PC%20Power%20Meter%20Pro",
+              exact['pc-power-meter-pro'][0]),
+          }
+          for rel, (old, new) in replacements.items():
+            path = ROOT / rel
+            text = path.read_text(encoding='utf-8')
+            if old not in text:
+              raise SystemExit(f'expected old URL not found in {rel}: {old}')
+            text = text.replace(old, new)
+            path.write_text(text, encoding='utf-8')
+
+          # Bump only the four changed Lite packages to a Marketplace-safe revision.
+          for slug in ['weather-timeline','work-session-tracker','desk-notes','pc-power-meter']:
+            manifest_path = ROOT / 'widgets' / slug / 'manifest.json'
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            if manifest.get('version') != '1.0.0':
+              raise SystemExit(f'unexpected {slug} manifest version {manifest.get("version")}')
+            manifest['version'] = '1.0.1'
+            manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+            sub_path = ROOT / 'widgets' / '_src' / slug / 'submission.json'
+            if sub_path.exists():
+              sub = json.loads(sub_path.read_text(encoding='utf-8'))
+              sub['version'] = '1.0.1'
+              sub['release_notes'] = 'Updated the Lite edition to use the verified direct Pro Marketplace listing and refreshed package validation.'
+              sub_path.write_text(json.dumps(sub, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          # Canonical relationship map: save every direct URL recovered from the live PackRat Marketplace API.
+          map_path = ROOT / 'products/lite-pro-map.json'
+          data = json.loads(map_path.read_text(encoding='utf-8'))
+          data['updated_at'] = '2026-09-01'
+          data['notes'] = 'Commercial edition relationships. Direct URLs and Marketplace IDs below were verified against the live public Elgato Marketplace API for PackRat on 2026-09-01; no search, creator, generic, or placeholder URLs are accepted.'
+          data['pairs'] = [p for p in data['pairs'] if p.get('lite_id') != 'cs2-lite']
+          by_lite = {p.get('lite_id'): p for p in data['pairs']}
+          pair_keys = {
+            'better-hotkeys':'better-hotkeys-pro',
+            'davinci-resolve-lite':'davinci-resolve-pro',
+            'window-manager':'window-manager-pro',
+            'workflow-automation':'workflow-automation-pro',
+            'calendar':'calendar-pro',
+            'epic-pen':'epic-pen-pro',
+            'api-spend':'api-spend-pro',
+            'weather-timeline':'weather-timeline-pro',
+            'work-session-tracker':'work-session-tracker-pro',
+            'desk-notes':'desk-notes-pro',
+            'pc-power-meter':'pc-power-meter-pro',
+            'clipboard-manager':'clipboard-manager-pro',
+          }
+          for lite, pro in pair_keys.items():
+            p = by_lite.get(lite)
+            if not p:
+              raise SystemExit(f'missing pair in relationship map: {lite}')
+            p['pro_id'] = pro
+            p['lite_marketplace_url'] = exact[lite][0]
+            p['pro_marketplace_url'] = exact[pro][0]
+            p['lite_marketplace_product_id'] = exact[lite][1]
+            p['pro_marketplace_product_id'] = exact[pro][1]
+            p['classification'] = 'lite_to_pro'
+          by_lite['pc-power-meter']['source_status'] = 'shared_core_verified_marketplace_live'
+          by_lite['pc-power-meter']['notes'] = 'PC Power Meter Pro source and live paid Marketplace listing are both verified.'
+          by_lite['clipboard-manager']['source_status'] = 'marketplace_verified_source_local_only'
+          by_lite['clipboard-manager']['notes'] = 'Live Lite and Pro listings verified. Shipping source is not present in the connected RatPack GitHub tree and must be updated from the local product source.'
+          by_lite['api-spend']['notes'] = 'Live Marketplace names are Claude & Codex Cost Lite / Pro; canonical internal IDs remain api-spend / api-spend-pro until the local source is synchronized.'
+          map_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          # Keep the product index truthful for the four public XENEON families without reformatting the whole catalog.
+          index_path = ROOT / 'products/index.json'
+          lines = index_path.read_text(encoding='utf-8').splitlines()
+          lite_versions = {'weather-timeline':'1.0.1','work-session-tracker':'1.0.1','desk-notes':'1.0.1','pc-power-meter':'1.0.1'}
+          pro_ids = {'weather-timeline-pro','work-session-tracker-pro','desk-notes-pro'}
+          found = set()
+          out = []
+          for line in lines:
+            m = re.search(r'\{"id":"([^"]+)"', line)
+            pid = m.group(1) if m else None
+            if pid in lite_versions:
+              found.add(pid)
+              line = re.sub(r'"status":"[^"]+"', '"status":"published"', line)
+              line = re.sub(r'"version":"[^"]+"', f'"version":"{lite_versions[pid]}"', line)
+            elif pid in pro_ids:
+              found.add(pid)
+              line = re.sub(r'"status":"[^"]+"', '"status":"published"', line)
+            out.append(line)
+            if pid == 'pc-power-meter':
+              out.append('    {"id":"pc-power-meter-pro","name":"PC Power Meter Pro","type":"widget","status":"published","price_usd":7.99,"version":"1.0.0"},')
+          missing = set(lite_versions) | pro_ids
+          missing -= found
+          if missing:
+            raise SystemExit(f'expected XENEON catalog entries missing: {sorted(missing)}')
+          if sum('"id":"pc-power-meter-pro"' in x for x in out) != 1:
+            raise SystemExit('PC Power Meter Pro registry insertion failed or duplicated')
+          index_path.write_text('\n'.join(out) + '\n', encoding='utf-8')
+
+          # Validate no bad Marketplace target remains anywhere in the four accessible Lite source families.
+          bad = ['REPLACE_WITH_WEATHER_TIMELINE_PRO','marketplace.elgato.com/search?q=Weather%20Timeline%20Pro','marketplace.elgato.com/@packrat','marketplace.elgato.com/icue','marketplace.elgato.com/search?q=PC%20Power%20Meter%20Pro']
+          roots = [
+            ROOT/'widgets/_src/weather-timeline', ROOT/'widgets/_shared/weather-timeline',
+            ROOT/'widgets/_src/work-session-tracker', ROOT/'widgets/_src/desk-notes', ROOT/'widgets/_src/desk-notes-common',
+            ROOT/'widgets/_src/pc-power-meter', ROOT/'widgets/_shared/pc-power-meter'
+          ]
+          for root in roots:
+            for path in root.rglob('*'):
+              if not path.is_file(): continue
+              try: text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError: continue
+              for marker in bad:
+                if marker in text:
+                  raise SystemExit(f'bad Marketplace target remains: {path}: {marker}')
+
+          print('Verified XENEON links patched and canonical map updated.')
+          PY
+
+      - name: Run portfolio audit
+        run: python tools/lite_pro_audit.py
+
+      - name: Remove temporary Marketplace discovery workflows
+        shell: bash
+        run: |
+          rm -f \
+            .github/workflows/marketplace-url-scrape.yml \
+            .github/workflows/marketplace-url-scrape-v2.yml \
+            .github/workflows/marketplace-url-scrape-fast.yml \
+            .github/workflows/marketplace-catalog-extract.yml \
+            .github/workflows/apply-xeneon-lite-pro-links.yml
+
+      - name: Commit verified XENEON updates
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "Use verified Marketplace URLs for XENEON Lite upgrades"
+          git push origin HEAD:audit/lite-pro-sync-2026-09-01
