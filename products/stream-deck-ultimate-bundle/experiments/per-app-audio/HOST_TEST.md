@@ -6,31 +6,55 @@ Use this only to prove whether Windows Core Audio application sessions behave co
 
 ## Fastest path
 
-Open Command Prompt in this folder.
-
-### 1. Inventory only
+Have the target app actively playing audio, then open Command Prompt in this folder and run:
 
 ```bat
-run-host-test.cmd
+run-host-test-and-save.cmd -Process Spotify -Exercise
 ```
 
-This is read-only. It reports the currently visible Windows application audio sessions.
+Replace `Spotify` with the process you want to test.
+
+The test is deliberately reversible. It changes that app by exactly 1 volume percentage point, verifies the change, restores the original value, and verifies the restoration.
+
+The wrapper automatically saves the complete machine-readable report as:
+
+`host-test-result.json`
+
+That is the preferred file to send back for review.
+
+Expected success:
+
+`write-and-restore-pass`
+
+If the app resolves to multiple PIDs, first run the inventory command below and then repeat the exercise with the exact PID:
+
+```bat
+run-host-test-and-save.cmd -Pid 1234 -Exercise
+```
+
+## Inventory only
+
+```bat
+run-host-test-and-save.cmd
+```
+
+This is read-only. It reports the currently visible Windows application audio sessions and still saves `host-test-result.json`.
 
 Useful result states:
 
 - `audit-only-needs-target` — audio endpoint works and the inventory was generated
 - `audio-endpoint-unavailable-or-error` — Windows exposed no usable playback endpoint to the helper
 
-### 2. Check one app without changing anything
+## Check one app without changing anything
 
 ```bat
-run-host-test.cmd -Process Discord
+run-host-test-and-save.cmd -Process Discord
 ```
 
 or
 
 ```bat
-run-host-test.cmd -Process Spotify
+run-host-test-and-save.cmd -Process Spotify
 ```
 
 This remains read-only.
@@ -42,21 +66,9 @@ Expected states:
 
 Matching is exact after normalizing `.exe`. `Discord` does not intentionally match `DiscordHelper`.
 
-### 3. Reversible 1% write test
+## Reversible 1% write test details
 
-Only after the read-only result looks correct:
-
-```bat
-run-host-test.cmd -Process Discord -Exercise
-```
-
-The harness will only exercise the write if the target resolves safely.
-
-It changes volume by exactly 1 percentage point, verifies the observed value, restores the original value, and verifies the restoration.
-
-Expected success:
-
-`write-and-restore-pass`
+The harness only exercises a write when the target resolves safely.
 
 Safety refusals are intentional:
 
@@ -65,7 +77,9 @@ Safety refusals are intentional:
 
 The harness never modifies mute state.
 
-## Save the result to a file
+## Custom result filename
+
+The original wrapper remains available when a custom output filename is useful:
 
 ```bat
 run-host-test.cmd -Process Discord -OutputPath discord-audio-audit.json
@@ -77,7 +91,7 @@ For the reversible test:
 run-host-test.cmd -Pid 1234 -Exercise -OutputPath discord-audio-write-test.json
 ```
 
-That JSON result is enough to diagnose the next layer without a button-by-button Stream Deck debugging loop.
+The saved JSON is enough to diagnose the next layer without a button-by-button Stream Deck debugging loop.
 
 ## What this proves
 
@@ -101,4 +115,4 @@ Those remain separate acceptance gates.
 
 ## Promotion rule
 
-Do not merge per-app audio into the accepted Ultimate plugin only because CI passes. At least one normal Windows desktop must produce a successful read-only app result and a successful reversible write/restore result first.
+Do not promote per-app audio into the accepted Ultimate plugin only because CI passes. At least one normal Windows desktop must produce a successful reversible `write-and-restore-pass`, followed by the separate physical App Volume Lab Stream Deck acceptance pass.
