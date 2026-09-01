@@ -4,9 +4,9 @@
   "base": "base.png",
   "monitor_outer": [412, 57, 1515, 606],
   "monitor_screen": [429, 73, 1496, 572],
-  "product_box": [40, 390, 1880, 890],
+  "product_box": [35, 410, 1885, 910],
   "brand_anchor": [1818, 62],
   "brand_max_size": 64,
   "desk_horizon_y": 570,
-  "notes": "Coordinates calibrated from the approved warm-studio environment plate. Product box intentionally allows XENEON Edge to occupy roughly 92-96% of canvas width and most of the lower half."
+  "notes": "Coordinates calibrated from the approved warm-studio environment plate. Product box is intentionally near full width so XENEON Edge occupies roughly 96% of canvas width and most of the lower half while leaving the monitor title readable."
 }
