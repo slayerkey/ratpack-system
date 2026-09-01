@@ -193,7 +193,7 @@ try {
     const geometry = await page.evaluate(() => {
       const doc = document.documentElement;
       const body = document.body;
-      const visibleScreens = [...document.querySelectorAll('.screen')].filter(el => getComputedStyle(el).opacity !== '0');
+      const visibleScreens = [...document.querySelectorAll('.screen')].filter(el => Number.parseFloat(getComputedStyle(el).opacity || '0') > 0.01);
       const touch = [...document.querySelectorAll('button')].filter(el => {
         const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
         return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
