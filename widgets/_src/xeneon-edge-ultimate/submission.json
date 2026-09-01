@@ -3,7 +3,7 @@
   "name": "XENEON EDGE Ultimate",
   "type": "widget",
   "price_usd": 34.99,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "marketplace_category": [
     "Utilities",
     "Productivity"
@@ -25,6 +25,6 @@
     "Rolling performance history plus HTTPS response-timing history for connection diagnosis.",
     "Optional Open-Meteo weather, ICS agenda, focus timer, pinned note and system media controls.",
     "Smart Mode can enter Performance for active FPS sessions while respecting manual overrides.",
-    "Local-first state and cached daily data with no PackRat cloud account required."
+    "Hardened startup keeps navigation responsive if an optional iCUE provider initializes late or temporarily fails."
   ]
 }
