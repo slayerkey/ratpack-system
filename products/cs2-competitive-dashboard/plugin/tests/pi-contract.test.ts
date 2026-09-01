@@ -193,9 +193,9 @@ test("Property Inspector keeps a manual bundled profile fallback for Rat Dev", (
 test("session metric labels are customer facing and immediately distinct", () => {
   assert.deepEqual(sessionDisplay("record", emptySession), { label: "SESSION", value: "0W 0L", subtitle: "0 MATCHES" });
   assert.deepEqual(sessionDisplay("matches", emptySession), { label: "MATCHES", value: "0" });
-  assert.deepEqual(sessionDisplay("kd", emptySession), { label: "SESSION K/D", value: "0.00" });
-  assert.deepEqual(sessionDisplay("adr", emptySession), { label: "SESSION ADR", value: "0.0" });
-  assert.deepEqual(sessionDisplay("hs", emptySession), { label: "SESSION HS%", value: "0%" });
+  assert.deepEqual(sessionDisplay("kd", emptySession), { label: "MATCH K/D", value: "0.00" });
+  assert.deepEqual(sessionDisplay("adr", emptySession), { label: "MATCH ADR", value: "0.0" });
+  assert.deepEqual(sessionDisplay("hs", emptySession), { label: "MATCH HS%", value: "0%" });
   assert.doesNotMatch(JSON.stringify([
     sessionDisplay("adr", emptySession),
     sessionDisplay("hs", emptySession)

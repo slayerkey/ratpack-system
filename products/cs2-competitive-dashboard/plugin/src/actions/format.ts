@@ -46,8 +46,8 @@ export function liveDisplay(metric: LiveMetric, live: LiveState | undefined, ses
     case "deaths": return { label: "DEATHS", value: String(live.deaths) };
     case "assists": return { label: "ASSISTS", value: String(live.assists) };
     case "kd": return { label: "K/D", value: decimal(live.deaths === 0 ? live.kills : live.kills / live.deaths) };
-    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1) };
-    case "hs": return { label: "SESSION HS%", value: `${decimal(session.hsPercent, 0)}%` };
+    case "adr": return { label: "MATCH ADR", value: decimal(session.adr, 1) };
+    case "hs": return { label: "MATCH HS%", value: `${decimal(session.hsPercent, 0)}%` };
     case "health": return { label: "HEALTH", value: live.health === undefined ? "--" : String(live.health), tone: live.health !== undefined && live.health <= 25 ? "danger" : "good" };
     case "armor": return { label: "ARMOR", value: live.armor === undefined ? "--" : String(live.armor), subtitle: live.helmet ? "HELMET" : undefined };
     case "money": return { label: "MONEY", value: live.money === undefined ? "--" : `$${live.money.toLocaleString("en-US")}` };
@@ -68,9 +68,9 @@ export function sessionDisplay(metric: string, session: SessionMetrics): Display
   switch (metric) {
     case "record": return { label: "SESSION", value: `${session.wins}W ${session.losses}L`, subtitle: `${session.matches} MATCH${session.matches === 1 ? "" : "ES"}` };
     case "matches": return { label: "MATCHES", value: String(session.matches) };
-    case "kd": return { label: "SESSION K/D", value: decimal(session.kd) };
-    case "adr": return { label: "SESSION ADR", value: decimal(session.adr, 1) };
-    case "hs": return { label: "SESSION HS%", value: `${decimal(session.hsPercent, 0)}%` };
+    case "kd": return { label: "MATCH K/D", value: decimal(session.kd) };
+    case "adr": return { label: "MATCH ADR", value: decimal(session.adr, 1) };
+    case "hs": return { label: "MATCH HS%", value: `${decimal(session.hsPercent, 0)}%` };
     default: return { label: "SESSION", value: "--" };
   }
 }

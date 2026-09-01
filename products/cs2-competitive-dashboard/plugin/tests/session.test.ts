@@ -178,3 +178,45 @@ test("Deathmatch HS% reflects a genuine mix of headshot and body kills", () => {
   assert.equal(metrics.headshotKills, 2);
   assert.equal(metrics.hsPercent, 50);
 });
+
+test("match metrics reset when the player joins a different match", () => {
+  const session = new SessionTracker();
+  const dm = { mapName: "de_dust2", mapMode: "deathmatch" };
+
+  session.ingest(live({ ...dm, roundKills: 4, roundHeadshotKills: 1, roundTotalDamage: 400, kills: 20, deaths: 10 }));
+  session.ingest(live({ ...dm, roundKills: 0, roundHeadshotKills: 0, roundTotalDamage: 0, kills: 20, deaths: 11 }));
+  const deathmatch = session.ingest(live({ ...dm, roundKills: 5, roundHeadshotKills: 2, roundTotalDamage: 500, kills: 30, deaths: 11 }));
+  assert.equal(deathmatch.kills, 30);
+
+  // The player leaves for Arms Race. CS2 never sends a gameover packet, so the map
+  // and mode change is the only signal that the previous match is finished.
+  const arms = { mapName: "ar_shoots", mapMode: "gungameprogressive" };
+  const first = session.ingest(live({ ...arms, roundKills: 1, roundHeadshotKills: 1, roundTotalDamage: 100, kills: 1, deaths: 0 }));
+  assert.equal(first.kills, 1, "a new match must not inherit the previous match kill total");
+  assert.equal(first.hsPercent, 100);
+  assert.equal(first.matches, 1, "the abandoned match still counts toward the session record");
+
+  const later = session.ingest(live({ ...arms, roundKills: 4, roundHeadshotKills: 3, roundTotalDamage: 400, kills: 4, deaths: 1 }));
+  assert.equal(later.kills, 4);
+  assert.equal(later.hsPercent, 75);
+});
+
+test("warmup closes the previous match without blanking the keys", () => {
+  const session = new SessionTracker();
+  const map = { mapName: "de_mirage", mapMode: "competitive" };
+
+  session.ingest(live({ ...map, roundKills: 2, roundHeadshotKills: 1, roundTotalDamage: 200, kills: 2, deaths: 0 }));
+
+  // Warmup for the next game. The finished match stays on the keys so the deck does
+  // not drop to zero between games.
+  const warmup = session.ingest(live({ ...map, mapPhase: "warmup", kills: 0, deaths: 0 }));
+  assert.equal(warmup.kills, 2);
+  assert.equal(warmup.hsPercent, 50);
+  assert.equal(warmup.matches, 1);
+  assert.equal(warmup.inMatch, false);
+
+  // The next live packet starts a genuinely fresh match.
+  const next = session.ingest(live({ ...map, roundKills: 1, roundHeadshotKills: 0, roundTotalDamage: 90, kills: 1, deaths: 0 }));
+  assert.equal(next.kills, 1);
+  assert.equal(next.hsPercent, 0);
+});

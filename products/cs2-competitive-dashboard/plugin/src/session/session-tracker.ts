@@ -4,18 +4,23 @@ interface CompletedTotals {
   matches: number;
   wins: number;
   losses: number;
+}
+
+/** The values surfaced on the keys, scoped to a single match. */
+interface MatchTotals {
   kills: number;
   deaths: number;
   assists: number;
   damage: number;
   rounds: number;
-  headshotKills: number;
-  /** Kills seen inside observed lives, so HS% divides by the same window headshots came from. */
   observedKills: number;
+  headshotKills: number;
 }
 
 interface MatchAccumulator {
   team: Team;
+  mapName?: string;
+  mapMode?: string;
   roundNumber?: number;
   maxRoundDamage: number;
   maxRoundHeadshots: number;
@@ -33,31 +38,41 @@ interface MatchAccumulator {
   finalized: boolean;
 }
 
-const emptyTotals = (): CompletedTotals => ({
-  matches: 0,
-  wins: 0,
-  losses: 0,
+const emptyTotals = (): CompletedTotals => ({ matches: 0, wins: 0, losses: 0 });
+
+const emptyMatch = (): MatchTotals => ({
   kills: 0,
   deaths: 0,
   assists: 0,
   damage: 0,
   rounds: 0,
-  headshotKills: 0,
-  observedKills: 0
+  observedKills: 0,
+  headshotKills: 0
 });
 
 export class SessionTracker {
   private completed: CompletedTotals = emptyTotals();
   private current?: MatchAccumulator;
+  /** Kept so the keys still show the finished match instead of blanking between games. */
+  private lastMatch?: MatchTotals;
 
   reset(): void {
     this.completed = emptyTotals();
     this.current = undefined;
+    this.lastMatch = undefined;
   }
 
   ingest(live: LiveState): SessionMetrics {
     const activePhase = live.mapPhase === "live" || live.mapPhase === "intermission";
     const gameOver = live.mapPhase === "gameover";
+
+    // A player can leave one match and join another without the plugin ever seeing a
+    // gameover packet. Without this the stale accumulator keeps pinning kills to the
+    // previous match through Math.max and blends both matches into one percentage.
+    if (this.current && !this.current.finalized && this.startsNewMatch(live, this.current)) {
+      this.settleMatch(this.current);
+      this.current = undefined;
+    }
 
     if (!this.current && activePhase) {
       this.current = this.createMatch(live);
@@ -67,7 +82,7 @@ export class SessionTracker {
       this.updateMatch(live, this.current);
 
       if (gameOver && !this.current.finalized) {
-        this.finalizeMatch(live, this.current);
+        this.settleMatch(this.current, live);
         this.current = undefined;
       }
     }
@@ -77,18 +92,8 @@ export class SessionTracker {
 
   snapshot(): SessionMetrics {
     const current = this.current && !this.current.finalized ? this.current : undefined;
-    const currentDamage = current ? current.committedDamage + current.maxRoundDamage : 0;
-    const currentRounds = current ? current.committedRounds + (current.roundNumber === undefined ? 0 : 1) : 0;
-    const currentHeadshots = current ? current.committedHeadshots + current.maxRoundHeadshots : 0;
-    const kills = this.completed.kills + (current?.lastKills ?? 0);
-    const deaths = this.completed.deaths + (current?.lastDeaths ?? 0);
-    const assists = this.completed.assists + (current?.lastAssists ?? 0);
-    const damage = this.completed.damage + currentDamage;
-    const rounds = this.completed.rounds + currentRounds;
-    const currentObservedKills = current ? current.committedKills + current.maxRoundKills : 0;
-    const observedKills = this.completed.observedKills + currentObservedKills;
-    const rawHeadshotKills = this.completed.headshotKills + currentHeadshots;
-    const headshotKills = Math.min(observedKills, rawHeadshotKills);
+    const totals = current ? this.matchTotals(current, false) : this.lastMatch ?? emptyMatch();
+    const { kills, deaths, assists, damage, rounds, observedKills, headshotKills } = totals;
 
     return {
       matches: this.completed.matches,
@@ -107,9 +112,56 @@ export class SessionTracker {
     };
   }
 
+  /** True when this payload clearly belongs to a different match than the one being tracked. */
+  private startsNewMatch(live: LiveState, match: MatchAccumulator): boolean {
+    // Warmup always precedes a match, so it reliably separates back to back games
+    // played on the same map and mode.
+    if (live.mapPhase === "warmup") return true;
+    if (live.mapName !== undefined && match.mapName !== undefined && live.mapName !== match.mapName) return true;
+    if (live.mapMode !== undefined && match.mapMode !== undefined && live.mapMode !== match.mapMode) return true;
+    // player.match_stats defaults to zero when absent from a payload, so a kill or
+    // death decrease is deliberately not treated as a match boundary here.
+    return false;
+  }
+
+  private matchTotals(match: MatchAccumulator, settled: boolean): MatchTotals {
+    const observedKills = match.committedKills + match.maxRoundKills;
+    const headshots = match.committedHeadshots + match.maxRoundHeadshots;
+    return {
+      kills: match.lastKills,
+      deaths: match.lastDeaths,
+      assists: match.lastAssists,
+      damage: match.committedDamage + match.maxRoundDamage,
+      rounds: settled ? match.committedRounds : match.committedRounds + (match.roundNumber === undefined ? 0 : 1),
+      observedKills,
+      headshotKills: Math.min(observedKills, headshots)
+    };
+  }
+
+  /** Closes a match, remembers its final values, and records a result when the score is known. */
+  private settleMatch(match: MatchAccumulator, live?: LiveState): void {
+    if (match.roundNumber !== undefined) this.commitRound(match);
+    match.maxRoundDamage = 0;
+    match.maxRoundHeadshots = 0;
+    match.maxRoundKills = 0;
+    match.finalized = true;
+
+    this.lastMatch = this.matchTotals(match, true);
+    this.completed.matches += 1;
+
+    if (!live) return;
+    const winner = this.winnerFromScore(live);
+    if (winner !== "UNKNOWN" && match.team !== "UNKNOWN") {
+      if (winner === match.team) this.completed.wins += 1;
+      else this.completed.losses += 1;
+    }
+  }
+
   private createMatch(live: LiveState): MatchAccumulator {
     return {
       team: live.playerTeam,
+      mapName: live.mapName,
+      mapMode: live.mapMode,
       roundNumber: live.roundNumber,
       maxRoundDamage: live.roundTotalDamage,
       maxRoundHeadshots: live.roundHeadshotKills,
@@ -155,14 +207,9 @@ export class SessionTracker {
       // and headshot counts as the previous life.
       const damageReset = live.roundTotalDamage < match.lastRoundDamage;
       const respawnReset = live.roundKills < match.lastRoundKills || damageReset;
-      if (respawnReset) {
+      if (respawnReset || live.roundHeadshotKills < match.lastRoundHeadshots) {
         match.committedDamage += match.maxRoundDamage;
         match.maxRoundDamage = 0;
-        match.committedHeadshots += match.maxRoundHeadshots;
-        match.maxRoundHeadshots = 0;
-        match.committedKills += match.maxRoundKills;
-        match.maxRoundKills = 0;
-      } else if (live.roundHeadshotKills < match.lastRoundHeadshots) {
         match.committedHeadshots += match.maxRoundHeadshots;
         match.maxRoundHeadshots = 0;
         match.committedKills += match.maxRoundKills;
@@ -187,26 +234,6 @@ export class SessionTracker {
     match.committedHeadshots += match.maxRoundHeadshots;
     match.committedKills += match.maxRoundKills;
     match.committedRounds += 1;
-  }
-
-  private finalizeMatch(live: LiveState, match: MatchAccumulator): void {
-    if (match.roundNumber !== undefined) this.commitRound(match);
-
-    match.finalized = true;
-    this.completed.matches += 1;
-    this.completed.kills += match.lastKills;
-    this.completed.deaths += match.lastDeaths;
-    this.completed.assists += match.lastAssists;
-    this.completed.damage += match.committedDamage;
-    this.completed.rounds += match.committedRounds;
-    this.completed.observedKills += match.committedKills;
-    this.completed.headshotKills += Math.min(match.committedKills, match.committedHeadshots);
-
-    const winner = this.winnerFromScore(live);
-    if (winner !== "UNKNOWN" && match.team !== "UNKNOWN") {
-      if (winner === match.team) this.completed.wins += 1;
-      else this.completed.losses += 1;
-    }
   }
 
   private winnerFromScore(live: LiveState): Team {
