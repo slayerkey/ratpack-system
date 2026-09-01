@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-01",
+  "notes": "Commercial edition relationships only. A null marketplace URL means the direct public product page has not been verified and must not be guessed.",
+  "pairs": [
+    {
+      "lite_id": "better-hotkeys",
+      "pro_id": "better-hotkeys-pro",
+      "platform": "streamdeck",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack",
+      "notes": "Published pair. Existing Lite upsell is the reference UX, but exact public URLs still need capture into RatPack metadata."
+    },
+    {
+      "lite_id": "davinci-resolve-lite",
+      "pro_id": "davinci-resolve-pro",
+      "platform": "streamdeck_profile",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": "https://marketplace.elgato.com/product/davinci-resolve-lite-f76cfeae-614a-4381-ab7a-a8e8d6298285",
+      "pro_marketplace_url": "https://marketplace.elgato.com/product/davinci-resolve-pro-b703cfa1-1e25-4c62-b26d-30a70ab33933",
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "window-manager",
+      "pro_id": "window-manager-pro",
+      "platform": "streamdeck",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "workflow-automation",
+      "pro_id": "workflow-automation-pro",
+      "platform": "streamdeck",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "calendar",
+      "pro_id": "calendar-pro",
+      "platform": "streamdeck",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "epic-pen",
+      "pro_id": "epic-pen-pro",
+      "platform": "streamdeck_profile",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "api-spend",
+      "pro_id": "api-spend-pro",
+      "platform": "streamdeck",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "catalog_only_in_ratpack"
+    },
+    {
+      "lite_id": "weather-timeline",
+      "pro_id": "weather-timeline-pro",
+      "platform": "xeneon",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "lite_marketplace_product_id": "418f836f-b5fb-4456-b412-9b7fe9295aa0",
+      "pro_marketplace_product_id": "160c8019-ce77-49d8-a306-8ef1764a70c5",
+      "source_paths": ["widgets/_src/weather-timeline", "widgets/_src/weather-timeline-pro", "widgets/_shared/weather-timeline"],
+      "source_status": "shared_core_verified_2026_08_27"
+    },
+    {
+      "lite_id": "work-session-tracker",
+      "pro_id": "work-session-tracker-pro",
+      "platform": "xeneon",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "lite_marketplace_product_id": "e11e003d-5ca3-4c2d-ba94-f37fca8dabc7",
+      "pro_marketplace_product_id": "f8e12d94-4354-41ca-b6da-beb2297fb9e2",
+      "source_paths": ["widgets/_src/work-session-tracker", "widgets/_src/work-session-tracker-pro"],
+      "source_status": "shared_core_verified_2026_08_27"
+    },
+    {
+      "lite_id": "desk-notes",
+      "pro_id": "desk-notes-pro",
+      "platform": "xeneon",
+      "classification": "lite_to_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "lite_marketplace_product_id": "3926a6a3-5860-4e11-a01b-7e90f8a4c900",
+      "pro_marketplace_product_id": null,
+      "source_paths": ["widgets/_src/desk-notes", "widgets/_src/desk-notes-pro", "widgets/_src/desk-notes-common"],
+      "source_status": "shared_core_verified_2026_08_27",
+      "notes": "Desk Notes Pro Marketplace product ID was not captured in the recovery ledger."
+    },
+    {
+      "lite_id": "pc-power-meter",
+      "pro_id": "pc-power-meter-pro",
+      "platform": "xeneon",
+      "classification": "lite_with_unregistered_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "lite_marketplace_product_id": "113488ed-3043-48b5-96d0-67c2130cc1ed",
+      "source_paths": ["widgets/_src/pc-power-meter", "widgets/_src/pc-power-meter-pro", "widgets/_shared/pc-power-meter"],
+      "source_status": "pro_source_exists_but_pro_missing_from_product_index",
+      "notes": "Do not ship Lite with a search URL. Register/verify PC Power Meter Pro first."
+    },
+    {
+      "lite_id": "clipboard-manager",
+      "pro_id": "clipboard-manager-pro",
+      "platform": "streamdeck",
+      "classification": "lite_with_unregistered_pro",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "pro_not_in_canonical_index",
+      "notes": "Known portfolio clue says this should upsell to Pro, but canonical RatPack currently has no Pro product record."
+    },
+    {
+      "lite_id": "cs2-lite",
+      "pro_id": "cs2-pro",
+      "platform": "streamdeck",
+      "classification": "ambiguous_missing_from_registry",
+      "lite_marketplace_url": null,
+      "pro_marketplace_url": null,
+      "source_status": "not_in_canonical_index",
+      "notes": "Known portfolio clue references CS2 Lite/Pro, but the current canonical index only contains a paid CS2 profile. Resolve against local/Marketplace state before modifying."
+    },
+    {
+      "lite_id": "ai-prompts-lite",
+      "pro_id": null,
+      "platform": "streamdeck_profile",
+      "classification": "ambiguous_multi_product_funnel",
+      "source_status": "catalog_only_in_ratpack",
+      "notes": "Multiple paid prompt packs and AI Prompt Toolkit exist; no single true Pro counterpart should be invented."
+    }
+  ],
+  "standalone_free": [
+    {"id": "discord-essentials", "reason": "Free profile; no verified edition pair."},
+    {"id": "net-spike", "reason": "Standalone free XENEON network probe."},
+    {"id": "retro-terminal", "reason": "Standalone free XENEON widget."},
+    {"id": "todo-list", "reason": "Standalone free plugin; no canonical Pro counterpart."},
+    {"id": "discord-bridge", "reason": "Free bridge/infrastructure product. Paid Discord Voice Panel and Voice Deck are different products, not proven editions of the same application."}
+  ],
+  "obsolete_or_rejected_free": [
+    {"id": "hwinfo", "reason": "Rejected."},
+    {"id": "foundry-vtt", "reason": "Rejected."}
+  ]
+}
