@@ -305,7 +305,7 @@ export class DashboardRuntime {
       );
       this.trace("Stream Deck global settings saved.");
 
-      this.setSetupStage("checking-cs2", onProgress, "enable-gsi", "Checking whether cs2.exe is already running…\");
+      this.setSetupStage("checking-cs2", onProgress, "enable-gsi", "Checking whether cs2.exe is already running…");
       const cs2Running = this.store.get().status.cs2Running || await this.detectCs2Running();
       const alreadyConnected = this.store.get().status.gsiConnected;
 
