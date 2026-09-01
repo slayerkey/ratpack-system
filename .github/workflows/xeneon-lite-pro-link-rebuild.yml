@@ -26,7 +26,7 @@ permissions:
 jobs:
   package:
     name: Package ${{ matrix.slug }}
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
