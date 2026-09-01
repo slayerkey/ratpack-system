@@ -25,8 +25,8 @@ BAD_URL_MARKERS = (
     "REPLACE_WITH",
     "TODO_PRO_URL",
     "example.com",
-    "/search?",
-    "?search=",
+    "marketplace.elgato.com/search?",
+    "marketplace.elgato.com/?search=",
     "marketplace.elgato.com/icue",
     "marketplace.elgato.com/@packrat",
 )
