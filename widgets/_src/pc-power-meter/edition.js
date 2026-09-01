@@ -5,5 +5,5 @@ globalThis.PACKRAT_POWER_METER = {
   comparisonProperty: null,
   history: false,
   daily: false,
-  proUrl: "https://marketplace.elgato.com/search?q=PC%20Power%20Meter%20Pro"
+  proUrl: "https://marketplace.elgato.com/product/pc-power-meter-pro-53e57034-588b-498f-9882-12b4a8837098"
 };

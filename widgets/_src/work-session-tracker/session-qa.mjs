@@ -105,7 +105,7 @@ export async function runSessionQa(edition, entryArg, outDirArg) {
       await page.evaluate(now=>globalThis.__workSessionTest.setNow(now),fixedNow+7*hour);
       await page.locator('#upgradeButton').click();
       const opened=await page.evaluate(()=>globalThis.__openedLink||null);
-      if(opened!=='https://marketplace.elgato.com/icue') throw new Error(`LinkProvider upgrade route failed: ${opened}`);
+      if(opened!=='https://marketplace.elgato.com/product/work-session-tracker-pro-f8e12d94-4354-41ca-b6da-beb2297fb9e2') throw new Error(`LinkProvider upgrade route failed: ${opened}`);
       report.transitions.upgradeRoute=opened;
     }
 
