@@ -92,7 +92,7 @@ def monitor_art(width: int, height: int, title: str, accent_title: str, subtitle
 
     if subtitle:
         sub_font = rat_art.fit_font(draw, subtitle, int(width * 0.78), int(height * 0.095), 28, False)
-        draw.text((width // 2, int(height * 0.70)), subtitle, font=sub_font, fill=(*MUTED, 255), anchor="mm")
+        draw.text((width // 2, int(height * 0.64)), subtitle, font=sub_font, fill=(*MUTED, 255), anchor="mm")
 
     return panel
 
