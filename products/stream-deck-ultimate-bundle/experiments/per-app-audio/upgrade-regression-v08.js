@@ -12,7 +12,11 @@ const APP_AUDIO = `${UUID}.app-audio`;
 const pluginDir = path.resolve(process.argv[2] || "");
 if (!pluginDir || !fs.existsSync(pluginDir)) throw new Error(`Candidate plugin directory missing: ${pluginDir}`);
 const acceptedDir = path.resolve(__dirname, "../../prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin");
-const acceptedManifest = JSON.parse(fs.readFileSync(path.join(acceptedDir, "manifest.json"), "utf8"));
+const fixturePath = path.resolve(__dirname, "accepted-v071-manifest-contract.json");
+const currentCanonicalManifest = JSON.parse(fs.readFileSync(path.join(acceptedDir, "manifest.json"), "utf8"));
+const acceptedManifest = currentCanonicalManifest.Version === "0.7.1.0"
+  ? currentCanonicalManifest
+  : JSON.parse(fs.readFileSync(fixturePath, "utf8"));
 const candidateManifest = JSON.parse(fs.readFileSync(path.join(pluginDir, "manifest.json"), "utf8"));
 
 assert.equal(acceptedManifest.UUID, UUID);
@@ -156,7 +160,8 @@ async function runtimeProof() {
 }
 
 runtimeProof().then(result => {
-  console.log(`v0.7.1 -> v0.8 upgrade regression passed: production UUID stable, ${acceptedManifest.Actions.length} existing action contracts unchanged, profile declarations unchanged, seeded config/history preserved${result.skipped ? `; runtime skipped (${result.reason})` : "; Windows multiplexed runtime preserved seeded state"}`);
+  const baseline = currentCanonicalManifest.Version === "0.7.1.0" ? "canonical v0.7.1" : "frozen v0.7.1 manifest fixture";
+  console.log(`v0.7.1 -> v0.8 upgrade regression passed against ${baseline}: production UUID stable, ${acceptedManifest.Actions.length} existing action contracts unchanged, profile declarations unchanged, seeded config/history preserved${result.skipped ? `; runtime skipped (${result.reason})` : "; Windows multiplexed runtime preserved seeded state"}`);
 }).catch(error => {
   console.error(error.stack || error);
   process.exit(1);
