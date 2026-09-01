@@ -9,7 +9,7 @@
   var PALETTE = ['#2BE86A', '#62A8FF', '#A879FF', '#FFB454', '#FF6B7A', '#45D6D1'];
   var EDITION = String(globalThis.WORK_SESSION_EDITION || 'lite').toLowerCase() === 'pro' ? 'pro' : 'lite';
   var IS_PRO = EDITION === 'pro';
-  var PRO_UPGRADE_URL = 'https://marketplace.elgato.com/icue';
+  var PRO_UPGRADE_URL = 'https://marketplace.elgato.com/product/work-session-tracker-pro-f8e12d94-4354-41ca-b6da-beb2297fb9e2';
   var STORAGE_VERSION = 2;
   var RENDER_TIMER = null;
   var lastActionAt = -Infinity;

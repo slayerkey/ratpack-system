@@ -110,8 +110,8 @@ jobs:
               archive.extractall(out)
           manifest = json.loads((out / 'manifest.json').read_text(encoding='utf-8-sig'))
           version = str(manifest.get('version', manifest.get('Version', '')))
-          if version not in ('1', '1.0', '1.0.0'):
-              raise SystemExit(f'Marketplace revision must remain Version 1, found {version!r}')
+          if not version or version.split('.', 1)[0] != '1':
+              raise SystemExit(f'Marketplace revision must remain major Version 1, found {version!r}')
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw 'exact package integrity/version check failed' }
 

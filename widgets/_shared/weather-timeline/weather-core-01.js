@@ -12,7 +12,7 @@
   var REFRESH_TIMER = null;
   var CLOCK_TIMER = null;
   var ABORTER = null;
-  var PRO_MARKETPLACE_URL = CFG.proMarketplaceUrl || 'https://marketplace.elgato.com/product/REPLACE_WITH_WEATHER_TIMELINE_PRO';
+  var PRO_MARKETPLACE_URL = CFG.proMarketplaceUrl || 'https://marketplace.elgato.com/product/weather-timeline-pro-160c8019-ce77-49d8-a306-8ef1764a70c5';
 
   var STATE = {
     status: 'loading', message: '', stale: false, updatedAt: 0,
