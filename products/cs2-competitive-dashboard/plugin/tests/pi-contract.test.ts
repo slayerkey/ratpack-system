@@ -13,6 +13,8 @@ const hostLog = readFileSync("src/diagnostics/host.ts", "utf8");
 const hostFlavor = readFileSync("src/host-flavor.ts", "utf8");
 const pluginPro = readFileSync("src/plugin-pro.ts", "utf8");
 const pluginLite = readFileSync("src/plugin-lite.ts", "utf8");
+const runtime = readFileSync("src/runtime.ts", "utf8");
+const directClient = readFileSync("src/providers/direct-client.ts", "utf8");
 
 const emptySession = {
   matches: 0,
@@ -174,6 +176,11 @@ test("Property Inspector makes provider ownership explicit with approved Leetify
   assert.match(html, /Data Provided by Leetify/);
   assert.match(pi, /LEETIFY_DEVELOPER_PAGE/);
   assert.match(pi, /FACEIT_DEVELOPER_PORTAL/);
+});
+
+test("provider setup copy never promises that external API keys are free", () => {
+  const customerFacingProviderSource = `${html}\n${pi}\n${runtime}\n${directClient}`;
+  assert.doesNotMatch(customerFacingProviderSource, /free\s+(?:Leetify|FACEIT)\s+(?:App\/)?API key/i);
 });
 
 test("Property Inspector keeps a manual bundled profile fallback for Rat Dev", () => {
