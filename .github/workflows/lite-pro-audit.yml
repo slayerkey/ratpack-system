@@ -9,6 +9,7 @@ on:
       - 'plugins/**'
       - 'tools/lite_pro_audit.py'
       - 'tools/apply_verified_lite_pro_links.py'
+      - 'tools/apply_verified_lite_pro_links_v2.py'
       - '.github/workflows/lite-pro-audit.yml'
   push:
     branches: [main]
@@ -41,7 +42,7 @@ jobs:
           python-version: '3.13'
       - name: Apply verified direct Marketplace URLs on audit branch
         if: ${{ github.head_ref == 'audit/lite-pro-sync-2026-09-01' || github.ref_name == 'audit/lite-pro-sync-2026-09-01' }}
-        run: python tools/apply_verified_lite_pro_links.py
+        run: python tools/apply_verified_lite_pro_links_v2.py
       - name: Portfolio relationship audit
         run: python tools/lite_pro_audit.py
       - name: Commit verified URL synchronization
@@ -50,7 +51,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add products/index.json products/lite-pro-map.json widgets tools/apply_verified_lite_pro_links.py
+          git add products/index.json products/lite-pro-map.json widgets tools/apply_verified_lite_pro_links.py tools/apply_verified_lite_pro_links_v2.py
           if git diff --cached --quiet; then
             echo "No synchronization changes to commit."
           else
