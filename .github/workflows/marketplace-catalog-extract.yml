@@ -1,11 +1,6 @@
 name: PackRat Marketplace Catalog Extract
 
 on:
-  push:
-    branches:
-      - audit/lite-pro-sync-2026-09-01
-    paths:
-      - .github/workflows/marketplace-catalog-extract.yml
   workflow_dispatch:
 
 permissions:
@@ -19,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Fetch complete public PackRat catalog
         run: |
           node --input-type=commonjs <<'NODE'
@@ -47,11 +42,8 @@ jobs:
             }));
             rows.sort((a,b)=>a.name.localeCompare(b.name));
             fs.writeFileSync('packrat-marketplace-catalog.json',JSON.stringify({count:rows.length,products:rows},null,2));
-            const targets=/Weather Timeline|Work Session Tracker|Desk Notes|PC Power Meter|Better Hotkeys|Clipboard Manager|Window Manager|Workflow Automation|Calendar Sync|Epic Pen|Claude.*Codex.*Cost|Claude.*OpenAI.*Cost|DaVinci Resolve/i;
-            console.log('TARGETS_START');
-            console.log(JSON.stringify(rows.filter(x=>targets.test(x.name)),null,2));
-            console.log('TARGETS_END');
             console.log('COUNT',rows.length);
+            console.log(JSON.stringify(rows,null,2));
           })().catch(e=>{console.error(e);process.exit(1)});
           NODE
       - uses: actions/upload-artifact@v4
@@ -59,3 +51,4 @@ jobs:
           name: packrat-marketplace-catalog
           path: packrat-marketplace-catalog.json
           if-no-files-found: error
+          retention-days: 30
