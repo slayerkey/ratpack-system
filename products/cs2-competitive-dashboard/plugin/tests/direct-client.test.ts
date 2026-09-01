@@ -167,6 +167,23 @@ test("keeps FACEIT history usable when latest match map enrichment is unavailabl
   assert.equal(result.faceit.recentMatches[0]?.mapName, "");
 });
 
+test("bounds a hung provider refresh and clears the in-flight request", async () => {
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    return await new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      const fail = () => reject(signal?.reason ?? new Error("aborted"));
+      if (signal?.aborted) fail();
+      else signal?.addEventListener("abort", fail, { once: true });
+    });
+  };
+
+  const client = new ProviderClient(fetchImpl, 20);
+  const result = await client.getProfile(STEAM_ID, { faceitApiKey: "faceit-user-key" });
+  assert.equal(result.faceit.status, "offline");
+  assert.match(result.faceit.message ?? "", /timed out|abort/i);
+  assert.equal(result.leetify.status, "not_configured");
+});
+
 test("maps Leetify 200 private profile responses to an explicit private state", async () => {
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
