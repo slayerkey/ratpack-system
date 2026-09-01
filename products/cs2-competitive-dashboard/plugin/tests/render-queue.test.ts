@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { KeyImageUpdateQueue } from "../src/render/key-update-queue.js";
-import { fitValue } from "../src/render/key-svg.js";
+import { clampValue, fitValue, measureEm, VALUE_MAX_WIDTH } from "../src/render/key-svg.js";
 
 test("key image queue coalesces pending values and skips unchanged images", async () => {
   const sent: string[] = [];
@@ -52,10 +52,38 @@ test("key image queue contains Stream Deck timeouts instead of rejecting globall
 });
 
 test("long map and weapon values progressively shrink to stay on a key", () => {
-  assert.equal(fitValue("MIRAGE"), 33);
-  assert.equal(fitValue("OVERPASS"), 27);
-  assert.equal(fitValue("DESERT EAGLE"), 23);
-  assert.equal(fitValue("M4A1 SILENCER"), 20);
-  assert.equal(fitValue("VERY LONG MAP NAME"), 18);
-  assert.equal(fitValue("EXTREMELY LONG WORKSHOP MAP NAME"), 16);
+  // Real CS2 values that previously overflowed the 124px inner panel because the old
+  // fit was based on character count instead of glyph width.
+  const samples = [
+    "WAITING",
+    "MIRAGE",
+    "ANCIENT",
+    "OVERPASS",
+    "AK-47",
+    "DESERT EAGLE",
+    "M4A1 SILENCER",
+    "VERY LONG MAP NAME",
+    "EXTREMELY LONG WORKSHOP MAP NAME"
+  ];
+
+  for (const sample of samples) {
+    const size = fitValue(sample);
+    const shown = clampValue(sample, size);
+    assert.ok(
+      measureEm(shown) * size <= VALUE_MAX_WIDTH,
+      `${sample} renders ${(measureEm(shown) * size).toFixed(1)}px at size ${size} and would clip`
+    );
+  }
+});
+
+test("short values keep the large key font and are never truncated", () => {
+  for (const sample of ["100", "13-9", "0.00", "24"]) {
+    assert.equal(fitValue(sample), 40);
+    assert.equal(clampValue(sample, 40), sample);
+  }
+});
+
+test("wide glyphs shrink further than narrow glyphs of the same length", () => {
+  // "WAITING" and "1111111" are both seven characters; only the wide one must shrink.
+  assert.ok(fitValue("WAITING") < fitValue("1111111"));
 });
