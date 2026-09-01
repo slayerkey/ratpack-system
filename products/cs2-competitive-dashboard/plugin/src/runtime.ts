@@ -313,7 +313,7 @@ export class DashboardRuntime {
       this.updateStatus({
         cs2Running,
         gsiConfigured: true,
-        gsiRestartRequired: cs2Running && !alreadyConnected,
+        gsiRestartRequired: false,
         setupStage: "ready",
         detectedCs2Path: installed.cs2.installDir,
         listenerPort: port,
@@ -524,9 +524,9 @@ export class DashboardRuntime {
         failed.updatedAt = Date.now();
         failed.error = message;
         failed.leetify.status = this.globals.leetifyApiKey ? "offline" : "not_configured";
-        failed.leetify.message = this.globals.leetifyApiKey ? message : "Add your free Leetify API key in setup";
+        failed.leetify.message = this.globals.leetifyApiKey ? message : "Add your Leetify API key in setup";
         failed.faceit.status = this.globals.faceitApiKey ? "offline" : "not_configured";
-        failed.faceit.message = this.globals.faceitApiKey ? message : "Add your free FACEIT API key in setup";
+        failed.faceit.message = this.globals.faceitApiKey ? message : "Add your FACEIT API key in setup";
         this.publish({ online: failed });
       } finally {
         this.onlineRefresh = undefined;
