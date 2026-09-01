@@ -1,0 +1,223 @@
+name: Marketplace URL Discovery
+
+on:
+  push:
+    branches:
+      - audit/lite-pro-sync-2026-09-01
+    paths:
+      - .github/workflows/marketplace-url-scrape.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install browser
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Discover live PackRat Marketplace URLs
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('playwright');
+
+          const targets = [
+            'Weather Timeline Lite',
+            'Weather Timeline Pro',
+            'Work Session Tracker Lite',
+            'Work Session Tracker Pro',
+            'Desk Notes Lite',
+            'Desk Notes Pro',
+            'PC Power Meter Lite',
+            'PC Power Meter Pro',
+            'Better Hotkeys & Mouse',
+            'Better Hotkeys & Mouse Pro',
+            'Clipboard Manager',
+            'Clipboard Manager Pro',
+            'Window Manager Lite',
+            'Window Manager Pro',
+            'Workflow Automation Lite',
+            'Workflow Automation Pro',
+            'Calendar Sync Lite',
+            'Calendar Sync Pro',
+            'Epic Pen Profile',
+            'Epic Pen Pro Profile',
+            'Claude & OpenAI Cost Monitor',
+            'Claude & OpenAI Cost Pro',
+            'DaVinci Resolve Lite',
+            'DaVinci Resolve Pro'
+          ];
+
+          const knownCandidates = [
+            'https://marketplace.elgato.com/product/weather-timeline-lite-418f836f-b5fb-4456-b412-9b7fe9295aa0',
+            'https://marketplace.elgato.com/product/weather-timeline-pro-160c8019-ce77-49d8-a306-8ef1764a70c5',
+            'https://marketplace.elgato.com/product/work-session-tracker-lite-e11e003d-5ca3-4c2d-ba94-f37fca8dabc7',
+            'https://marketplace.elgato.com/product/work-session-tracker-pro-f8e12d94-4354-41ca-b6da-beb2297fb9e2',
+            'https://marketplace.elgato.com/product/desk-notes-lite-3926a6a3-5860-4e11-a01b-7e90f8a4c900',
+            'https://marketplace.elgato.com/product/pc-power-meter-lite-113488ed-3043-48b5-96d0-67c2130cc1ed',
+            'https://marketplace.elgato.com/product/davinci-resolve-lite-f76cfeae-614a-4381-ab7a-a8e8d6298285',
+            'https://marketplace.elgato.com/product/davinci-resolve-pro-b703cfa1-1e25-4c62-b26d-30a70ab33933'
+          ];
+
+          const normalize = s => (s || '').replace(/\s+/g, ' ').trim();
+          const lower = s => normalize(s).toLowerCase();
+          const targetLow = targets.map(lower);
+          const output = {
+            generatedAt: new Date().toISOString(),
+            creatorPage: 'https://marketplace.elgato.com/@packrat',
+            anchors: [],
+            targetMatches: {},
+            candidateChecks: [],
+            searchChecks: [],
+            jsonHits: [],
+            resourceUrls: []
+          };
+
+          const browser = await chromium.launch({ headless: true });
+          const context = await browser.newContext({
+            viewport: { width: 1600, height: 1200 },
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152.0.0.0 Safari/537.36'
+          });
+          const page = await context.newPage();
+
+          const seenResource = new Set();
+          page.on('request', req => {
+            const u = req.url();
+            if (/elgato|marketplace|gateway/i.test(u) && !seenResource.has(u)) {
+              seenResource.add(u);
+              output.resourceUrls.push(u);
+            }
+          });
+          page.on('response', async res => {
+            try {
+              const ct = (res.headers()['content-type'] || '').toLowerCase();
+              if (!ct.includes('json')) return;
+              const text = await res.text();
+              const l = text.toLowerCase();
+              const hits = targets.filter(t => l.includes(t.toLowerCase()));
+              if (hits.length) {
+                output.jsonHits.push({ url: res.url(), status: res.status(), hits, text: text.slice(0, 250000) });
+              }
+            } catch (_) {}
+          });
+
+          async function settle(p, ms = 1800) {
+            try { await p.waitForLoadState('domcontentloaded', { timeout: 15000 }); } catch (_) {}
+            await p.waitForTimeout(ms);
+            for (let i = 0; i < 10; i++) {
+              await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+              await p.waitForTimeout(500);
+            }
+            await p.evaluate(() => window.scrollTo(0, 0));
+            await p.waitForTimeout(500);
+          }
+
+          async function collectAnchors(label) {
+            const rows = await page.evaluate(() => [...document.querySelectorAll('a[href*="/product/"]')].map(a => ({
+              href: a.href,
+              text: (a.innerText || a.textContent || '').replace(/\s+/g, ' ').trim(),
+              aria: a.getAttribute('aria-label') || '',
+              title: a.getAttribute('title') || ''
+            })));
+            for (const r of rows) {
+              const key = r.href;
+              if (!output.anchors.some(x => x.href === key)) output.anchors.push({ ...r, source: label });
+            }
+          }
+
+          // Creator page, all products and widget filter.
+          for (const url of [
+            'https://marketplace.elgato.com/@packrat',
+            'https://marketplace.elgato.com/@packrat?extension=widgets',
+            'https://marketplace.elgato.com/maker/packrat',
+            'https://marketplace.elgato.com/maker/packrat?extension=widgets'
+          ]) {
+            try {
+              const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await settle(page);
+              await collectAnchors(url);
+              output.searchChecks.push({ query: url, status: res ? res.status() : null, finalUrl: page.url(), title: await page.title(), body: normalize((await page.locator('body').innerText()).slice(0, 120000)) });
+            } catch (e) {
+              output.searchChecks.push({ query: url, error: String(e) });
+            }
+          }
+
+          // Marketplace's own search for each target.
+          for (const target of targets) {
+            const url = 'https://marketplace.elgato.com/search?q=' + encodeURIComponent(target);
+            try {
+              const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await settle(page, 1300);
+              await collectAnchors('search:' + target);
+              const body = normalize((await page.locator('body').innerText()).slice(0, 50000));
+              output.searchChecks.push({ query: target, status: res ? res.status() : null, finalUrl: page.url(), title: await page.title(), body });
+            } catch (e) {
+              output.searchChecks.push({ query: target, error: String(e) });
+            }
+          }
+
+          // Verify candidates that already have known Marketplace UUIDs.
+          for (const url of knownCandidates) {
+            try {
+              const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await settle(page, 900);
+              const h1 = await page.locator('h1,h2').first().innerText().catch(() => '');
+              const body = normalize((await page.locator('body').innerText()).slice(0, 12000));
+              output.candidateChecks.push({
+                requestedUrl: url,
+                finalUrl: page.url(),
+                status: res ? res.status() : null,
+                title: await page.title(),
+                heading: normalize(h1),
+                packrat: /packrat/i.test(body),
+                body
+              });
+            } catch (e) {
+              output.candidateChecks.push({ requestedUrl: url, error: String(e) });
+            }
+          }
+
+          // Build target mapping from rendered anchor text/nearby card text and URL slug.
+          for (const target of targets) {
+            const tl = lower(target);
+            const words = tl.replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+            const matches = output.anchors.filter(a => {
+              const hay = lower([a.text, a.aria, a.title, a.href].join(' '));
+              if (hay.includes(tl)) return true;
+              return words.length >= 2 && words.every(w => hay.includes(w));
+            });
+            output.targetMatches[target] = matches;
+          }
+
+          fs.writeFileSync('marketplace-links.json', JSON.stringify(output, null, 2));
+          console.log(JSON.stringify({
+            generatedAt: output.generatedAt,
+            anchors: output.anchors,
+            targetMatches: output.targetMatches,
+            candidateChecks: output.candidateChecks,
+            jsonHitSummary: output.jsonHits.map(x => ({ url: x.url, status: x.status, hits: x.hits })),
+            resourceUrls: output.resourceUrls
+          }, null, 2));
+
+          await browser.close();
+          NODE
+
+      - name: Upload discovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketplace-url-discovery
+          path: marketplace-links.json
+          if-no-files-found: error
