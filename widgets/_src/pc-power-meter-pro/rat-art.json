@@ -1,38 +1,49 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "accent": "#F2B14B",
   "hero": {
-    "subtitle": "From live watts to daily energy and real electricity cost."
-  },
-  "showcase": {
-    "title": "See where the power is going.",
-    "subtitle": "One authoritative energy meter plus separate CPU, GPU and PSU comparison traces when iCUE exposes them.",
+    "title_mode": "use_case",
+    "label": "PC POWER",
+    "edition": "PRO",
+    "platform_label": "XENEON EDGE",
     "shot": "XL_H.png"
   },
+  "demo": {
+    "recommended": true,
+    "reason": "Live watts, graph movement, comparisons, energy accumulation, and cost are more convincing when the values visibly change together.",
+    "concept_seconds": 14,
+    "beats": ["LIVE POWER", "ENERGY + COST", "COMPARE SENSORS", "SESSION HISTORY"]
+  },
   "features": {
-    "title": "Energy accounting, not another sensor graph.",
-    "subtitle": "The primary measurement stays honest while Pro adds the context around it.",
+    "title": "See what the watts add up to.",
+    "subtitle": "Pro turns one measured power source into useful energy and cost context without inventing totals.",
     "shot": "M_H.png",
     "items": [
-      ["Energy + cost", "Integrated Wh and kWh become an estimated cost using your configured electricity rate."],
-      ["Separate comparisons", "Additional power sensors get their own traces and values instead of being silently combined."],
-      ["Daily + history", "Local daily energy and archived session summaries make power useful beyond the current moment."],
-      ["No fake totals", "Whole-PC wording appears only when the selected iCUE sensor actually exposes that scope."]
+      ["Energy + cost", "Integrated Wh and kWh become an estimated cost using the electricity rate you set."],
+      ["Compare real sensors", "Extra iCUE power sensors keep separate traces and values instead of being silently combined."],
+      ["Keep daily history", "Local daily energy and completed-session summaries make the data useful beyond the current moment."],
+      ["Know what is measured", "The primary label follows the selected iCUE sensor scope, so CPU power is never presented as whole-PC power."]
     ]
   },
+  "showcase": {
+    "title": "One meter. More context.",
+    "subtitle": "Live draw, rolling history, energy, cost, and separate comparison traces stay visible in one dashboard.",
+    "shot": "XL_H.png"
+  },
   "settings": {
-    "title": "Tune the meter around your hardware.",
-    "subtitle": "Choose the primary source, add comparisons, set your rate, graph window and high-power threshold.",
+    "title": "Tune it to your hardware.",
+    "subtitle": "Choose the measured source, comparisons, electricity rate, graph window, and high-power threshold.",
     "panels": [
-      { "label": "Full dashboard", "file": "XL_H.png" },
-      { "label": "Vertical", "file": "L_V.png" },
-      { "label": "Compact", "file": "S_H.png" },
-      { "label": "Measurement details", "file": "VARIANT_INFO.png" }
+      {"label": "Full dashboard", "file": "XL_H.png"},
+      {"label": "Vertical", "file": "L_V.png"},
+      {"label": "Compact", "file": "S_H.png"},
+      {"label": "Measurement details", "file": "VARIANT_INFO.png"}
     ],
-    "tags": "Primary + comparison sensors   •   electricity rate   •   graph window   •   high-power threshold"
+    "tags": "measured primary source   •   separate comparisons   •   electricity rate   •   60 s–10 min graph"
   },
   "sizes": {
-    "title": "Deep power data at every size.",
-    "subtitle": "Compact slots preserve the core meter. Larger slots expand into comparisons, history and the full energy picture.",
-    "footer": "8 tuned layouts total   •   4 sizes   •   horizontal + vertical"
+    "title": "Power data that fits the slot.",
+    "subtitle": "Small layouts preserve the core meter; larger layouts expand into comparisons, energy, cost, and history.",
+    "footer": "8 tuned layouts   •   S, M, L + XL   •   horizontal + vertical"
   }
 }
