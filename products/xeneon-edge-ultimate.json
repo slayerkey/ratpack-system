@@ -5,7 +5,7 @@
   "status": "qa_passed",
   "workflow_state": "READY_TO_SHIP",
   "price_usd": 34.99,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "platform": "CORSAIR iCUE / XENEON Edge",
   "source": "widgets/_src/xeneon-edge-ultimate",
   "package": "widgets/xeneon-edge-ultimate",
@@ -15,8 +15,9 @@
     "desk-distance readability and live settings propagation regression coverage",
     "Smart Mode immediate reevaluation regression coverage",
     "Previous, Play-Pause and Next media transport regression coverage",
+    "runtime bootstrap remains interactive when optional iCUE providers initialize late or fail",
     "official CORSAIR CLI validation and .icuewidget packaging",
-    "Corsair Labs exact-package host/settings smoke",
+    "Corsair Labs exact-package host/settings and real mode-click smoke",
     "StreamSpell exact-package preview",
     "all eight XENEON responsive layouts",
     "deterministic Rat Art",
@@ -29,5 +30,5 @@
     "rat_ship_run": 33349022230
   },
   "final_boundary": "Authenticated Maker Console submission through rat ship xeneon-edge-ultimate",
-  "notes": "The final validated XENEON EDGE Ultimate source and shipping trees were reconciled onto canonical main while preserving newer unrelated RatPack work. Marketplace auto-publish remains disabled in submission metadata."
+  "notes": "1.0.1 forces a clean iCUE candidate version after repeated 1.0.0 hardware installs and hardens startup so an optional native provider failure cannot strand the dashboard in a static non-interactive state. Marketplace auto-publish remains disabled in submission metadata."
 }
