@@ -14,11 +14,13 @@ on:
 jobs:
   windows-v08-prepromotion:
     runs-on: windows-latest
-    timeout-minutes: 14
+    timeout-minutes: 16
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -29,25 +31,56 @@ jobs:
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-app-audio-adapter.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/plugin-v08-shadow.cjs
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-runtime-smoke.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/runtime-factory.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/streamdeck-bridge.js
           node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/worker-client.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js
           node --check products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js
 
-      - name: v0.8 staging PowerShell syntax
+      - name: v0.8 staging and promotion PowerShell syntax
         shell: powershell
         run: |
           foreach ($file in @(
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-v08-candidate.ps1',
+            'products/stream-deck-ultimate-bundle/experiments/per-app-audio/promote-v08.ps1',
             'products/stream-deck-ultimate-bundle/experiments/per-app-audio/app-audio-worker.ps1'
           )) {
             $errors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$errors)
             if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
           }
-          Write-Host 'v0.8 prepromotion PowerShell syntax parsed'
+          Write-Host 'v0.8 prepromotion and guarded promotion PowerShell syntax parsed'
+
+      - name: Promotion guard rejects pending approval and allows plan only after full approval
+        shell: powershell
+        run: |
+          $script = 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/promote-v08.ps1'
+          $template = 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/hardware-approval-v08.template.json'
+          $blocked = $false
+          try { & $script -ApprovalPath $template | Out-Null } catch { $blocked = $true; Write-Host "pending approval correctly blocked: $($_.Exception.Message)" }
+          if (-not $blocked) { throw 'Pending hardware approval unexpectedly opened production promotion gate' }
+
+          $approval = Get-Content -LiteralPath $template -Raw | ConvertFrom-Json
+          $approval.hostTest.result = 'pass'
+          $approval.hostTest.writeAndRestorePass = $true
+          $approval.labTest.result = 'pass'
+          foreach ($gate in @(
+            'currentAppFollowsForeground','specificAppTargetsSelectedProcess','keypadMuteToggle','dialVolume',
+            'dialPushMuteToggle','waitingStateSafe','audioOffStateSafe','focusChangeDoesNotRetargetBurst',
+            'propertyInspectorAppList','manualProcessName','labRemovalLeavesV071Unaffected'
+          )) { $approval.labTest.$gate = $true }
+          $approval.allowProductionPromotion = $true
+          $approval.approvedAt = '2026-08-31T00:00:00Z'
+          $approved = Join-Path $env:RUNNER_TEMP 'v08-hardware-approval-ci.json'
+          [IO.File]::WriteAllText($approved, ($approval | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+          $plan = (& $script -ApprovalPath $approved) | ConvertFrom-Json
+          if (-not $plan.ok -or $plan.mode -ne 'plan' -or -not $plan.hardwareGatesPassed -or -not $plan.sourceStillMatchesApprovedCandidate) {
+            throw 'Fully approved promotion record did not produce the expected read-only plan'
+          }
+          git diff --exit-code -- products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+          Write-Host 'promotion guard passed: pending blocks; complete approval yields plan without touching canonical source'
 
       - name: Build precompiled App Volume helper
         shell: powershell
@@ -122,6 +155,10 @@ jobs:
       - name: Combined frozen-core plus lazy App Volume runtime
         shell: powershell
         run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/v08-candidate-runtime-smoke.js "$env:PACKRAT_V08_CANDIDATE"
+
+      - name: Seeded v0.7.1 to v0.8 upgrade regression
+        shell: powershell
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js "$env:PACKRAT_V08_CANDIDATE"
 
       - name: Verify Windows-staged v0.8 contract and helper
         shell: powershell
