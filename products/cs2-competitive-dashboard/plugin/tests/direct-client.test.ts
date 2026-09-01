@@ -75,10 +75,35 @@ test("loads current Leetify v3 profile shape and FACEIT directly with customer k
         games: { cs2: { faceit_elo: 1743, skill_level: 8, region: "EU" } }
       });
     }
-    if (url.includes("/stats/cs2")) {
+    if (url.includes("/players/faceit-player/stats/cs2")) {
       return json({ lifetime: { "Average K/D Ratio": "1.21", "Average Headshots %": "52", "Win Rate %": "54" } });
     }
-    if (url.includes("/history?")) return json({ items: [] });
+    if (url.includes("/players/faceit-player/history?")) {
+      return json({
+        items: [{
+          match_id: "faceit-recent-1",
+          finished_at: 1788109200,
+          results: {
+            winner: "faction1",
+            score: { faction1: 13, faction2: 9 }
+          },
+          teams: {
+            faction1: {
+              players: [
+                { player_id: "faceit-player", nickname: "Rat" },
+                { player_id: "teammate", nickname: "Mouse" }
+              ]
+            },
+            faction2: {
+              players: [{ player_id: "opponent", nickname: "Cat" }]
+            }
+          }
+        }]
+      });
+    }
+    if (url.includes("/matches/faceit-recent-1/stats")) {
+      return json({ rounds: [{ round_stats: { Map: "de_ancient", Region: "EU", Score: "13 / 9" } }] });
+    }
     throw new Error(`unexpected URL ${url}`);
   };
 
@@ -98,6 +123,48 @@ test("loads current Leetify v3 profile shape and FACEIT directly with customer k
   assert.equal(result.faceit.elo, 1743);
   assert.equal(result.faceit.level, 8);
   assert.equal(result.faceit.kd, 1.21);
+  assert.deepEqual(result.faceit.recentRecord, { wins: 1, losses: 0 });
+  assert.equal(result.faceit.recentMatches[0]?.outcome, "WIN");
+  assert.equal(result.faceit.recentMatches[0]?.score, "13-9");
+  assert.equal(result.faceit.recentMatches[0]?.mapName, "de_ancient");
+});
+
+test("keeps FACEIT history usable when latest match map enrichment is unavailable", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("open.faceit.com/data/v4/players?")) {
+      return json({
+        player_id: "faceit-player",
+        nickname: "Rat",
+        faceit_url: "https://www.faceit.com/{lang}/players/Rat",
+        games: { cs2: { faceit_elo: 1743, skill_level: 8, region: "EU" } }
+      });
+    }
+    if (url.includes("/players/faceit-player/stats/cs2")) return json({ lifetime: {} });
+    if (url.includes("/players/faceit-player/history?")) {
+      return json({
+        items: [{
+          match_id: "faceit-recent-2",
+          finished_at: 1788109200,
+          results: { winner: "faction2", score: { faction1: 7, faction2: 13 } },
+          teams: {
+            faction1: { players: [{ player_id: "opponent" }] },
+            faction2: { players: [{ player_id: "faceit-player" }] }
+          }
+        }]
+      });
+    }
+    if (url.includes("/matches/faceit-recent-2/stats")) return json({ error: "temporarily unavailable" }, 503);
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  const client = new ProviderClient(fetchImpl);
+  const result = await client.getProfile(STEAM_ID, { faceitApiKey: "faceit-user-key" });
+  assert.equal(result.faceit.status, "ready");
+  assert.deepEqual(result.faceit.recentRecord, { wins: 1, losses: 0 });
+  assert.equal(result.faceit.recentMatches[0]?.outcome, "WIN");
+  assert.equal(result.faceit.recentMatches[0]?.score, "13-7");
+  assert.equal(result.faceit.recentMatches[0]?.mapName, "");
 });
 
 test("maps Leetify 200 private profile responses to an explicit private state", async () => {
