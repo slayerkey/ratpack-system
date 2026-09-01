@@ -177,7 +177,17 @@ export class ProviderClient {
 
     const lifetime = statsResult.ok ? (statsResult.body as any)?.lifetime ?? {} : {};
     const history = historyResult.ok ? this.array((historyResult.body as any)?.items) : [];
-    const recentMatches = history.map((match: any) => this.normalizeFaceitHistory(match, playerId));
+    const recentMatches = history
+      .map((match: any) => this.normalizeFaceitHistory(match, playerId))
+      .filter((match: RecentMatchSummary) => match.id);
+
+    const latestMatch = recentMatches[0];
+    if (latestMatch?.id) {
+      const latestStats = await this.faceitJson(`${FACEIT_BASE}/matches/${encodeURIComponent(latestMatch.id)}/stats`, headers, signal);
+      const mapName = latestStats.ok ? this.faceitMapName(latestStats.body) : undefined;
+      if (mapName) recentMatches[0] = { ...latestMatch, mapName };
+    }
+
     const wins = recentMatches.filter((match) => match.outcome === "WIN").length;
     const losses = recentMatches.filter((match) => match.outcome === "LOSS").length;
 
@@ -211,7 +221,10 @@ export class ProviderClient {
     const teams: [string, any][] = match?.teams && typeof match.teams === "object"
       ? Object.entries(match.teams) as [string, any][]
       : [];
-    const playerTeam = teams.find(([, team]) => this.array(team?.roster).some((member: any) => member?.player_id === playerId));
+    const playerTeam = teams.find(([, team]) => {
+      const members = [...this.array(team?.players), ...this.array(team?.roster)];
+      return members.some((member: any) => member?.player_id === playerId);
+    });
     const teamKey = playerTeam?.[0];
     const winner = this.stringValue(match?.results?.winner);
     const outcome = teamKey && winner ? (teamKey === winner ? "WIN" : "LOSS") : undefined;
@@ -225,6 +238,16 @@ export class ProviderClient {
       score,
       finishedAt: this.epochSecondsToIso(this.finiteNumber(match?.finished_at))
     };
+  }
+
+  private faceitMapName(body: unknown): string | undefined {
+    for (const round of this.array((body as any)?.rounds)) {
+      const stats = round?.round_stats;
+      if (!stats || typeof stats !== "object") continue;
+      const mapName = this.stringValue(stats.Map) ?? this.stringValue(stats.map) ?? this.stringValue(stats["Map Name"]) ?? this.stringValue(stats.map_name);
+      if (mapName) return mapName;
+    }
+    return undefined;
   }
 
   private mapLeetifyFailure(status: number): LeetifyData {
