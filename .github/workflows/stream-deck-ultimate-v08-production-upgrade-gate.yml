@@ -1,0 +1,94 @@
+name: Stream Deck Ultimate v0.8 Production Upgrade Gate
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/**'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/accepted-v071-manifest-contract.json'
+      - '.github/workflows/stream-deck-ultimate-v08-production-upgrade-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  production-upgrade-gate:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Read canonical production version
+        id: version
+        shell: powershell
+        run: |
+          $manifestPath = 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/manifest.json'
+          $m = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if ($m.UUID -ne 'com.packrat.stream-deck-ultimate-bundle') { throw "Unexpected production UUID: $($m.UUID)" }
+          "version=$($m.Version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "canonical production version=$($m.Version) CodePath=$($m.CodePath) actions=$(@($m.Actions).Count)"
+
+      - name: v0.7.1 remains accepted and gate stays dormant
+        if: steps.version.outputs.version == '0.7.1.0'
+        shell: powershell
+        run: |
+          $m = Get-Content -LiteralPath 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/manifest.json' -Raw | ConvertFrom-Json
+          if ($m.CodePath -ne 'bin/plugin-v071.cjs') { throw "v0.7.1 canonical CodePath drifted: $($m.CodePath)" }
+          if (@($m.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' }).Count -ne 0) { throw 'Accepted v0.7.1 unexpectedly contains App Volume' }
+          Write-Host 'v0.8 production upgrade gate dormant: canonical v0.7.1 remains frozen'
+
+      - name: Reject unknown canonical version
+        if: steps.version.outputs.version != '0.7.1.0' && steps.version.outputs.version != '0.8.0.0'
+        shell: powershell
+        run: throw "Production Upgrade Gate supports only canonical v0.7.1 or v0.8.0.0, saw ${{ steps.version.outputs.version }}"
+
+      - name: Install canonical v0.8 runtime dependency
+        if: steps.version.outputs.version == '0.8.0.0'
+        working-directory: products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+      - name: Verify promoted v0.8 production identity
+        if: steps.version.outputs.version == '0.8.0.0'
+        shell: powershell
+        run: |
+          $root = 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin'
+          $m = Get-Content -LiteralPath (Join-Path $root 'manifest.json') -Raw | ConvertFrom-Json
+          if ($m.CodePath -ne 'bin/plugin-v08.cjs') { throw "Promoted v0.8 CodePath mismatch: $($m.CodePath)" }
+          if (@($m.Actions).Count -ne 16) { throw "Promoted v0.8 must contain 16 actions, found $(@($m.Actions).Count)" }
+          if (@($m.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' }).Count -ne 1) { throw 'Promoted v0.8 must contain exactly one App Volume action' }
+          foreach ($rel in @(
+            'bin/plugin-v08.cjs',
+            'bin/lib-v08-app-audio.js',
+            'bin/app-audio/PackRatAppAudio.dll',
+            'bin/app-audio/app-audio-worker.ps1',
+            'ui/property-inspector-app-volume.html'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $root $rel))) { throw "Promoted v0.8 file missing: $rel" }
+          }
+          if (@(Get-ChildItem -Recurse -File -LiteralPath $root | Where-Object { $_.Extension -eq '.cs' }).Count -ne 0) { throw 'Promoted v0.8 must not ship C# source' }
+          Write-Host 'promoted v0.8 production identity and source-free helper contract verified'
+
+      - name: Syntax check promoted v0.8 runtime
+        if: steps.version.outputs.version == '0.8.0.0'
+        run: |
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/plugin-v08.cjs
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/lib-v08-app-audio.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/app-audio/runtime-factory.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/app-audio/streamdeck-bridge.js
+          node --check products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin/bin/app-audio/worker-client.js
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js
+
+      - name: Mandatory v0.7.1 to production v0.8 upgrade regression
+        if: steps.version.outputs.version == '0.8.0.0'
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_CONTEXT_PROCESS: 'chrome'
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
