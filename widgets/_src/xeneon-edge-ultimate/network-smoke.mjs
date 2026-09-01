@@ -24,11 +24,12 @@ const report = {
   providers: {},
   liveSettings: {},
   mediaTransport: {},
+  bootResilience: {},
   slots: [],
   runtimeErrors: [],
 };
 
-function initFixture() {
+function initFixture(options = {}) {
   globalThis.uniqueId = 'ultimate-package-smoke';
   globalThis.iCUE = { isPreview: false };
   globalThis.preset = 'everyday';
@@ -47,6 +48,7 @@ function initFixture() {
   globalThis.accentColor = '#2BE86A';
   globalThis.backgroundColor = '#07090D';
   globalThis.tr = async value => value;
+  globalThis.__stalledSensorRequests = 0;
   try { localStorage.clear(); } catch {}
 
   function signal() {
@@ -79,6 +81,9 @@ function initFixture() {
     getSensorKind: id => sensorMeta[id]?.[4] || '',
     getSensorValue: id => sensorValues[id] ?? null,
   });
+  if (options.stallSensors) {
+    sensors.getAllSensorIds = () => { globalThis.__stalledSensorRequests += 1; };
+  }
   const fps = makeAsync({
     getFpsAvailable: () => true,
     getCurrentFps: () => 237,
@@ -105,7 +110,7 @@ try {
   for (let index = 0; index < SLOTS.length; index += 1) {
     const [slot, width, height] = SLOTS[index];
     const context = await browser.newContext({ viewport: { width, height } });
-    await context.addInitScript(initFixture);
+    await context.addInitScript(initFixture, { stallSensors: false });
     const page = await context.newPage();
     const localErrors = [];
     page.on('pageerror', error => localErrors.push(`pageerror: ${String(error)}`));
@@ -180,8 +185,6 @@ try {
       await page.waitForFunction(() => document.getElementById('gpuTemp')?.textContent?.trim() === '67', { timeout: 2000 });
     }
 
-    // Mode changes intentionally cross-fade for 220ms. Wait for that visual state to
-    // settle before treating screen visibility as a responsive-layout invariant.
     await page.waitForFunction(() => {
       const screens = [...document.querySelectorAll('.screen')];
       const visible = screens.filter(el => Number.parseFloat(getComputedStyle(el).opacity || '0') > 0.01);
@@ -228,6 +231,57 @@ try {
     }
     await context.close();
   }
+
+  // A real iCUE provider can initialize late. Deliberately leave sensor discovery
+  // unresolved and prove the shell becomes interactive before ask() reaches its 3.5s timeout.
+  const stalledContext = await browser.newContext({ viewport: { width: 840, height: 344 } });
+  await stalledContext.addInitScript(initFixture, { stallSensors: true });
+  const stalledPage = await stalledContext.newPage();
+  const stalledErrors = [];
+  stalledPage.on('pageerror', error => stalledErrors.push(`pageerror: ${String(error)}`));
+  stalledPage.on('console', message => { if (message.type() === 'error') stalledErrors.push(`console: ${message.text()}`); });
+  const bootStartedAt = Date.now();
+  await stalledPage.goto(pathToFileURL(path.resolve(entry)).href, { waitUntil: 'load', timeout: 30_000 });
+  await stalledPage.waitForFunction(() =>
+    document.body?.getAttribute('data-runtime') === 'ready' &&
+    globalThis.state?.started === true &&
+    globalThis.state?.uiBound === true &&
+    globalThis.state?.timersStarted === true,
+  { timeout: 1200 });
+  await stalledPage.locator('.navButton[data-mode-target="performance"]').click();
+  await stalledPage.waitForFunction(() => document.body?.getAttribute('data-mode') === 'performance', { timeout: 500 });
+  await stalledPage.locator('.navButton[data-mode-target="today"]').click();
+  await stalledPage.waitForFunction(() => document.body?.getAttribute('data-mode') === 'today', { timeout: 500 });
+  await stalledPage.locator('.navButton[data-mode-target="ambient"]').click();
+  await stalledPage.waitForFunction(() => document.body?.getAttribute('data-mode') === 'ambient', { timeout: 500 });
+  await stalledPage.locator('.navButton[data-mode-target="home"]').click();
+  await stalledPage.waitForFunction(() => document.body?.getAttribute('data-mode') === 'home', { timeout: 500 });
+  await stalledPage.evaluate(() => { globalThis.pinnedNote = 'Provider stall did not freeze shell'; });
+  await stalledPage.waitForFunction(() => document.getElementById('noteText')?.textContent?.trim() === 'Provider stall did not freeze shell', { timeout: 1000 });
+  const bootElapsedMs = Date.now() - bootStartedAt;
+  report.bootResilience = await stalledPage.evaluate(elapsedMs => ({
+    elapsedMs,
+    runtime: document.body?.getAttribute('data-runtime'),
+    started: globalThis.state?.started === true,
+    uiBound: globalThis.state?.uiBound === true,
+    timersStarted: globalThis.state?.timersStarted === true,
+    mode: document.body?.getAttribute('data-mode'),
+    note: document.getElementById('noteText')?.textContent?.trim() || '',
+    stalledSensorRequests: globalThis.__stalledSensorRequests || 0,
+  }), bootElapsedMs);
+  report.runtimeErrors.push(...stalledErrors.map(error => `stalled-provider: ${error}`));
+  await stalledPage.screenshot({ path: path.join(outDir, 'stalled-provider-boot.png') });
+  await stalledContext.close();
+
+  if (bootElapsedMs >= 3200) throw new Error(`shell waited too long for stalled sensor provider: ${bootElapsedMs}ms`);
+  if (report.bootResilience.stalledSensorRequests < 1) throw new Error(`stalled sensor fixture was not exercised: ${JSON.stringify(report.bootResilience)}`);
+  if (!report.bootResilience.started || !report.bootResilience.uiBound || !report.bootResilience.timersStarted || report.bootResilience.runtime !== 'ready') {
+    throw new Error(`shell did not become ready while sensor discovery was stalled: ${JSON.stringify(report.bootResilience)}`);
+  }
+  if (report.bootResilience.mode !== 'home' || report.bootResilience.note !== 'Provider stall did not freeze shell') {
+    throw new Error(`touch/settings stopped responding while sensor discovery was stalled: ${JSON.stringify(report.bootResilience)}`);
+  }
+  if (stalledErrors.length) throw new Error(`stalled provider boot produced runtime errors: ${JSON.stringify(stalledErrors)}`);
 
   if (!/\b\d+\s*ms\b/i.test(String(report.network.text || ''))) {
     throw new Error(`live HTTPS response timing did not produce a reading: ${JSON.stringify(report.network)}`);
