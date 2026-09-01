@@ -313,7 +313,7 @@ export class DashboardRuntime {
       this.updateStatus({
         cs2Running,
         gsiConfigured: true,
-        gsiRestartRequired: false,
+        gsiRestartRequired: cs2Running && !alreadyConnected,
         setupStage: "ready",
         detectedCs2Path: installed.cs2.installDir,
         listenerPort: port,
@@ -395,7 +395,7 @@ export class DashboardRuntime {
     lines.push(`Manual override: ${manualPath || "<automatic detection>"}`);
     lines.push(`Saved CS2 path: ${this.globals.cs2InstallPath || "<none>"}`);
     lines.push(`Saved GSI config: ${this.globals.gsiConfigPath || "<none>"}`);
-    lines.push(`Runtime listener: ${this.server.listening ? `LISTENING on ${this.server.port}` : "stopped"}`);
+    lines.push(`Runtime listener: ${this.server.listening ? `LISTENING on 127.0.0.1:${this.server.port}` : "stopped"}`);
     lines.push(`Runtime GSI connected: ${this.store.get().status.gsiConnected ? "yes" : "no"}`);
     lines.push("");
 
