@@ -1,0 +1,139 @@
+name: Stream Deck Ultimate v0.8 Promotion Mechanics CI
+
+on:
+  push:
+    branches:
+      - product/stream-deck-ultimate-bundle
+    paths:
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/promote-v08.ps1'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/prepare-v08-candidate.ps1'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/build-helper.ps1'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/hardware-approval-v08.template.json'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js'
+      - 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/accepted-v071-manifest-contract.json'
+      - '.github/workflows/stream-deck-ultimate-v08-promotion-mechanics-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  disposable-full-apply:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Promotion tool syntax
+        shell: powershell
+        run: |
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/promote-v08.ps1'),
+            [ref]$null,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          node --check products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js
+
+      - name: Create synthetic complete hardware approval for disposable CI clone
+        shell: powershell
+        run: |
+          $template = 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/hardware-approval-v08.template.json'
+          $approval = Get-Content -LiteralPath $template -Raw | ConvertFrom-Json
+          $approval.hostTest.result = 'pass'
+          $approval.hostTest.writeAndRestorePass = $true
+          $approval.hostTest.process = 'CI-SYNTHETIC-NOT-HARDWARE'
+          $approval.labTest.result = 'pass'
+          foreach ($gate in @(
+            'currentAppFollowsForeground','specificAppTargetsSelectedProcess','keypadMuteToggle','dialVolume',
+            'dialPushMuteToggle','waitingStateSafe','audioOffStateSafe','focusChangeDoesNotRetargetBurst',
+            'propertyInspectorAppList','manualProcessName','labRemovalLeavesV071Unaffected'
+          )) { $approval.labTest.$gate = $true }
+          $approval.labTest.notes = 'Synthetic CI approval used only against disposable canonical clone.'
+          $approval.allowProductionPromotion = $true
+          $approval.approvedAt = '2026-09-01T00:00:00Z'
+          $approval.approvedBy = 'ci-disposable-clone'
+          $path = Join-Path $env:RUNNER_TEMP 'v08-ci-full-approval.json'
+          [IO.File]::WriteAllText($path, ($approval | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+          "PACKRAT_APPROVAL=$path" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Clone accepted canonical source into disposable directory
+        shell: powershell
+        run: |
+          $real = (Resolve-Path 'products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin').Path
+          $tempRoot = Join-Path $env:RUNNER_TEMP 'packrat-v08-promotion-mechanics'
+          $clone = Join-Path $tempRoot 'com.packrat.stream-deck-ultimate-bundle.sdPlugin'
+          $stage = Join-Path $tempRoot 'stage'
+          if (Test-Path -LiteralPath $tempRoot) { Remove-Item -Recurse -Force -LiteralPath $tempRoot }
+          New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+          Copy-Item -Recurse -Force -LiteralPath $real -Destination $clone
+          $before = Get-Content -LiteralPath (Join-Path $clone 'manifest.json') -Raw | ConvertFrom-Json
+          if ($before.Version -ne '0.7.1.0' -or $before.CodePath -ne 'bin/plugin-v071.cjs') { throw 'Disposable clone did not start from accepted v0.7.1' }
+          "PACKRAT_REAL_CANONICAL=$real" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKRAT_DISPOSABLE_CANONICAL=$clone" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PACKRAT_PROMOTION_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Full guarded v0.8 apply against disposable canonical clone
+        shell: powershell
+        run: |
+          $json = & 'products/stream-deck-ultimate-bundle/experiments/per-app-audio/promote-v08.ps1' `
+            -ApprovalPath $env:PACKRAT_APPROVAL `
+            -CanonicalDir $env:PACKRAT_DISPOSABLE_CANONICAL `
+            -OutputRoot $env:PACKRAT_PROMOTION_STAGE `
+            -Apply
+          $result = $json | ConvertFrom-Json
+          if (-not $result.ok -or $result.mode -ne 'apply' -or -not $result.canonicalPromoted) { throw "Disposable apply failed: $json" }
+          if (-not $result.canonicalOverride) { throw 'Disposable CI apply was not marked as canonical override' }
+          if ([string]::IsNullOrWhiteSpace([string]$result.helperSha256)) { throw 'Disposable promotion result missing helper hash' }
+          Write-Host "disposable full apply passed helper=$($result.helperSha256)"
+
+      - name: Verify disposable clone promoted while real canonical stayed frozen
+        shell: powershell
+        run: |
+          $promoted = Get-Content -LiteralPath (Join-Path $env:PACKRAT_DISPOSABLE_CANONICAL 'manifest.json') -Raw | ConvertFrom-Json
+          if ($promoted.UUID -ne 'com.packrat.stream-deck-ultimate-bundle') { throw 'Disposable promoted UUID changed' }
+          if ($promoted.Version -ne '0.8.0.0' -or $promoted.CodePath -ne 'bin/plugin-v08.cjs') { throw 'Disposable clone did not become v0.8' }
+          if (@($promoted.Actions).Count -ne 16) { throw "Disposable promoted action count mismatch: $(@($promoted.Actions).Count)" }
+          if (@($promoted.Actions | Where-Object { $_.UUID -eq 'com.packrat.stream-deck-ultimate-bundle.app-audio' }).Count -ne 1) { throw 'Disposable promoted clone missing App Volume' }
+          if (-not (Test-Path -LiteralPath (Join-Path $env:PACKRAT_DISPOSABLE_CANONICAL 'bin\app-audio\PackRatAppAudio.dll'))) { throw 'Disposable promoted clone missing helper DLL' }
+          if (@(Get-ChildItem -Recurse -File -LiteralPath $env:PACKRAT_DISPOSABLE_CANONICAL | Where-Object { $_.Extension -eq '.cs' }).Count -ne 0) { throw 'Disposable promoted clone contains C# source' }
+
+          $real = Get-Content -LiteralPath (Join-Path $env:PACKRAT_REAL_CANONICAL 'manifest.json') -Raw | ConvertFrom-Json
+          if ($real.Version -ne '0.7.1.0' -or $real.CodePath -ne 'bin/plugin-v071.cjs') { throw 'REAL canonical source changed during disposable promotion test' }
+          git diff --exit-code -- products/stream-deck-ultimate-bundle/prototype/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+          Write-Host 'real canonical v0.7.1 remained byte-clean during full disposable -Apply'
+
+      - name: Install promoted disposable runtime dependency
+        shell: powershell
+        run: |
+          Push-Location $env:PACKRAT_DISPOSABLE_CANONICAL
+          try { npm ci --omit=dev --ignore-scripts --no-audit --no-fund } finally { Pop-Location }
+
+      - name: Upgrade regression against actual -Apply result
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_CONTEXT_PROCESS: 'chrome'
+        run: node products/stream-deck-ultimate-bundle/experiments/per-app-audio/upgrade-regression-v08.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+
+      - name: Frozen core regressions against actual -Apply result
+        env:
+          PACKRAT_AUDIO_MOCK: '1'
+          PACKRAT_APP_AUDIO_MOCK: '1'
+          PACKRAT_CONTEXT_MOCK: '1'
+          PACKRAT_CONTEXT_PROCESS: 'chrome'
+          PACKRAT_DIAGNOSTICS_MOCK: '1'
+        run: |
+          node products/stream-deck-ultimate-bundle/prototype/tools/v06_product_logic_test.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+          node products/stream-deck-ultimate-bundle/prototype/tools/context_logic_test_v7.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+          node products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_logic_test_v71.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+          node products/stream-deck-ultimate-bundle/prototype/tools/runtime_smoke_test_v6.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+          node products/stream-deck-ultimate-bundle/prototype/tools/context_smoke_test_v7.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
+          node products/stream-deck-ultimate-bundle/prototype/tools/diagnostics_smoke_test_v71.js "$env:PACKRAT_DISPOSABLE_CANONICAL"
