@@ -1,0 +1,44 @@
+name: Lite Pro Portfolio Audit
+
+on:
+  pull_request:
+    paths:
+      - 'products/index.json'
+      - 'products/lite-pro-map.json'
+      - 'widgets/**'
+      - 'plugins/**'
+      - 'tools/lite_pro_audit.py'
+      - '.github/workflows/lite-pro-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'products/index.json'
+      - 'products/lite-pro-map.json'
+      - 'widgets/**'
+      - 'plugins/**'
+      - 'tools/lite_pro_audit.py'
+  workflow_dispatch:
+    inputs:
+      shipping_lite_id:
+        description: 'Optional Lite product id for strict shipping preflight'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Portfolio relationship audit
+        run: python tools/lite_pro_audit.py
+      - name: Strict shipping preflight
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.shipping_lite_id != '' }}
+        env:
+          LITE_ID: ${{ inputs.shipping_lite_id }}
+        run: python tools/lite_pro_audit.py --shipping "$LITE_ID"
