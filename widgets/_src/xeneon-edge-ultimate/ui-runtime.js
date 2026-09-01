@@ -102,24 +102,22 @@ async function start() {
         {start:new Date(now+160*60000),end:new Date(now+220*60000),summary:"Deep work block",location:"",allDay:false}
       ];
       state.calendar.ready = true;
-    } else {
-      await optionalRuntime("discover sensors", discoverSensors);
     }
 
-    // The shell must be interactive even when one optional native provider is absent,
-    // late, or throws during host startup. Mark the runtime ready before provider I/O.
+    // Nothing supplied by the native host is allowed to block the shell. The UI,
+    // navigation, clock and timers become ready first; every provider starts later
+    // through optionalRuntime and may fail independently without freezing the widget.
     renderAll();
     startTimers();
     state.started = true;
     state.startAttempts = 0;
     document.body.setAttribute("data-runtime", "ready");
 
-    await Promise.all([
-      optionalRuntime("initial sensor poll", pollSensors),
-      optionalRuntime("initial FPS poll", pollFps),
-      optionalRuntime("initial media poll", pollMedia),
-      optionalRuntime("initial network probe", probeNetwork)
-    ]);
+    if (!state.preview) optionalRuntime("discover sensors", discoverSensors);
+    optionalRuntime("initial sensor poll", pollSensors);
+    optionalRuntime("initial FPS poll", pollFps);
+    optionalRuntime("initial media poll", pollMedia);
+    optionalRuntime("initial network probe", probeNetwork);
     optionalRuntime("initial weather refresh", function(){ return refreshWeather(true); });
     optionalRuntime("initial calendar refresh", function(){ return refreshCalendar(true); });
     renderAll();
