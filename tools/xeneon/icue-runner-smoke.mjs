@@ -32,7 +32,7 @@ function containsValue(object, expected) {
 }
 
 const report = {
-  schema_version: 3,
+  schema_version: 4,
   runner: "Corsair-Labs/iCUE-widget-runner-windows",
   runner_url: baseUrl,
   slug,
@@ -44,6 +44,8 @@ const report = {
   updated: null,
   lifecycle_tested: false,
   style_tested: false,
+  interaction_tested: false,
+  interaction: null,
   passed: false,
 };
 
@@ -100,6 +102,35 @@ async function snapshot(frame) {
   });
 }
 
+async function testUltimateInteraction(frame) {
+  await frame.waitForFunction(() => globalThis.state?.started === true, { timeout: 10_000 });
+  const buttons = frame.locator('[data-mode-target]');
+  const count = await buttons.count();
+  if (count < 4) throw new Error(`Ultimate runtime exposed only ${count} mode buttons`);
+
+  const observed = [];
+  for (const mode of ["performance", "today", "ambient", "home"]) {
+    const button = frame.locator(`[data-mode-target="${mode}"]`).first();
+    await button.waitFor({ state: "visible", timeout: 5_000 });
+    await button.click();
+    await frame.waitForFunction((expected) => document.body?.getAttribute("data-mode") === expected, mode, { timeout: 3_000 });
+    observed.push(await frame.evaluate(() => document.body?.getAttribute("data-mode")));
+  }
+
+  const runtime = await frame.evaluate(() => ({
+    started: globalThis.state?.started === true,
+    mode: document.body?.getAttribute("data-mode") || null,
+    autoLabel: document.getElementById("autoLabel")?.textContent?.trim() || null,
+    hasSetMode: typeof globalThis.setMode === "function",
+    hasRenderAll: typeof globalThis.renderAll === "function",
+    navButtons: document.querySelectorAll("[data-mode-target]").length,
+  }));
+  if (!runtime.started || !runtime.hasSetMode || !runtime.hasRenderAll || runtime.mode !== "home") {
+    throw new Error(`Ultimate runtime boot/interaction invariant failed: ${JSON.stringify(runtime)}`);
+  }
+  return { observedModes: observed, runtime };
+}
+
 let exitCode = 0;
 try {
   const url = new URL(baseUrl);
@@ -129,6 +160,11 @@ try {
     if (!report.initial.hasOnDataUpdated) {
       throw new Error(`widget declares ${report.initial.declared.length} iCUE properties but does not expose icueEvents.onDataUpdated`);
     }
+  }
+
+  if (slug === "xeneon-edge-ultimate") {
+    report.interaction_tested = true;
+    report.interaction = await testUltimateInteraction(frame);
   }
 
   await page.screenshot({ path: path.join(outDir, `${slug}-runner-before.png`), fullPage: true });
@@ -177,6 +213,9 @@ try {
 
   if (!report.initial.bodyState) throw new Error("runner loaded widget without a document body state snapshot");
   if (pageErrors.length) throw new Error(`runner page errors: ${JSON.stringify(pageErrors)}`);
+  if (slug === "xeneon-edge-ultimate" && consoleErrors.length) {
+    throw new Error(`Ultimate runner console errors: ${JSON.stringify(consoleErrors)}`);
+  }
   await page.screenshot({ path: path.join(outDir, `${slug}-runner-after.png`), fullPage: true });
   report.passed = true;
 } catch (error) {
