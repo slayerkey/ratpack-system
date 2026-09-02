@@ -1,6 +1,16 @@
 {
   "schema_version": 2,
   "accent": "#F2B14B",
+  "environment_hero": {
+    "enabled": true,
+    "scene": "warm-studio-v1",
+    "shot": "XL_H.png",
+    "title": "PC POWER",
+    "accent_title": "METER",
+    "subtitle": "for XENEON Edge",
+    "accent": "#F27900",
+    "brand": true
+  },
   "hero": {
     "title_mode": "use_case",
     "label": "PC POWER",
