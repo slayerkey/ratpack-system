@@ -41,7 +41,7 @@ jobs:
             --status published \
             --json-out artifacts/catalog/published-source-audit.json \
             --md-out artifacts/catalog/published-source-audit.md
-          python -m py_compile tools/art/marketplace_catalog_audit.py tools/art/marketplace_catalog_contact_sheet.py
+          python -m py_compile tools/art/marketplace_catalog_audit.py tools/art/marketplace_catalog_contact_sheet.py tools/art/render_environment_product.py tools/art/render_environment_hero.py
 
       - name: Upload catalog source audit
         uses: actions/upload-artifact@v4
@@ -96,7 +96,14 @@ jobs:
 
       - name: Render Marketplace Listing V2 candidate
         shell: pwsh
-        run: python tools/art/rat_art.py xeneon $env:WIDGET_SLUG --shots "artifacts/marketplace-v2/$env:WIDGET_SLUG/shots" --out "artifacts/marketplace-v2/$env:WIDGET_SLUG/review"
+        run: |
+          $shots = "artifacts/marketplace-v2/$env:WIDGET_SLUG/shots"
+          $out = "artifacts/marketplace-v2/$env:WIDGET_SLUG/review"
+          if ($env:WIDGET_SLUG -eq 'pc-power-meter-pro') {
+            python tools/art/render_environment_product.py xeneon $env:WIDGET_SLUG --shots $shots --out $out
+          } else {
+            python tools/art/rat_art.py xeneon $env:WIDGET_SLUG --shots $shots --out $out
+          }
 
       - name: Verify V2 contract
         shell: pwsh
@@ -104,8 +111,17 @@ jobs:
           $dir = "artifacts/marketplace-v2/$env:WIDGET_SLUG/review"
           $report = Get-Content "$dir/rat-art-report.json" -Raw | ConvertFrom-Json
           if ($report.image_generation -ne 'disabled') { throw 'Image generation must stay disabled.' }
-          if ($report.design_system -ne 'marketplace-listing-v2') { throw 'Prototype did not render through Marketplace Listing V2.' }
           if ($report.schema_version -ne 4) { throw 'V2 report schema must be 4.' }
+
+          if ($env:WIDGET_SLUG -eq 'pc-power-meter-pro') {
+            if ($report.design_system -ne 'marketplace-listing-v2+environment:warm-studio-v1') { throw 'PC Power Meter Pro did not use the warm studio environment hero.' }
+            if (-not $report.environment_hero.enabled) { throw 'Environment hero report flag missing.' }
+            if ($report.environment_hero.image_generation -ne 'disabled') { throw 'Environment hero must remain deterministic.' }
+            if ($report.environment_hero.scene -ne 'warm-studio-v1') { throw 'Unexpected environment scene.' }
+          } elseif ($report.design_system -ne 'marketplace-listing-v2') {
+            throw 'Prototype did not render through Marketplace Listing V2.'
+          }
+
           if (-not (Test-Path "$dir/contact-sheet.jpg")) { throw 'Missing V2 contact sheet.' }
           if (-not (Test-Path "$dir/thumbnail-sheet.jpg")) { throw 'Missing V2 thumbnail sheet.' }
           foreach ($name in @('1-hero.png','2-showcase.png','3-features.png','4-settings.png','5-sizes.png')) {
