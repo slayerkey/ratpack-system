@@ -78,6 +78,8 @@ That command:
 
 `.github/workflows/marketplace-environment-hero-preview.yml` is a focused environment-only validation workflow for the same product.
 
+CI trigger probe: 2026-09-02. This line exists only to verify that GitHub schedules the PR workflow after the environment renderer integration.
+
 ## Stream Deck
 
 The scene/monitor layer is reusable for Stream Deck, but truthful Stream Deck compositing still requires an approved calibrated Stream Deck hardware plate/key geometry. Do not substitute generated or approximate hardware for that missing calibration.
