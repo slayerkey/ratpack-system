@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'tools/art/render_environment_product.py'
       - 'tools/art/render_environment_hero.py'
       - 'tools/art/scenes/warm-studio-v1/**'
       - 'tools/art/rat_art.py'
@@ -22,63 +23,79 @@ jobs:
       RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
     steps:
       - uses: actions/checkout@v4
-      - name: Check warm studio scene asset
-        id: scene
+
+      - name: Verify canonical warm studio scene
         shell: pwsh
         run: |
-          if (Test-Path 'tools/art/scenes/warm-studio-v1/base.png') {
-            'present=true' >> $env:GITHUB_OUTPUT
-            'Warm studio base.png found.' >> $env:GITHUB_STEP_SUMMARY
-          } else {
-            'present=false' >> $env:GITHUB_OUTPUT
-            'SCENE_ASSET_REQUIRED: add tools/art/scenes/warm-studio-v1/base.png at exactly 1920x960. Preview intentionally skipped until the binary scene plate is committed.' >> $env:GITHUB_STEP_SUMMARY
+          $required = @(
+            'tools/art/scenes/warm-studio-v1/base.png',
+            'tools/art/scenes/warm-studio-v1/geometry.json',
+            'tools/art/scenes/warm-studio-v1/title-style.json'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) { throw "Missing environment scene asset: $path" }
           }
+          Add-Content $env:GITHUB_STEP_SUMMARY 'Warm studio scene assets found.'
+
       - uses: actions/setup-node@v4
-        if: steps.scene.outputs.present == 'true'
         with:
           node-version: '24'
+
       - uses: actions/setup-python@v5
-        if: steps.scene.outputs.present == 'true'
         with:
           python-version: '3.13'
+
       - name: Install deterministic art dependencies
-        if: steps.scene.outputs.present == 'true'
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check Pillow==12.3.0
           npm install --no-save playwright@1.62.1
           npx playwright install chromium
+
       - name: Build PC Power Meter Pro from canonical source
-        if: steps.scene.outputs.present == 'true'
         shell: pwsh
         run: python tools/xeneon/inline.py pc-power-meter-pro
-      - name: Capture real XENEON product state
-        if: steps.scene.outputs.present == 'true'
+
+      - name: Capture real XENEON product states
         shell: pwsh
         run: node tools/art/capture_xeneon.mjs pc-power-meter-pro artifacts/environment-hero/shots
-      - name: Render warm studio hero using real capture
-        if: steps.scene.outputs.present == 'true'
+
+      - name: Render complete Rat Art set with environment hero
         shell: pwsh
         run: |
-          python tools/art/render_environment_hero.py `
-            --scene warm-studio-v1 `
+          python tools/art/render_environment_product.py xeneon pc-power-meter-pro `
             --shots artifacts/environment-hero/shots `
-            --shot XL_H.png `
-            --title 'PC POWER' `
-            --accent-title 'METER' `
-            --subtitle 'for XENEON Edge' `
-            --accent '#F2B14B' `
-            --out artifacts/environment-hero/pc-power-meter-pro.png
-      - name: Create 15 percent review image
-        if: steps.scene.outputs.present == 'true'
+            --out artifacts/environment-hero/review
+
+      - name: Verify environment hero integration
         shell: pwsh
         run: |
-          python -c "from PIL import Image; p='artifacts/environment-hero/pc-power-meter-pro.png'; im=Image.open(p).convert('RGB'); im.resize((288,144),Image.Resampling.LANCZOS).save('artifacts/environment-hero/pc-power-meter-pro-15pct.jpg',quality=96)"
-      - name: Upload preview
-        if: steps.scene.outputs.present == 'true'
+          $required = @(
+            '1-hero.png',
+            '2-showcase.png',
+            '3-features.png',
+            '4-settings.png',
+            '5-sizes.png',
+            'contact-sheet.jpg',
+            'thumbnail-sheet.jpg',
+            'rat-art-report.json'
+          )
+          foreach ($name in $required) {
+            $path = "artifacts/environment-hero/review/$name"
+            if (-not (Test-Path $path)) { throw "Missing final Rat Art output: $name" }
+          }
+
+          $report = Get-Content 'artifacts/environment-hero/review/rat-art-report.json' -Raw | ConvertFrom-Json
+          if (-not $report.environment_hero.enabled) { throw 'environment_hero report flag is not enabled' }
+          if ($report.environment_hero.scene -ne 'warm-studio-v1') { throw 'unexpected environment hero scene' }
+          if ($report.environment_hero.image_generation -ne 'disabled') { throw 'environment hero must remain deterministic' }
+          if ($report.design_system -notlike '*environment:warm-studio-v1*') { throw 'environment design system was not recorded' }
+          Add-Content $env:GITHUB_STEP_SUMMARY 'Environment hero rendered from real XENEON capture with image generation disabled.'
+
+      - name: Upload final environment Rat Art set
         uses: actions/upload-artifact@v4
         with:
           name: marketplace-environment-hero-preview
-          path: artifacts/environment-hero/
+          path: artifacts/environment-hero/review/
           if-no-files-found: error
           retention-days: 30
