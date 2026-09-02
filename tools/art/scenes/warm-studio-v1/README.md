@@ -70,15 +70,13 @@ That command:
 
 ## Product geometry
 
-`geometry.json` currently defines the XENEON hero box as approximately the full lower half of the marketplace canvas. The calibrated box is intentionally around 96% of canvas width so the real display remains readable even after marketplace thumbnail reduction.
+`geometry.json` intentionally gives the XENEON enough vertical room to preserve the calibrated hardware aspect ratio at approximately 96% of the full marketplace canvas width. The product overlaps the lower monitor naturally while the approved title stack remains fully readable above it.
 
 ## CI
 
-`.github/workflows/marketplace-listing-v2-ci.yml` now uses the environment-product integration automatically for `pc-power-meter-pro` while the other prototype products continue through ordinary Marketplace Listing V2 rendering.
+`.github/workflows/marketplace-listing-v2-ci.yml` uses the environment-product integration automatically for `pc-power-meter-pro` while the other prototype products continue through ordinary Marketplace Listing V2 rendering.
 
 `.github/workflows/marketplace-environment-hero-preview.yml` is a focused environment-only validation workflow for the same product.
-
-CI trigger probe: 2026-09-02. This line exists only to verify that GitHub schedules the PR workflow after the environment renderer integration.
 
 ## Stream Deck
 
