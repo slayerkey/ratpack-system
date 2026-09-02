@@ -1,1 +1,0 @@
-The approved environment image was uploaded by the user as `base (1).png`. The repository wiring normalizes it to the canonical scene asset path `base.png` without modifying the underlying image bytes.
