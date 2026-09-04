@@ -70,13 +70,37 @@ function normalizePrefs(raw) {
 function readPreferenceIndex() {
     try {
         var parsed = JSON.parse(localStorage.getItem(LEGACY_PREFS_INDEX_KEY));
-        return parsed && typeof parsed === "object" ? parsed : {};
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     } catch (e) { return {}; }
+}
+
+/* Keep a sensor-signature backup in addition to the iCUE instance UUID record.
+ * Real iCUE can recreate a widget webview with a fresh instance storage identity;
+ * without this backup a valid Bar/Radial/Readout choice and custom min/max would
+ * silently fall back to Graph + Auto. 1.4.1 already read this index but stopped
+ * writing new preferences into it. */
+function writePreferenceIndex(payload) {
+    if (!payload || typeof payload !== "object" || !payload.signature) return;
+    try {
+        var index = readPreferenceIndex();
+        index[payload.signature] = payload;
+
+        /* Bound old sensor-set snapshots so changing hardware/configuration cannot
+         * grow localStorage forever. Keep the newest twelve signatures. */
+        var keys = Object.keys(index);
+        if (keys.length > 12) {
+            keys.sort(function (a, b) {
+                return Number(index[b] && index[b].at || 0) - Number(index[a] && index[a].at || 0);
+            });
+            for (var i = 12; i < keys.length; i++) delete index[keys[i]];
+        }
+        localStorage.setItem(LEGACY_PREFS_INDEX_KEY, JSON.stringify(index));
+    } catch (e) { }
 }
 
 function preferencePayload() {
     return {
-        version: 3,
+        version: 4,
         at: Date.now(),
         signature: sensorSignature(),
         sensorPrefs: normalizePrefs(sensorPrefs),
@@ -89,10 +113,14 @@ function persistPreferences() {
     var payload = preferencePayload();
     sensorPrefs = payload.sensorPrefs;
     prefsStore.write(payload);
+    writePreferenceIndex(payload);
 }
 
 function applySavedPreferences(saved) {
-    if (!saved || typeof saved !== "object") return false;
+    if (!saved || typeof saved !== "object"
+        || !saved.sensorPrefs || typeof saved.sensorPrefs !== "object" || Array.isArray(saved.sensorPrefs)) {
+        return false;
+    }
     sensorPrefs = normalizePrefs(saved.sensorPrefs);
     if (saved.view) {
         fpsState.windowIndex = clamp(Math.round(Number(saved.view.fpsWindow) || 0), 0, FPS_WINDOWS.length - 1);
@@ -103,7 +131,14 @@ function applySavedPreferences(saved) {
 
 function restorePreferences(legacy) {
     var exact = prefsStore ? prefsStore.read(null) : null;
-    if (applySavedPreferences(exact)) return true;
+    if (applySavedPreferences(exact)) {
+        /* Seed the missing 1.4.1 fallback immediately, before a later iCUE webview
+         * recreation has a chance to lose access to this UUID-scoped copy. */
+        var migrated = preferencePayload();
+        prefsStore.write(migrated);
+        writePreferenceIndex(migrated);
+        return true;
+    }
     var previous = readLegacyStore("perf-prefs-v3");
     if (applySavedPreferences(previous)) {
         persistPreferences();
@@ -115,8 +150,7 @@ function restorePreferences(legacy) {
         persistPreferences();
         return true;
     }
-    if (legacy && typeof legacy === "object") {
-        applySavedPreferences(legacy);
+    if (legacy && typeof legacy === "object" && applySavedPreferences(legacy)) {
         persistPreferences();
         return true;
     }
