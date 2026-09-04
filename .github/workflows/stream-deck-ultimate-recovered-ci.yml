@@ -16,23 +16,18 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
-      - name: Stage exact hardware-accepted runtime
+      - name: Stage source + exact seven hardware fixes
         shell: powershell
         run: |
           $lines = @(& 'plugins/stream-deck-ultimate/scripts/stage-runtime.ps1')
-          $lines | ForEach-Object { Write-Host $_ }
-          $json = [string]$lines[-1]
-          $result = $json | ConvertFrom-Json
-          if (-not $result.ok) { throw "Recovered Ultimate stage did not report ok: $json" }
-          if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected staged contract: $json" }
-          if ($result.hardwareFixes -ne 'F1-F7 PASS') { throw "Hardware acceptance gates did not pass: $json" }
-          Write-Host "native runtime staged: version=$($result.version) helper=$($result.helperSha256)"
-
+          $result = $lines[-1] | ConvertFrom-Json
+          if (-not $result.ok) { throw "Recovered Ultimate stage did not report ok: $($lines -join [Environment]::NewLine)" }
+          if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected staged contract" }
+          if ($result.hardwareFixes -ne 'F1-F7 PASS') { throw "Hardware acceptance gates did not pass" }
+          Write-Host "native runtime staged: version=$($result.version) source-built-helper=$($result.helperSha256)"
       - uses: actions/upload-artifact@v4
         with:
           name: stream-deck-ultimate-v1-native-stage
@@ -47,65 +42,53 @@ jobs:
       PLUGIN: plugins/stream-deck-ultimate/.release-stage/com.packrat.stream-deck-ultimate-bundle.sdPlugin
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-
       - uses: actions/download-artifact@v4
         with:
           name: stream-deck-ultimate-v1-native-stage
           path: ${{ env.PLUGIN }}
-
       - name: Install recovered art dependencies
         run: python -m pip install -r plugins/stream-deck-ultimate/authoring/prototype/requirements.txt --disable-pip-version-check --quiet
-
-      - name: Generate accepted profiles and key art
+      - name: Generate and polish recovered key/profile art
         run: |
           python plugins/stream-deck-ultimate/authoring/prototype/tools/generate_prototype_assets_v71.py "$PLUGIN"
           python plugins/stream-deck-ultimate/authoring/prototype/tools/polish_context_art_v7.py "$PLUGIN"
           python plugins/stream-deck-ultimate/scripts/polish_icons.py "$PLUGIN/imgs/keys" --apply
-
+      - name: Restore exact immutable hardware-accepted release slice
+        run: python plugins/stream-deck-ultimate/scripts/apply_accepted_immutable.py "$PLUGIN"
       - name: Apply Elgato white app-list icon correction
         run: python plugins/stream-deck-ultimate/scripts/whiten_manifest_icons.py "$PLUGIN"
-
-      - name: Verify hardware and Marketplace contracts
+      - name: Verify hardware, immutable, key-art and Marketplace contracts
         run: |
           python plugins/stream-deck-ultimate/scripts/verify_hardware_fixes.py "$PLUGIN"
+          python plugins/stream-deck-ultimate/scripts/verify_accepted_immutable.py "$PLUGIN"
+          python plugins/stream-deck-ultimate/scripts/verify_key_art_contract.py "$PLUGIN/imgs/keys"
           python plugins/stream-deck-ultimate/scripts/verify_white_icons.py "$PLUGIN"
           python - <<'PY'
           import json, os
           from pathlib import Path
-          p = Path(os.environ['PLUGIN'])
-          m = json.loads((p/'manifest.json').read_text(encoding='utf-8-sig'))
-          assert m['Name'] == 'Stream Deck Ultimate'
-          assert m['Version'] == '1.0.0.0'
-          assert m['SDKVersion'] == 3
-          assert len(m['Actions']) == 16
-          assert (p/'bin/app-audio/PackRatAppAudio.dll').is_file()
-          print('final source contract passed: v1.0.0.0, SDK3, 16 actions, helper present')
+          p=Path(os.environ['PLUGIN']); m=json.loads((p/'manifest.json').read_text(encoding='utf-8-sig'))
+          assert m['Name']=='Stream Deck Ultimate' and m['Version']=='1.0.0.0' and m['SDKVersion']==3 and len(m['Actions'])==16
+          assert len([x for x in p.rglob('*') if x.is_file()]) == 252
+          print('final recovered tree contract passed: v1.0.0.0, SDK3, 16 actions, 252 files')
           PY
-
       - name: Install locked runtime dependency
         working-directory: ${{ env.PLUGIN }}
         run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
-
       - name: Install Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
-
       - name: Officially validate recovered v1.0 runtime
         run: streamdeck validate "$PLUGIN" --force-update-check
-
       - name: Officially pack recovered v1.0 runtime
         run: |
           mkdir -p plugins/stream-deck-ultimate/dist
           streamdeck pack "$PLUGIN" --output plugins/stream-deck-ultimate/dist --force --no-file-list
           test $(find plugins/stream-deck-ultimate/dist -name '*.streamDeckPlugin' | wc -l) -eq 1
-
       - uses: actions/upload-artifact@v4
         with:
           name: stream-deck-ultimate-v1.0.0-white-icons
@@ -118,45 +101,44 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-
       - name: Install image verifier dependency
         run: python -m pip install pillow --disable-pip-version-check --quiet
-
       - uses: actions/download-artifact@v4
         with:
           name: stream-deck-ultimate-v1.0.0-white-icons
           path: packed
-
-      - name: Inspect exact packed artifact
+      - name: Inspect exact packed artifact contract
         run: |
           python - <<'PY'
-          import io, json, zipfile
+          import io,json,zipfile
           from pathlib import Path
           from PIL import Image
-
-          packages = list(Path('packed').glob('*.streamDeckPlugin'))
-          assert len(packages) == 1, packages
-          package = packages[0]
-          with zipfile.ZipFile(package) as z:
-              names = z.namelist()
-              roots = sorted({name.split('/', 1)[0] for name in names if '/' in name})
-              assert roots == ['com.packrat.stream-deck-ultimate-bundle.sdPlugin'], roots
-              root = roots[0] + '/'
-              manifest = json.loads(z.read(root + 'manifest.json'))
-              assert manifest['Name'] == 'Stream Deck Ultimate'
-              assert manifest['Version'] == '1.0.0.0'
-              assert manifest['SDKVersion'] == 3
-              assert len(manifest['Actions']) == 16
-              bases = {manifest['CategoryIcon']}
-              bases.update(a['Icon'] for a in manifest['Actions'] if a.get('Icon'))
-              files = [root + f'{base}{suffix}.png' for base in bases for suffix in ('', '@2x')]
-              assert len(files) == 32, len(files)
-              for name in files:
-                  image = Image.open(io.BytesIO(z.read(name))).convert('RGBA')
-                  assert all((not a) or (r, g, b) == (255, 255, 255) for r, g, b, a in image.getdata()), name
-          print('packed v1.0.0 artifact contract passed: 16 actions, SDK 3, 32 white app-list icons')
+          packages=list(Path('packed').glob('*.streamDeckPlugin')); assert len(packages)==1,packages
+          with zipfile.ZipFile(packages[0]) as z:
+            names=z.namelist(); roots=sorted({n.split('/',1)[0] for n in names if '/' in n}); assert roots==['com.packrat.stream-deck-ultimate-bundle.sdPlugin'],roots
+            root=roots[0]+'/'; m=json.loads(z.read(root+'manifest.json'))
+            assert m['Name']=='Stream Deck Ultimate' and m['Version']=='1.0.0.0' and m['SDKVersion']==3 and len(m['Actions'])==16
+            bases={m['CategoryIcon']}|{a['Icon'] for a in m['Actions'] if a.get('Icon')}
+            files=[root+f'{b}{s}.png' for b in bases for s in ('','@2x')]; assert len(files)==32
+            for name in files:
+              im=Image.open(io.BytesIO(z.read(name))).convert('RGBA')
+              assert all((not a) or (r,g,b)==(255,255,255) for r,g,b,a in im.getdata()),name
+            from hashlib import sha256
+            expected={
+              'profiles/Stream Deck Ultimate - Audio & Modes.streamDeckProfile':'0e71a396a718adeae307b989455a42f137ad86ca85dd2c167069ba54170b055b',
+              'profiles/Stream Deck Ultimate - Home.streamDeckProfile':'cf8786a18b7acba1bd15369476b27e962ea5ba885a47255a14a82d91027d3bf6',
+              'profiles/Stream Deck Ultimate - Neo.streamDeckProfile':'77f889a4d3a357746e4e7f4ee0a0f17434fcd2dc9f3f9cf06eb4c55e42d983bc',
+              'profiles/Stream Deck Ultimate - Plus.streamDeckProfile':'f73507ace9a41442ac79bebec75f001bcd82cffb8fd519a649e850a36efa0bc1',
+              'profiles/Stream Deck Ultimate - Smart.streamDeckProfile':'fb9fd481b2dc3a3c1b3bcbf95123ade3687989efe2e63525828bf4298725863e',
+              'profiles/Stream Deck Ultimate - Utilities.streamDeckProfile':'93072e830beb97d393c72883a7a1306fb307d9d8a9a4da6d080fed950c6b8285',
+              'profiles/Stream Deck Ultimate - Windows.streamDeckProfile':'c4398824cb0538a8a76e33452f5998711ecbe28502504e00fa4e1c6082c8b8af',
+              'profiles/Stream Deck Ultimate - XL.streamDeckProfile':'1164f15c886254aa76bb6336b0e15fe83e0a5f13f9b3edc07ee720126deb7067',
+              'bin/app-audio/PackRatAppAudio.dll':'e261060792da8183e2c4dfde04e3e385e58399b237d7a9a3df6598fc59e4fc08',
+              'bin/lib-v07-context.js':'55ed8fe19b75e009d48d76abf65e9c091bd371b3e76c929f0be5273500646a3b',
+            }
+            for rel,digest in expected.items(): assert sha256(z.read(root+rel)).hexdigest()==digest,rel
+          print('packed v1.0.0 contract passed: accepted profiles/runtime + 32 white app-list icons')
           PY
