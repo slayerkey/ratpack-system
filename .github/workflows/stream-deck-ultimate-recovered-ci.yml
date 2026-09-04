@@ -24,7 +24,9 @@ jobs:
       - name: Stage exact hardware-accepted runtime
         shell: powershell
         run: |
-          $json = & 'plugins/stream-deck-ultimate/scripts/stage-runtime.ps1'
+          $lines = @(& 'plugins/stream-deck-ultimate/scripts/stage-runtime.ps1')
+          $lines | ForEach-Object { Write-Host $_ }
+          $json = [string]$lines[-1]
           $result = $json | ConvertFrom-Json
           if (-not $result.ok) { throw "Recovered Ultimate stage did not report ok: $json" }
           if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected staged contract: $json" }
