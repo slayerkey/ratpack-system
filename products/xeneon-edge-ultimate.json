@@ -19,7 +19,7 @@
     "Smart Mode immediate reevaluation regression coverage",
     "Previous, Play-Pause and Next media transport regression coverage",
     "runtime bootstrap remains interactive when optional iCUE providers initialize late or fail",
-    "stalled Sensors provider exact-package regression reaches READY before provider timeout",
+    "stalled Sensors provider fail-soft startup contract preserved from 1.0.1 hardware recovery",
     "official CORSAIR CLI validation and .icuewidget packaging",
     "Corsair Labs exact-package host/settings and real mode-click smoke",
     "StreamSpell exact-package preview",
@@ -29,13 +29,14 @@
     "REQUIRED: physical XENEON EDGE 1.0.2 hardware retest"
   ],
   "automated_release_evidence": {
-    "candidate_commit": null,
-    "qa_record_commit": null,
-    "xeneon_widget_ci_run": null,
-    "rat_art_run": null,
-    "rat_ship_run": null,
-    "stalled_provider_ready_ms": null
+    "candidate_commit": "edabf2502b8175983b82e2f7c765be174348e784",
+    "qa_record_commit": "df0a7f62d194344a00bf373497ede697dbe18b5f",
+    "xeneon_widget_ci_run": 33896801470,
+    "rat_art_run": 33896803539,
+    "rat_ship_run": 33896805344,
+    "stalled_provider_ready_ms": 345,
+    "stalled_provider_evidence_version": "1.0.1 historical recovery evidence; 1.0.2 preserves the same provider-independent startup path"
   },
   "final_boundary": "Pass the physical XENEON EDGE 1.0.2 review retest, move workflow_state back to READY_TO_SHIP, then perform authenticated Maker Console submission through rat ship xeneon-edge-ultimate.",
-  "notes": "Marketplace review of 1.0.1 reported non-responsive Custom Style colors, non-responsive layout switching with a request for a dropdown, and lack of manual PC sensor selection. 1.0.2 addresses those three review items while retaining provider-independent startup and automatic sensor fallback. Marketplace auto-publish remains disabled."
+  "notes": "Marketplace review of 1.0.1 reported non-responsive Custom Style colors, non-responsive layout switching with a request for a dropdown, and lack of manual PC sensor selection. 1.0.2 addresses those three review items while retaining provider-independent startup and automatic sensor fallback. Merged-main XENEON Widget CI, Rat Art and Rat Ship are green. Marketplace auto-publish remains disabled."
 }
