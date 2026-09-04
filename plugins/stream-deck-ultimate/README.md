@@ -1,73 +1,58 @@
-# Stream Deck Ultimate — canonical recovered v1.0 source
+# Stream Deck Ultimate — recovered canonical v1.0 source
 
-This directory is the durable source-of-truth for the **hardware-accepted Stream Deck Ultimate 1.0.0.0** release and the Elgato review correction requiring white category/action-list icons.
+This directory is the durable source of truth for **Stream Deck Ultimate 1.0.0.0** after the physical Windows/Stream Deck acceptance pass and the Elgato review correction requiring white category/action-list icons.
 
-## What was recovered
+## Source lineage
 
-The final v1.0.0.0 build was completed in a local hardware-acceptance workspace and submitted to Elgato. Seven hardware fixes were made after the older authoring pipeline had staged the plugin, so rebuilding directly from the older prototype would silently reintroduce those defects.
-
-The acceptance bundle identified the upstream authoring commit as:
+The desktop acceptance bundle recorded upstream authoring commit:
 
 `fc314e6f42fbe3e16da82a3af7aca75bda288e4f`
 
-That commit still exists in `slayerkey/rp-system`. This recovery therefore preserves both sides of the product:
+That source is preserved under `authoring/`. The final submission also contained post-build hardware fixes and final profile/key-art state that the older authoring pipeline did not reproduce by itself.
 
-- `authoring/` — recovered historical source/build machinery from the recorded upstream commit;
-- `accepted-source/` — recovered App Volume source used by the accepted runtime;
-- `recovery/` — sanitized acceptance notes, tests and hardware evidence;
-- `release/manifest-v1.0.0.json` — the final v1.0 Marketplace manifest contract;
-- `reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin` — the exact hardware-accepted v1.0 runtime with only Elgato's white-icon review correction applied;
-- `scripts/` — deterministic materialization/validation helpers for that exact reference package.
+The recovery therefore uses three layers:
 
-## Canonical rule
+1. **Recovered authoring source** — normal JS/HTML/PowerShell/build machinery.
+2. **Exact hardware payloads** — seven post-build fixes restored byte-for-byte and regression checked as F1–F7.
+3. **Accepted v1 immutable capsules** — 16 exact final files that must not be regenerated for the v1 release: eight physically tested profile archives, the accepted native App Volume helper, final Smart Context runtime, final app/smart key faces, and acceptance bookkeeping/backup files.
 
-**Start all future Stream Deck Ultimate work from this directory.**
+Everything else is regenerated from source. The corrected key-art pipeline reproduces all 105 accepted key faces pixel-for-pixel; PNG compression bytes may differ while rendered pixels remain identical.
 
-For the accepted v1.0 release, the immutable baseline is the reference `.streamDeckPlugin`. It is a ZIP-format bundle containing the complete final runtime: JavaScript, HTML, PowerShell, App Volume helper, dependency files, profiles and image assets. `scripts/build-final.ps1` materializes that exact package and validates it; it does **not** regenerate v1 from the older prototype.
-
-`authoring/` is retained so future feature work still has the original source history and test/build machinery, but it must not be treated as a byte-equivalent copy of the accepted v1 runtime.
-
-## Seven hardware fixes preserved in the accepted baseline
+## Seven hardware fixes
 
 1. Correct `IMMDeviceCollection` IID in `bin/audio.ps1`.
-2. Use `pluginUUID` as the context for `switchToProfile`.
-3. Render the Smart navigation key with the Smart artwork.
-4. Limit App Volume process titles to 9 characters for 72px readability.
+2. Use `pluginUUID` context for `switchToProfile`.
+3. Use the Smart artwork for Smart navigation.
+4. Limit App Volume titles to 9 characters.
 5. Handle encoder activation on `dialDown`.
-6. Handle `touchTap` as an encoder press.
-7. Add configurable physical `micDevice` targeting through audio, config, diagnostics and onboarding.
+6. Handle `touchTap` as App Volume activation.
+7. Carry configurable physical `micDevice` through audio/config/diagnostics/onboarding.
 
-The recovered reference package contains all seven. This is the guard against a future authoring rebuild silently losing them.
+The old summarized `ALL-FIXES.patch` is **not** the authority. The exact accepted payload files plus automated F1–F7 checks are authoritative.
 
-## Elgato review correction — 2026-09-04
+## Profile rule
 
-Elgato requested that the icons shown inside the Stream Deck app for the plugin category and actions be white.
+The eight `profiles/*.streamDeckProfile` files in the immutable capsules are the exact archives physically imported/tested. Preserve them for v1.0.0.0. A prior attempt to rewrite the known page-ID mismatch caused full profile import failure and was deliberately not shipped.
 
-The corrected reference package differs from the submitted v1.0.0.0 package in exactly **32 PNG files**:
+## Elgato review correction
 
-- 15 action icon base files and their `@2x` variants (30 PNGs)
-- category icon base and `@2x` variants (2 PNGs)
+The Marketplace correction changes only the Stream Deck app's category/action-list icons: 15 action icon pairs plus the category pair, **32 PNGs total**. Every visible pixel is pure `#FFFFFF` with transparency preserved. Key faces remain colorful.
 
-Every visible pixel in those 32 assets is pure `#FFFFFF`, with transparency preserved. Runtime code, profiles, key faces, property inspectors and Marketplace artwork are unchanged.
-
-Corrected package SHA-256:
+The corrected package produced directly from the hardware-accepted submission has SHA-256:
 
 `5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb`
 
-Original submitted package SHA-256:
+## Build and validation
 
-`70a2e807fda53fc021297839b5e7d4f258ca68c3940fa2fb9d6f16d1b2462373`
+The canonical CI deliberately splits native and art phases:
 
-## Build / validate
+- Windows rebuilds/stages the App Volume runtime and proves F1–F7.
+- Ubuntu regenerates art, applies accepted key polish, restores the immutable final slice, applies the white-icon correction, runs all release contracts, then runs official Elgato validation/packing.
 
-On Windows with Python and Elgato's Stream Deck CLI available:
+For a local environment with a working CairoSVG/Cairo installation:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\plugins\stream-deck-ultimate\scripts\build-final.ps1
 ```
 
-This extracts the exact known-good reference runtime, verifies the 32 white app-list icons, verifies the v1 manifest contract, runs official Elgato validation, and repacks to `plugins/stream-deck-ultimate/dist/`.
-
-## Hardware acceptance
-
-Do not casually repeat already-proven hardware tests. The sanitized acceptance summary is in `recovery/FINISH_PROMPT.md`. In particular, preserve the intentionally unresolved profile page-ID behavior: the obvious attempted repair caused full profile-import failure and was deliberately not shipped.
+Start future Ultimate work from `plugins/stream-deck-ultimate/`, not the older `products/stream-deck-ultimate-bundle/prototype/` lineage.
