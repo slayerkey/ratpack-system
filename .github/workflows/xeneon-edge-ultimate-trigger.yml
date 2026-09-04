@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fix/xeneon-ultimate-1.0.2-review
     paths:
       - 'widgets/_src/xeneon-edge-ultimate/**'
       - 'widgets/xeneon-edge-ultimate/**'
@@ -23,16 +22,14 @@ jobs:
       - name: Dispatch canonical XENEON exact-package gate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run xeneon-widget-ci.yml --repo ${{ github.repository }} --ref ${{ github.ref_name }} -f slug=xeneon-edge-ultimate
+        run: gh workflow run xeneon-widget-ci.yml --repo ${{ github.repository }} --ref main -f slug=xeneon-edge-ultimate
 
       - name: Dispatch deterministic Rat Art gate
-        if: github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run rat-art-xeneon.yml --repo ${{ github.repository }} --ref main -f slug=xeneon-edge-ultimate
 
       - name: Dispatch candidate Rat Ship kit gate
-        if: github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run rat-ship-xeneon.yml --repo ${{ github.repository }} --ref main -f slug=xeneon-edge-ultimate
