@@ -1,8 +1,7 @@
 
-/* iCUE only carries localStorage[uniqueId] across dashboard-page webviews and app
- * restarts. Suffixing the UUID (the normal browser namespace pattern) works in a
- * browser but becomes intermittent on the Xeneon Edge. Keep our independent
- * history and preference records inside one JSON object at the exact UUID key. */
+/* CORSAIR persists widget-owned JSON under localStorage[uniqueId]. Keep history,
+ * active preferences, and our preference backup inside that exact UUID record so
+ * dashboard-page changes and iCUE restarts follow the documented storage path. */
 function widgetStorageKey() {
     try {
         if (typeof uniqueId !== "undefined" && uniqueId) return String(uniqueId);
@@ -67,35 +66,44 @@ function normalizePrefs(raw) {
     return clean;
 }
 
-function readPreferenceIndex() {
+/* 1.4.1 contained a legacy standalone sensor-signature lookup. Keep it readable for
+ * migration/preview compatibility, but real iCUE persistence must use the UUID JSON. */
+function readLegacyPreferenceIndex() {
     try {
         var parsed = JSON.parse(localStorage.getItem(LEGACY_PREFS_INDEX_KEY));
         return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     } catch (e) { return {}; }
 }
 
-/* Keep a sensor-signature backup in addition to the iCUE instance UUID record.
- * Real iCUE can recreate a widget webview with a fresh instance storage identity;
- * without this backup a valid Bar/Radial/Readout choice and custom min/max would
- * silently fall back to Graph + Auto. 1.4.1 already read this index but stopped
- * writing new preferences into it. */
+function validPreferenceIndex(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function readPreferenceIndex() {
+    var persisted = durableStore("preferenceIndex").read(null);
+    var index = validPreferenceIndex(persisted);
+    if (Object.keys(index).length) return index;
+    return readLegacyPreferenceIndex();
+}
+
+/* Keep a second copy by exact sensor set inside localStorage[uniqueId]. This protects
+ * against an empty/corrupt active preference record without leaving CORSAIR's
+ * documented persistence key. */
 function writePreferenceIndex(payload) {
     if (!payload || typeof payload !== "object" || !payload.signature) return;
-    try {
-        var index = readPreferenceIndex();
-        index[payload.signature] = payload;
+    var index = validPreferenceIndex(durableStore("preferenceIndex").read(null));
+    index[payload.signature] = payload;
 
-        /* Bound old sensor-set snapshots so changing hardware/configuration cannot
-         * grow localStorage forever. Keep the newest twelve signatures. */
-        var keys = Object.keys(index);
-        if (keys.length > 12) {
-            keys.sort(function (a, b) {
-                return Number(index[b] && index[b].at || 0) - Number(index[a] && index[a].at || 0);
-            });
-            for (var i = 12; i < keys.length; i++) delete index[keys[i]];
-        }
-        localStorage.setItem(LEGACY_PREFS_INDEX_KEY, JSON.stringify(index));
-    } catch (e) { }
+    /* Bound old sensor-set snapshots so changing hardware/configuration cannot grow
+     * the widget's persisted UUID object forever. Keep the newest twelve signatures. */
+    var keys = Object.keys(index);
+    if (keys.length > 12) {
+        keys.sort(function (a, b) {
+            return Number(index[b] && index[b].at || 0) - Number(index[a] && index[a].at || 0);
+        });
+        for (var i = 12; i < keys.length; i++) delete index[keys[i]];
+    }
+    durableStore("preferenceIndex").write(index);
 }
 
 function preferencePayload() {
@@ -121,7 +129,9 @@ function applySavedPreferences(saved) {
         || !saved.sensorPrefs || typeof saved.sensorPrefs !== "object" || Array.isArray(saved.sensorPrefs)) {
         return false;
     }
-    sensorPrefs = normalizePrefs(saved.sensorPrefs);
+    var normalized = normalizePrefs(saved.sensorPrefs);
+    if (!Object.keys(normalized).length) return false;
+    sensorPrefs = normalized;
     if (saved.view) {
         fpsState.windowIndex = clamp(Math.round(Number(saved.view.fpsWindow) || 0), 0, FPS_WINDOWS.length - 1);
         fpsState.heroUnit = saved.view.heroUnit === "ms" ? "ms" : "fps";
@@ -132,8 +142,7 @@ function applySavedPreferences(saved) {
 function restorePreferences(legacy) {
     var exact = prefsStore ? prefsStore.read(null) : null;
     if (applySavedPreferences(exact)) {
-        /* Seed the missing 1.4.1 fallback immediately, before a later iCUE webview
-         * recreation has a chance to lose access to this UUID-scoped copy. */
+        /* Existing 1.4.1 preferences immediately seed the new UUID-scoped backup. */
         var migrated = preferencePayload();
         prefsStore.write(migrated);
         writePreferenceIndex(migrated);
