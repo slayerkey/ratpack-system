@@ -1,40 +1,54 @@
 # Stream Deck Ultimate — canonical recovered v1.0 source
 
-This directory is the durable source-of-truth for the **hardware-accepted Stream Deck Ultimate 1.0.0.0** release and the Elgato review correction that makes all category/action-list icons white.
+This directory is the durable source-of-truth for the **hardware-accepted Stream Deck Ultimate 1.0.0.0** release and the Elgato review correction requiring white category/action-list icons.
 
-## Why this directory exists
+## What was recovered
 
-The v1.0.0.0 build was finalized and submitted from a local hardware-acceptance workspace. Seven fixes were applied directly to the staged plugin after the older authoring pipeline had produced it, so regenerating from that older source would silently undo the accepted fixes.
+The final v1.0.0.0 build was completed in a local hardware-acceptance workspace and submitted to Elgato. Seven hardware fixes were made after the older authoring pipeline had staged the plugin, so rebuilding directly from the older prototype would silently reintroduce those defects.
 
-The acceptance bundle recovered on 2026-09-04 identified the upstream authoring commit as:
+The acceptance bundle identified the upstream authoring commit as:
 
 `fc314e6f42fbe3e16da82a3af7aca75bda288e4f`
 
-That commit still exists in `slayerkey/rp-system`, so the durable source here combines:
+That commit still exists in `slayerkey/rp-system`. This recovery therefore preserves both sides of the product:
 
-- the recoverable upstream authoring/build machinery (`authoring/`);
-- the exact seven hardware-accepted runtime overrides (`runtime-overrides/`);
-- the exact v1.0.0.0 Marketplace manifest (`release/manifest-v1.0.0.json`);
-- the local acceptance handoff, patch, tests, and evidence (`recovery/`);
-- a build-enforced Elgato white category/action icon pass (`scripts/whiten_manifest_icons.py`);
-- a known-good corrected reference package (`reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin`).
+- `authoring/` — recovered historical source/build machinery from the recorded upstream commit;
+- `accepted-source/` — recovered App Volume source used by the accepted runtime;
+- `recovery/` — sanitized acceptance notes, tests and hardware evidence;
+- `release/manifest-v1.0.0.json` — the final v1.0 Marketplace manifest contract;
+- `reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin` — the exact hardware-accepted v1.0 runtime with only Elgato's white-icon review correction applied;
+- `scripts/` — deterministic materialization/validation helpers for that exact reference package.
 
 ## Canonical rule
 
 **Start all future Stream Deck Ultimate work from this directory.**
 
-Do not regenerate a release directly from `authoring/prototype/` and ship it. `authoring/` is historical build support. The final build must apply `runtime-overrides/`, the v1.0 manifest, the key-art polish, and the white icon compliance pass.
+For the accepted v1.0 release, the immutable baseline is the reference `.streamDeckPlugin`. It is a ZIP-format bundle containing the complete final runtime: JavaScript, HTML, PowerShell, App Volume helper, dependency files, profiles and image assets. `scripts/build-final.ps1` materializes that exact package and validates it; it does **not** regenerate v1 from the older prototype.
 
-## Current Marketplace correction
+`authoring/` is retained so future feature work still has the original source history and test/build machinery, but it must not be treated as a byte-equivalent copy of the accepted v1 runtime.
 
-Elgato review feedback required the icons shown inside the Stream Deck app for the plugin category and actions to be white.
+## Seven hardware fixes preserved in the accepted baseline
 
-The corrected reference package changes only:
+1. Correct `IMMDeviceCollection` IID in `bin/audio.ps1`.
+2. Use `pluginUUID` as the context for `switchToProfile`.
+3. Render the Smart navigation key with the Smart artwork.
+4. Limit App Volume process titles to 9 characters for 72px readability.
+5. Handle encoder activation on `dialDown`.
+6. Handle `touchTap` as an encoder press.
+7. Add configurable physical `micDevice` targeting through audio, config, diagnostics and onboarding.
+
+The recovered reference package contains all seven. This is the guard against a future authoring rebuild silently losing them.
+
+## Elgato review correction — 2026-09-04
+
+Elgato requested that the icons shown inside the Stream Deck app for the plugin category and actions be white.
+
+The corrected reference package differs from the submitted v1.0.0.0 package in exactly **32 PNG files**:
 
 - 15 action icon base files and their `@2x` variants (30 PNGs)
 - category icon base and `@2x` variants (2 PNGs)
 
-All visible pixels in those 32 files are pure white while transparency is preserved. Key faces, profiles, runtime code, property inspectors, and Marketplace artwork are unchanged from the hardware-accepted v1.0.0.0 package.
+Every visible pixel in those 32 assets is pure `#FFFFFF`, with transparency preserved. Runtime code, profiles, key faces, property inspectors and Marketplace artwork are unchanged.
 
 Corrected package SHA-256:
 
@@ -44,16 +58,16 @@ Original submitted package SHA-256:
 
 `70a2e807fda53fc021297839b5e7d4f258ca68c3940fa2fb9d6f16d1b2462373`
 
-## Build
+## Build / validate
 
-On Windows with Python, Node, PowerShell, and Elgato's Stream Deck CLI available:
+On Windows with Python and Elgato's Stream Deck CLI available:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\plugins\stream-deck-ultimate\scripts\build-final.ps1
 ```
 
-The script stages from the historical authoring source, builds App Volume, applies the accepted overrides, regenerates art/profiles, enforces white app-list icons, validates with Elgato's CLI, and packages to `plugins/stream-deck-ultimate/dist/`.
+This extracts the exact known-good reference runtime, verifies the 32 white app-list icons, verifies the v1 manifest contract, runs official Elgato validation, and repacks to `plugins/stream-deck-ultimate/dist/`.
 
 ## Hardware acceptance
 
-Do not casually repeat the already-proven hardware tests. The recovered acceptance record is in `recovery/FINISH_PROMPT.md`. In particular, preserve the intentionally-unresolved D1 profile page-ID behavior; the obvious attempted fix caused profile import failure and was deliberately not shipped.
+Do not casually repeat already-proven hardware tests. The sanitized acceptance summary is in `recovery/FINISH_PROMPT.md`. In particular, preserve the intentionally unresolved profile page-ID behavior: the obvious attempted repair caused full profile-import failure and was deliberately not shipped.
