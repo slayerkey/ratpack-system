@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  reference-package-contract:
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+  build-validate-pack:
+    runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -21,63 +21,83 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Verify exact corrected reference package
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Elgato Stream Deck CLI
+        run: npm install -g @elgato/cli@1.9.0
+
+      - name: Build exact v1.0 runtime from recovered source
+        shell: powershell
         run: |
-          python -m pip install pillow
+          $json = & 'plugins/stream-deck-ultimate/scripts/build-final.ps1'
+          $result = $json | ConvertFrom-Json
+          if (-not $result.ok) { throw "Recovered Ultimate build did not report ok: $json" }
+          if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected final contract: $json" }
+          if ($result.hardwareFixes -ne 'F1-F7 PASS' -or $result.whiteIcons -ne '32 assets PASS') { throw "Acceptance gates did not pass: $json" }
+          Write-Host "recovered source build passed: version=$($result.version) actions=$($result.actions)"
+
+      - name: Recheck generated package contract
+        shell: powershell
+        run: |
+          $packages = @(Get-ChildItem -File 'plugins/stream-deck-ultimate/dist' -Filter '*.streamDeckPlugin')
+          if ($packages.Count -ne 1) { throw "Expected exactly one packed plugin, found $($packages.Count)" }
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $packages[0].FullName).Hash.ToLowerInvariant()
+          Write-Host "PACKED_SHA256=$sha"
+          "PACKED_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-v1.0.0-white-icons
+          path: plugins/stream-deck-ultimate/dist/*.streamDeckPlugin
+          if-no-files-found: error
+
+  packed-artifact-contract:
+    needs: build-validate-pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install image verifier dependency
+        run: python -m pip install pillow --disable-pip-version-check --quiet
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stream-deck-ultimate-v1.0.0-white-icons
+          path: packed
+
+      - name: Inspect exact packed artifact
+        run: |
           python - <<'PY'
-          import hashlib, io, json, zipfile
+          import io, json, zipfile
           from pathlib import Path
           from PIL import Image
 
-          package = Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
-          expected = '5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb'
-          assert package.is_file(), package
-          assert hashlib.sha256(package.read_bytes()).hexdigest() == expected
-
-          root = 'com.packrat.stream-deck-ultimate-bundle.sdPlugin/'
+          packages = list(Path('packed').glob('*.streamDeckPlugin'))
+          assert len(packages) == 1, packages
+          package = packages[0]
           with zipfile.ZipFile(package) as z:
+              names = z.namelist()
+              roots = sorted({name.split('/', 1)[0] for name in names if '/' in name})
+              assert roots == ['com.packrat.stream-deck-ultimate-bundle.sdPlugin'], roots
+              root = roots[0] + '/'
               manifest = json.loads(z.read(root + 'manifest.json'))
               assert manifest['Name'] == 'Stream Deck Ultimate'
               assert manifest['Version'] == '1.0.0.0'
               assert manifest['SDKVersion'] == 3
               assert len(manifest['Actions']) == 16
-
               bases = {manifest['CategoryIcon']}
               bases.update(a['Icon'] for a in manifest['Actions'] if a.get('Icon'))
-              icon_files = [root + f'{base}{suffix}.png' for base in bases for suffix in ('', '@2x')]
-              assert len(icon_files) == 32, len(icon_files)
-              for name in icon_files:
+              files = [root + f'{base}{suffix}.png' for base in bases for suffix in ('', '@2x')]
+              assert len(files) == 32, len(files)
+              for name in files:
                   image = Image.open(io.BytesIO(z.read(name))).convert('RGBA')
                   assert all((not a) or (r, g, b) == (255, 255, 255) for r, g, b, a in image.getdata()), name
-
-          print('hardware-accepted v1.0.0 package identity + 32 white app-list icons verified')
+          print('packed v1.0.0 artifact contract passed: 16 actions, SDK 3, 32 white app-list icons')
           PY
-
-      - name: Materialize exact reference package
-        run: |
-          python - <<'PY'
-          import zipfile
-          from pathlib import Path
-          package = Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
-          out = Path('.tmp-stream-deck-ultimate')
-          with zipfile.ZipFile(package) as z:
-              z.extractall(out)
-          plugin = out / 'com.packrat.stream-deck-ultimate-bundle.sdPlugin'
-          assert plugin.is_dir()
-          print(plugin)
-          PY
-
-      - name: Verify all seven hardware-acceptance fixes survived
-        run: python plugins/stream-deck-ultimate/scripts/verify_hardware_fixes.py .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin
-
-      - name: Verify white app-list icons after materialization
-        run: python plugins/stream-deck-ultimate/scripts/verify_white_icons.py .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Official Elgato validation of exact corrected runtime
-        run: |
-          npm install -g @elgato/cli@1.9.0
-          streamdeck validate .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin --force-update-check
