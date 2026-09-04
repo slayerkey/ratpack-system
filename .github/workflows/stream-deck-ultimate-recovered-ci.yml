@@ -11,9 +11,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-validate-pack:
+  stage-native-runtime:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Stage exact hardware-accepted runtime
+        shell: powershell
+        run: |
+          $json = & 'plugins/stream-deck-ultimate/scripts/stage-runtime.ps1'
+          $result = $json | ConvertFrom-Json
+          if (-not $result.ok) { throw "Recovered Ultimate stage did not report ok: $json" }
+          if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected staged contract: $json" }
+          if ($result.hardwareFixes -ne 'F1-F7 PASS') { throw "Hardware acceptance gates did not pass: $json" }
+          Write-Host "native runtime staged: version=$($result.version) helper=$($result.helperSha256)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-deck-ultimate-v1-native-stage
+          path: plugins/stream-deck-ultimate/.stage/com.packrat.stream-deck-ultimate-bundle.sdPlugin/**
+          if-no-files-found: error
+
+  generate-validate-pack:
+    needs: stage-native-runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    env:
+      PLUGIN: plugins/stream-deck-ultimate/.release-stage/com.packrat.stream-deck-ultimate-bundle.sdPlugin
     steps:
       - uses: actions/checkout@v4
 
@@ -25,27 +54,55 @@ jobs:
         with:
           node-version: '24'
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: stream-deck-ultimate-v1-native-stage
+          path: ${{ env.PLUGIN }}
+
+      - name: Install recovered art dependencies
+        run: python -m pip install -r plugins/stream-deck-ultimate/authoring/prototype/requirements.txt --disable-pip-version-check --quiet
+
+      - name: Generate accepted profiles and key art
+        run: |
+          python plugins/stream-deck-ultimate/authoring/prototype/tools/generate_prototype_assets_v71.py "$PLUGIN"
+          python plugins/stream-deck-ultimate/authoring/prototype/tools/polish_context_art_v7.py "$PLUGIN"
+          python plugins/stream-deck-ultimate/scripts/polish_icons.py "$PLUGIN/imgs/keys" --apply
+
+      - name: Apply Elgato white app-list icon correction
+        run: python plugins/stream-deck-ultimate/scripts/whiten_manifest_icons.py "$PLUGIN"
+
+      - name: Verify hardware and Marketplace contracts
+        run: |
+          python plugins/stream-deck-ultimate/scripts/verify_hardware_fixes.py "$PLUGIN"
+          python plugins/stream-deck-ultimate/scripts/verify_white_icons.py "$PLUGIN"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path(os.environ['PLUGIN'])
+          m = json.loads((p/'manifest.json').read_text(encoding='utf-8-sig'))
+          assert m['Name'] == 'Stream Deck Ultimate'
+          assert m['Version'] == '1.0.0.0'
+          assert m['SDKVersion'] == 3
+          assert len(m['Actions']) == 16
+          assert (p/'bin/app-audio/PackRatAppAudio.dll').is_file()
+          print('final source contract passed: v1.0.0.0, SDK3, 16 actions, helper present')
+          PY
+
+      - name: Install locked runtime dependency
+        working-directory: ${{ env.PLUGIN }}
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
       - name: Install Elgato Stream Deck CLI
         run: npm install -g @elgato/cli@1.9.0
 
-      - name: Build exact v1.0 runtime from recovered source
-        shell: powershell
-        run: |
-          $json = & 'plugins/stream-deck-ultimate/scripts/build-final.ps1'
-          $result = $json | ConvertFrom-Json
-          if (-not $result.ok) { throw "Recovered Ultimate build did not report ok: $json" }
-          if ($result.version -ne '1.0.0.0' -or $result.actions -ne 16) { throw "Unexpected final contract: $json" }
-          if ($result.hardwareFixes -ne 'F1-F7 PASS' -or $result.whiteIcons -ne '32 assets PASS') { throw "Acceptance gates did not pass: $json" }
-          Write-Host "recovered source build passed: version=$($result.version) actions=$($result.actions)"
+      - name: Officially validate recovered v1.0 runtime
+        run: streamdeck validate "$PLUGIN" --force-update-check
 
-      - name: Recheck generated package contract
-        shell: powershell
+      - name: Officially pack recovered v1.0 runtime
         run: |
-          $packages = @(Get-ChildItem -File 'plugins/stream-deck-ultimate/dist' -Filter '*.streamDeckPlugin')
-          if ($packages.Count -ne 1) { throw "Expected exactly one packed plugin, found $($packages.Count)" }
-          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $packages[0].FullName).Hash.ToLowerInvariant()
-          Write-Host "PACKED_SHA256=$sha"
-          "PACKED_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          mkdir -p plugins/stream-deck-ultimate/dist
+          streamdeck pack "$PLUGIN" --output plugins/stream-deck-ultimate/dist --force --no-file-list
+          test $(find plugins/stream-deck-ultimate/dist -name '*.streamDeckPlugin' | wc -l) -eq 1
 
       - uses: actions/upload-artifact@v4
         with:
@@ -54,7 +111,7 @@ jobs:
           if-no-files-found: error
 
   packed-artifact-contract:
-    needs: build-validate-pack
+    needs: generate-validate-pack
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
