@@ -4,17 +4,67 @@
 
 **HARDWARE RETEST REQUIRED BEFORE MARKETPLACE RELEASE.**
 
-Current candidate: `1.0.1`.
+Current candidate: `1.0.2`.
 
-Validated runtime candidate commit: `c9eaf47715a6a877b18791e4576ed13d23313948`.
+Validated product commit: `edabf2502b8175983b82e2f7c765be174348e784`.
 
-The 1.0.0 candidate previously passed the complete automated RatPack XENEON pipeline, but a physical XENEON EDGE test then exposed a release-blocking startup failure: the widget could render its static shell while failing to load live data, respond to touch/click, change screens, or react to widget/page changes. Because physical hardware found a failure that the previous automated contract did not reproduce, physical XENEON validation is now mandatory for this release before Marketplace submission.
+Marketplace review of 1.0.1 confirmed that the provider-independent startup correction was sufficient for reviewers to reach and interact with the widget, but exposed three release-blocking settings issues:
 
-## 1.0.1 startup correction
+- Custom Style colors did not update reliably in real iCUE
+- changing the layout did not reliably change the displayed screen, and the reviewer requested a dropdown instead of the cramped multi-button control
+- CPU/GPU sensor roles were auto-selected only, with no manual correction when iCUE chose the wrong sensor
 
-The physical symptom was consistent with startup being held behind native provider initialization. Audit of `ui-runtime.js` found a remaining blocking path: real-hardware startup still awaited Sensors discovery before the shell was marked ready. Sensor discovery can wait on host responses for multiple seconds, leaving the screen visually present but effectively inert.
+1.0.2 addresses those three review items while preserving the 1.0.1 fail-soft startup architecture.
 
-The 1.0.1 runtime now enforces a fail-soft startup contract:
+## 1.0.2 Marketplace review corrections
+
+### Real-iCUE settings propagation
+
+The widget now includes a direct real-iCUE settings watcher for all important XENEON bindings. It reads the RatPack direct-binding bridge rather than depending only on legacy `window` properties or assuming that `icueEvents.onDataUpdated()` will always arrive exactly when expected.
+
+The watcher covers:
+
+- preset
+- layout / start mode
+- Smart Mode
+- time and temperature settings
+- weather/calendar/focus/note settings
+- graph window
+- four manual PC sensor selectors
+- text, accent and background Custom Style colors
+
+Custom Style also updates the supporting muted/panel palette so the result looks fully themed rather than only changing a few primary elements.
+
+### Layout control
+
+The previous `Start Mode` tab-button row is now a native iCUE `combobox` labeled **Layout**.
+
+Available selections remain:
+
+- Auto
+- Home
+- Performance
+- Today
+- Ambient
+
+A selection change is applied to the active screen immediately. Smart Mode behavior remains available through Auto.
+
+### Manual PC sensor selection
+
+1.0.2 adds native iCUE `sensors-combobox` controls for:
+
+- CPU Temperature Sensor
+- GPU Temperature Sensor
+- CPU Load Sensor
+- GPU Load Sensor
+
+The selected sensor IDs override automatic role detection. When a selected sensor is unavailable, the widget can fall back to the automatically discovered role rather than manufacturing or relabeling telemetry.
+
+Changing a selected sensor clears stale role data/history before the new source is used.
+
+## Preserved 1.0.1 startup correction
+
+The earlier physical failure was caused by shell readiness being held behind native provider initialization. 1.0.1 changed startup so provider I/O cannot block the interactive shell:
 
 - bind navigation, touch and click handlers first
 - apply the local UI and clock before provider work
@@ -23,76 +73,54 @@ The 1.0.1 runtime now enforces a fail-soft startup contract:
 - mark the runtime ready
 - only then initialize Sensors, FPS, Media, Network, Weather and Calendar
 - initialize optional providers independently so one failure cannot freeze the dashboard
-- clear the startup latch and retry if the actual shell bootstrap fails
-- retain provider/runtime warnings without converting an optional-data failure into a UI failure
+- retain provider/runtime warnings without converting optional-data failure into UI failure
 
-No native provider I/O is allowed to block shell readiness.
+That architecture is unchanged in 1.0.2.
 
-## Verified 1.0.1 release evidence
+Historical 1.0.1 stalled-provider evidence remains useful: the exact 1.0.1 package reached `data-runtime=ready` in 345 ms while the Sensors provider was deliberately left unresolved, with navigation and settings still responsive. 1.0.2 does not move provider work back into the blocking shell bootstrap.
+
+## Verified 1.0.2 release evidence
 
 ### Exact package and host gate
 
-GitHub Actions XENEON Widget CI run `33536936947` passed on runtime commit `c9eaf47715a6a877b18791e4576ed13d23313948`:
+GitHub Actions XENEON Widget CI run `33896801470` passed on merged product commit `edabf2502b8175983b82e2f7c765be174348e784`.
 
-- source regenerated with `tools/xeneon/inline.py`
+Verified steps include:
+
+- canonical source regeneration with `tools/xeneon/inline.py`
 - official `icuewidget-cli@0.4.47` validation
-- official `.icuewidget` creation
-- exact ZIP/package integrity checks
-- lexical iCUE Custom Style binding regression
-- Corsair Labs `iCUE-widget-runner-windows` exact-package host/settings smoke
-- actual Home, Performance, Today and Ambient interaction checks
-- live settings reaction without page navigation
-- packaged live HTTPS response-timing smoke
-- all eight XENEON viewport compositions with no overflow, no multiple visible screens, no runtime errors and no undersized product-smoke touch targets
-- StreamSpell packaged-widget render across the supported XENEON presets
+- official `.icuewidget` package creation
+- exact package integrity checks
+- lexical real-iCUE Custom Style regression
+- RatPack direct-binding bridge v2 present with all 1.0.2 settings, including the four sensor selectors
+- Custom Style text/accent/background values applied to CSS and body styling
+- Corsair Labs exact-package host/settings smoke
+- actual Performance → Today → Ambient → Home mode interaction smoke
+- no page or console errors
+- packaged network smoke
+- StreamSpell packaged preview
 
-### Stalled-provider regression
-
-The exact packaged 1.0.1 widget is now tested with native Sensors discovery deliberately left unresolved. This models a late or stuck iCUE provider rather than a normal fixture response.
-
-Run `33536936947` proved:
-
-- stalled Sensors request was actually exercised
-- shell reached `data-runtime=ready` in **345 ms**, before the provider request timeout
-- `state.started=true`
-- UI handlers were bound
-- timers were running
-- Performance, Today, Ambient and Home remained clickable
-- live settings continued to update
-- no runtime errors occurred
-
-Recorded smoke state:
-
-- runtime: `ready`
-- started: `true`
-- uiBound: `true`
-- timersStarted: `true`
-- final mode: `home`
-- settings sentinel: `Provider stall did not freeze shell`
-- stalled sensor requests: `1`
-
-This regression is a permanent release gate so a native provider can no longer silently reintroduce the same all-or-nothing startup dependency.
+An additional exact-package review smoke performed during the 1.0.2 repair changed real-iCUE-style lexical bindings without manually invoking `icueEvents.onDataUpdated()`. The watcher applied the new colors, layout and all four sensor-role IDs automatically with no runtime errors. This directly targets the lifecycle gap observed by CORSAIR review.
 
 ### Rat Art
 
-GitHub Actions Rat Art run `33536940027` passed on the same runtime candidate:
+GitHub Actions Rat Art run `33896803539` passed on the merged 1.0.2 candidate:
 
 - canonical shipping rebuild
-- deterministic native captures across all eight XENEON compositions
-- Home, Performance, Today and Ambient fixtures
-- canonical Rat Art rendering
+- native XENEON captures
+- deterministic canonical Rat Art rendering
 - Rat Art contract verification
 - isolated candidate artifact upload
 
-The desk-distance readability pass remains included in the 1.0.1 candidate.
-
 ### Rat Ship
 
-GitHub Actions Rat Ship run `33536943438` passed on the same runtime candidate:
+GitHub Actions Rat Ship run `33896805344` passed on the merged 1.0.2 candidate:
 
 - local Rat command/parser validation
-- official CORSAIR validation and package creation
-- deterministic product captures and Rat Art
+- official CORSAIR validation
+- official `.icuewidget` packaging
+- deterministic product captures
+- deterministic Rat Art
 - deterministic 288x288 search icon
 - Maker Console SHIP_KIT generation
 - Playwright Maker Console driver preflight
@@ -106,17 +134,18 @@ A green Rat Ship result is packaging evidence only. It does **not** override the
 - Source is XML-safe after RatPack inlining.
 - Authored JavaScript passes syntax validation.
 - No remote JavaScript or stylesheet dependencies.
-- Custom Style triplet is `textColor`, `accentColor`, `backgroundColor` in canonical order.
-- Required plugin declarations match documented iCUE provider module/plugin/version strings.
-- Native telemetry is limited to data the iCUE providers actually expose.
-- The product does not claim native 1% lows, true frametime, album art, media progress, ICMP ping or literal packet loss.
-- Browser network measurements are explicitly described as HTTPS response timing.
+- Custom Style triplet remains `textColor`, `accentColor`, `backgroundColor`.
+- Manual PC telemetry selectors use native `sensors-combobox` controls.
+- Required plugin declarations match the documented iCUE provider module/plugin/version strings.
+- Native telemetry is limited to values exposed by the iCUE providers.
+- The product does not claim native 1% lows, true frametime, album artwork, media progress, ICMP ping or literal packet loss.
+- Browser network measurements remain explicitly described as HTTPS response timing.
 - Weather and calendar fail closed when configuration or network access is unavailable.
 - Preview, CI and Rat Art fixtures never become shipping telemetry.
 
 ## Eight-slot layout contract
 
-Validated compositions:
+Supported compositions remain:
 
 - 840x344 S horizontal
 - 696x416 S vertical
@@ -127,27 +156,25 @@ Validated compositions:
 - 2536x696 XL horizontal
 - 696x2536 XL vertical
 
-Earlier QA caught and corrected compact S-horizontal mode navigation and M-vertical Focus controls that were below the desired touch target. The strict packaged smoke passes all eight compositions.
+The desk-distance readability pass remains included in 1.0.2.
 
-## Runtime coverage
+## Mandatory physical 1.0.2 retest
 
-Verified or deterministically exercised states include sensor provider loading and CPU/GPU discovery, deliberately stalled sensor discovery, FPS availability and foreground process, Smart Mode entry/exit behavior, media metadata and transport wiring, configured/unconfigured weather, ICS agenda states, HTTPS network success/history, Focus controls, live style/settings updates and local persistence.
+Before Marketplace resubmission, install the exact 1.0.2 package on a physical XENEON EDGE after removing the previous Ultimate installation. Confirm all of the following:
 
-## Mandatory physical 1.0.1 retest
+1. Change Text Color, Accent Color and Background Color in Custom Style. Each must update on-screen immediately without clicking away and back.
+2. Verify **Layout** is presented as a readable dropdown in iCUE.
+3. Change Layout through Home → Performance → Today → Ambient → Auto. Each manual selection must change the displayed screen immediately.
+4. Manually choose CPU Temperature, GPU Temperature, CPU Load and GPU Load sensors from the new iCUE sensor dropdowns. Confirm the intended readings populate and changing a selector changes the source rather than snapping back to auto-selection.
+5. Confirm the shell becomes interactive immediately even if telemetry has not populated yet.
+6. Confirm physical touch navigation and mouse click navigation still work.
+7. Confirm clock/UI continue updating while optional providers initialize.
+8. Confirm FPS behavior updates when a supported foreground application is active.
+9. Confirm Smart Mode and manual hold/resume still work.
+10. Confirm changing XENEON widget size/orientation adapts the layout without freezing the runtime.
+11. Confirm unavailable optional weather/calendar/network data does not make navigation unresponsive.
+12. Restart iCUE and verify the chosen settings remain effective after reload.
 
-Before Marketplace release, install the exact 1.0.1 hardware-retest package on a physical XENEON EDGE after removing the previous Ultimate installation. Confirm all of the following:
+The first four items correspond directly to CORSAIR's 1.0.1 review feedback and are the mandatory acceptance criteria for this resubmission.
 
-1. The shell becomes interactive immediately even if telemetry has not populated yet.
-2. Home → Performance → Today → Ambient → Home responds to physical touch.
-3. Mouse click interaction also changes screens.
-4. Clock/UI continue updating while providers initialize.
-5. CPU/GPU telemetry eventually populates when native Sensors data is available.
-6. FPS behavior updates when a supported foreground application is active.
-7. A settings change applies without requiring page/widget navigation.
-8. Smart Mode changes mode when appropriate and manual navigation hold/resume works.
-9. Changing XENEON widget size/orientation causes the layout to adapt rather than freezing the runtime.
-10. Unavailable optional weather/calendar/network data does not make navigation unresponsive.
-
-If any of items 1 through 4 fail, stop release immediately and capture the observed state. The next diagnostic step is a minimal on-screen boot/version marker and input-only hardware build to separate host input dispatch from application/provider startup.
-
-Marketplace submission remains a separate authenticated action. `marketplace_auto_publish` remains false. Do not submit or publish until this physical 1.0.1 retest passes and the final paid listing is explicitly reviewed.
+Marketplace submission remains a separate authenticated action. `marketplace_auto_publish` remains false. Do not submit or publish until this physical 1.0.2 retest passes.
