@@ -62,10 +62,22 @@ def diagnostics_icons(plugin):
     for size,sfx in ((72,''),(144,'@2x')):
         im=diagnostics_key(size); save(im,action/f'key{sfx}.png'); save(im,plugin/'imgs'/'keys'/f'diagnostics{sfx}.png')
 
+def make_action_list_icons_white(plugin):
+    """Enforce Elgato's white, monochrome, transparent action-list icon contract."""
+    paths=list((plugin/'imgs'/'actions').glob('*/icon*.png'))
+    paths += [plugin/'imgs'/'plugin'/'category.png', plugin/'imgs'/'plugin'/'category@2x.png']
+    for path in paths:
+        if not path.is_file():
+            continue
+        im=Image.open(path).convert('RGBA')
+        im.putdata([(255,255,255,a) if a else (0,0,0,0) for _,_,_,a in im.getdata()])
+        save(im,path)
+
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('plugin',type=Path); ns=ap.parse_args(); plugin=ns.plugin.resolve()
     v4.generate_icons(plugin); v5.extra_icons(plugin); v7.extra_context_icons(plugin)
     brand_plugin_icons(plugin); diagnostics_icons(plugin)
+    make_action_list_icons_white(plugin)
     profiles=plugin/'profiles'; shutil.rmtree(profiles,ignore_errors=True); profiles.mkdir(parents=True,exist_ok=True)
     prev=plugin.parent/'previews'; shutil.rmtree(prev,ignore_errors=True); prev.mkdir(parents=True,exist_ok=True)
     standard=v5.standard_specs()
@@ -76,6 +88,6 @@ def main():
         else: name,spec,cols,rows,device,encoders=entry
         v5.build_profile(plugin,name,spec,cols,rows,device,encoders)
         v5.preview(plugin,name,spec,cols,rows,prev/(name.lower().replace(' ','-').replace('&','and')+'.png'))
-    print('generated v0.7.1 support candidate: 8 profiles, PackRat rat/package brand mark, diagnostics art')
+    print('generated v0.7.1 support candidate: 8 profiles, PackRat rat/package brand mark, diagnostics art, white action-list icons')
 
 if __name__=='__main__': main()
