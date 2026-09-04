@@ -50,12 +50,8 @@ jobs:
                   image = Image.open(io.BytesIO(z.read(name))).convert('RGBA')
                   assert all((not a) or (r, g, b) == (255, 255, 255) for r, g, b, a in image.getdata()), name
 
-          print('hardware-accepted v1.0.0 contract + 32 white app-list icons verified')
+          print('hardware-accepted v1.0.0 package identity + 32 white app-list icons verified')
           PY
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
 
       - name: Materialize exact reference package
         run: |
@@ -70,6 +66,16 @@ jobs:
           assert plugin.is_dir()
           print(plugin)
           PY
+
+      - name: Verify all seven hardware-acceptance fixes survived
+        run: python plugins/stream-deck-ultimate/scripts/verify_hardware_fixes.py .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - name: Verify white app-list icons after materialization
+        run: python plugins/stream-deck-ultimate/scripts/verify_white_icons.py .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
 
       - name: Official Elgato validation of exact corrected runtime
         run: |
