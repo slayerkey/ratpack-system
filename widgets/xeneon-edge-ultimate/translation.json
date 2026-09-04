@@ -6,7 +6,7 @@
   "Work": "Work",
   "Minimal": "Minimal",
   "Enthusiast": "Enthusiast",
-  "Start Mode": "Start Mode",
+  "Layout": "Layout",
   "Auto": "Auto",
   "Home": "Home",
   "Performance": "Performance",
@@ -29,13 +29,17 @@
   "60 sec": "60 sec",
   "5 min": "5 min",
   "15 min": "15 min",
+  "CPU Temperature Sensor": "CPU Temperature Sensor",
+  "GPU Temperature Sensor": "GPU Temperature Sensor",
+  "CPU Load Sensor": "CPU Load Sensor",
+  "GPU Load Sensor": "GPU Load Sensor",
   "Text Color": "Text Color",
   "Accent Color": "Accent Color",
   "Background Color": "Background Color",
   "Experience": "Experience",
   "Daily Data": "Daily Data",
   "Appearance": "Appearance",
-  "Smart Mode can enter Performance automatically when iCUE reports an active FPS session. Manual screen changes are respected before Auto resumes.": "Smart Mode can enter Performance automatically when iCUE reports an active FPS session. Manual screen changes are respected before Auto resumes.",
+  "Choose the active layout from the dropdown. Smart Mode can enter Performance automatically when iCUE reports an active FPS session; manual screen changes are respected before Auto resumes.": "Choose the active layout from the dropdown. Smart Mode can enter Performance automatically when iCUE reports an active FPS session; manual screen changes are respected before Auto resumes.",
   "Weather uses Open-Meteo and requires latitude/longitude. Calendar reads an optional ICS URL; some providers require a companion transport when browser access is blocked.": "Weather uses Open-Meteo and requires latitude/longitude. Calendar reads an optional ICS URL; some providers require a companion transport when browser access is blocked.",
-  "Hardware sensors are auto-selected from iCUE by device and sensor names. FPS comes from the native iCUE FPS provider.": "Hardware sensors are auto-selected from iCUE by device and sensor names. FPS comes from the native iCUE FPS provider."
+  "Choose the exact CPU/GPU sensors iCUE should use if its automatic defaults are not correct. FPS comes from the native iCUE FPS provider.": "Choose the exact CPU/GPU sensors iCUE should use if its automatic defaults are not correct. FPS comes from the native iCUE FPS provider."
 }
