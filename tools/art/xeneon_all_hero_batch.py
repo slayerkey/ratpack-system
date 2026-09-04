@@ -1,162 +1,340 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse, csv, json, math, shutil, zipfile
+import argparse
+import csv
+import json
+import math
+import os
+import shutil
+import zipfile
 from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "tools" / "art"
-BASE = ART / "scenes" / "warm-studio-v1" / "base.png"
+CATALOG_PATH = ART / "xeneon_hero_catalog.json"
 PLATE = ART / "assets" / "xeneon-edge-transparent.png"
 LOGO = ART / "assets" / "ratpack-icon-transparent.png"
 W, H = 1920, 960
-ORANGE = (244,116,0)
-WHITE = (247,248,250)
-MON = (430,74,1495,570)
-
-PRODUCTS = {
-    "agenda-panel": ("Calendar Panel", "CALENDAR", "PANEL"),
-    "desk-notes": ("Desk Notes Lite", "DESK", "NOTES LITE"),
-    "desk-notes-pro": ("Desk Notes Pro", "DESK", "NOTES PRO"),
-    "discord-panel": ("Discord Voice Panel", "DISCORD", "VOICE PANEL"),
-    "helldivers": ("Helldivers 2 Panel", "HELLDIVERS 2", "PANEL"),
-    "net-dashboard": ("Net Dashboard", "NET", "DASHBOARD"),
-    "now-playing": ("Now Playing Panel", "NOW", "PLAYING"),
-    "obs-dashboard": ("OBS Dashboard", "OBS", "DASHBOARD"),
-    "pc-power-meter": ("PC Power Meter Lite", "PC POWER", "METER LITE"),
-    "pc-power-meter-pro": ("PC Power Meter Pro", "PC POWER", "METER PRO"),
-    "rig-battery": ("Rig Battery", "RIG", "BATTERY"),
-    "snake": ("Snake", "", "SNAKE"),
-    "weather-timeline": ("Weather Timeline Lite", "WEATHER", "TIMELINE LITE"),
-    "weather-timeline-pro": ("Weather Timeline Pro", "WEATHER", "TIMELINE PRO"),
-    "work-session-tracker": ("Work Session Tracker Lite", "WORK SESSION", "TRACKER LITE"),
-    "work-session-tracker-pro": ("Work Session Tracker Pro", "WORK SESSION", "TRACKER PRO"),
-    "xeneon-edge-ultimate": ("XENEON EDGE Ultimate", "ULTIMATE", "BUNDLE"),
-}
+ORANGE = (244, 116, 0)
+WHITE = (247, 248, 250)
+MON = (430, 74, 1495, 570)
 
 
-def fail(msg: str):
+def fail(msg: str) -> None:
     raise SystemExit(msg)
 
 
+def load_catalog() -> tuple[dict, dict[str, dict]]:
+    if not CATALOG_PATH.is_file():
+        fail(f"XENEON hero catalog missing: {CATALOG_PATH}")
+    data = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    if data.get("version") != 1:
+        fail(f"unsupported XENEON hero catalog version: {data.get('version')}")
+    scene = str(data.get("scene") or "").strip()
+    if not scene:
+        fail("XENEON hero catalog scene is required")
+    products = data.get("products")
+    if not isinstance(products, list) or not products:
+        fail("XENEON hero catalog requires products")
+
+    by_slug: dict[str, dict] = {}
+    for item in products:
+        if not isinstance(item, dict):
+            fail("XENEON hero catalog product entries must be objects")
+        slug = str(item.get("slug") or "").strip()
+        name = str(item.get("name") or "").strip()
+        title = item.get("title")
+        if not slug or not name or not isinstance(title, list) or len(title) != 2:
+            fail(f"invalid XENEON hero catalog entry: {item!r}")
+        if slug in by_slug:
+            fail(f"duplicate XENEON hero slug: {slug}")
+        by_slug[slug] = {
+            "slug": slug,
+            "name": name,
+            "title": [str(title[0] or "").strip(), str(title[1] or "").strip()],
+        }
+    return data, by_slug
+
+
+CATALOG, PRODUCTS = load_catalog()
+SCENE_NAME = str(CATALOG["scene"])
+BASE = ART / "scenes" / SCENE_NAME / "base.png"
+PLATFORM_SUBTITLE = str(CATALOG.get("platform_subtitle") or "for XENEON Edge")
+
+
 def font_path(bold: bool) -> str:
-    import os
     env = os.environ.get("RATPACK_ART_FONT_BOLD" if bold else "RATPACK_ART_FONT")
-    if env and Path(env).is_file(): return env
-    candidates = ([r"C:\Windows\Fonts\segoeuib.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"] if bold
-                  else [r"C:\Windows\Fonts\segoeui.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"])
-    for p in candidates:
-        if Path(p).is_file(): return p
+    if env and Path(env).is_file():
+        return env
+    candidates = (
+        [r"C:\Windows\Fonts\segoeuib.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        if bold
+        else [r"C:\Windows\Fonts\segoeui.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+    )
+    for candidate in candidates:
+        if Path(candidate).is_file():
+            return candidate
     fail("deterministic font missing")
 
 
-def F(size: int, bold: bool=True): return ImageFont.truetype(font_path(bold), size)
+def F(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(font_path(bold), size)
 
 
-def fit(d, text, maxw, maxs, mins, bold=True):
-    if not text: return F(mins, bold)
-    for s in range(maxs, mins-1, -2):
-        f=F(s,bold); b=d.textbbox((0,0),text,font=f)
-        if b[2]-b[0] <= maxw: return f
-    return F(mins,bold)
+def fit(draw: ImageDraw.ImageDraw, text: str, max_width: int, max_size: int, min_size: int, bold: bool = True):
+    if not text:
+        return F(min_size, bold)
+    for size in range(max_size, min_size - 1, -2):
+        font = F(size, bold)
+        box = draw.textbbox((0, 0), text, font=font)
+        if box[2] - box[0] <= max_width:
+            return font
+    return F(min_size, bold)
 
 
-def safe_logo():
-    src=Image.open(LOGO).convert("RGBA")
-    w,h=src.size; p=max(18,round(max(w,h)*.20))
-    out=Image.new("RGBA",(w+2*p,h+2*p),(0,0,0,0)); out.alpha_composite(src,(p,p))
-    out.thumbnail((82,86),Image.Resampling.LANCZOS)
+def safe_logo() -> Image.Image:
+    src = Image.open(LOGO).convert("RGBA")
+    width, height = src.size
+    pad = max(18, round(max(width, height) * 0.20))
+    out = Image.new("RGBA", (width + 2 * pad, height + 2 * pad), (0, 0, 0, 0))
+    out.alpha_composite(src, (pad, pad))
+    out.thumbnail((82, 86), Image.Resampling.LANCZOS)
     return out
 
 
-def monitor(img, line1, line2):
-    x1,y1,x2,y2=MON; w=x2-x1; h=y2-y1
-    p=Image.new("RGBA",(w,h),(4,6,8,255)); d=ImageDraw.Draw(p)
-    glow=Image.new("RGBA",(w,h),(0,0,0,0)); gd=ImageDraw.Draw(glow)
-    gd.ellipse((-120,int(h*.60),w+140,int(h*1.26)),fill=(*ORANGE,30))
-    p.alpha_composite(glow.filter(ImageFilter.GaussianBlur(42)))
+def monitor(img: Image.Image, line1: str, line2: str) -> None:
+    x1, y1, x2, y2 = MON
+    width = x2 - x1
+    height = y2 - y1
+    panel = Image.new("RGBA", (width, height), (4, 6, 8, 255))
+    draw = ImageDraw.Draw(panel)
+
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    glow_draw.ellipse((-120, int(height * 0.60), width + 140, int(height * 1.26)), fill=(*ORANGE, 30))
+    panel.alpha_composite(glow.filter(ImageFilter.GaussianBlur(42)))
+
     for band in range(6):
-        pts=[]; yy=int(h*.88)+band*3
-        for xx in range(-20,w+20,8):
-            pts.append((xx,yy+int(math.sin(xx/w*math.pi*2+band*.18)*(4+band))))
-        d.line(pts,fill=(*ORANGE,max(7,27-band*3)),width=1)
-    for xx in range(int(w*.81),w-28,10):
-        for yy in range(22,122,10): d.ellipse((xx,yy,xx+2,yy+2),fill=(*ORANGE,25))
-    f1=fit(d,line1,int(w*.84),116,50); f2=fit(d,line2,int(w*.88),126,48); fs=fit(d,"for XENEON Edge",int(w*.58),46,29)
-    def center(text,fnt,cy,col):
-        if not text: return
-        b=d.textbbox((0,0),text,font=fnt); tw,th=b[2]-b[0],b[3]-b[1]; tx=(w-tw)//2; ty=int(cy-th/2-b[1])
-        sh=Image.new("RGBA",(w,h),(0,0,0,0)); sd=ImageDraw.Draw(sh); sd.text((tx+2,ty+4),text,font=fnt,fill=(0,0,0,175)); p.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4)))
-        d.text((tx,ty),text,font=fnt,fill=(*col,255))
+        points = []
+        baseline = int(height * 0.88) + band * 3
+        for x in range(-20, width + 20, 8):
+            points.append((x, baseline + int(math.sin(x / width * math.pi * 2 + band * 0.18) * (4 + band))))
+        draw.line(points, fill=(*ORANGE, max(7, 27 - band * 3)), width=1)
+
+    for x in range(int(width * 0.81), width - 28, 10):
+        for y in range(22, 122, 10):
+            draw.ellipse((x, y, x + 2, y + 2), fill=(*ORANGE, 25))
+
+    f1 = fit(draw, line1, int(width * 0.84), 116, 50)
+    f2 = fit(draw, line2, int(width * 0.88), 126, 48)
+    fs = fit(draw, PLATFORM_SUBTITLE, int(width * 0.58), 46, 29)
+
+    def center(text: str, font, center_y: float, color: tuple[int, int, int]) -> None:
+        if not text:
+            return
+        box = draw.textbbox((0, 0), text, font=font)
+        text_width = box[2] - box[0]
+        text_height = box[3] - box[1]
+        tx = (width - text_width) // 2
+        ty = int(center_y - text_height / 2 - box[1])
+        shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow)
+        shadow_draw.text((tx + 2, ty + 4), text, font=font, fill=(0, 0, 0, 175))
+        panel.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(4)))
+        draw.text((tx, ty), text, font=font, fill=(*color, 255))
+
     if line1:
-        center(line1,f1,h*.10,WHITE); center(line2,f2,h*.31,ORANGE); center("for XENEON Edge",fs,h*.49,WHITE)
+        center(line1, f1, height * 0.10, WHITE)
+        center(line2, f2, height * 0.31, ORANGE)
+        center(PLATFORM_SUBTITLE, fs, height * 0.49, WHITE)
     else:
-        center(line2,f2,h*.22,ORANGE); center("for XENEON Edge",fs,h*.48,WHITE)
-    img.alpha_composite(p,(x1,y1))
+        center(line2, f2, height * 0.22, ORANGE)
+        center(PLATFORM_SUBTITLE, fs, height * 0.48, WHITE)
+
+    img.alpha_composite(panel, (x1, y1))
 
 
 def device_geometry():
-    plate=Image.open(PLATE).convert("RGBA")
-    bbox=plate.getchannel("A").getbbox(); pad=10
-    cx1=max(0,bbox[0]-pad); cy1=max(0,bbox[1]-pad); cx2=min(plate.width,bbox[2]+pad); cy2=min(plate.height,bbox[3]+pad)
-    crop=plate.crop((cx1,cy1,cx2,cy2)); screen=(243-cx1,465-cy1,1658-cx1,848-cy1)
-    tw=1890; scale=tw/crop.width; th=round(crop.height*scale); x=(W-tw)//2; y=H-th-8
-    dev=crop.resize((tw,th),Image.Resampling.LANCZOS); sx1,sy1,sx2,sy2=[round(v*scale) for v in screen]
-    return dev,x,y,(sx1,sy1,sx2,sy2)
+    plate = Image.open(PLATE).convert("RGBA")
+    bbox = plate.getchannel("A").getbbox()
+    if bbox is None:
+        fail("approved XENEON device plate has no alpha content")
+    pad = 10
+    cx1 = max(0, bbox[0] - pad)
+    cy1 = max(0, bbox[1] - pad)
+    cx2 = min(plate.width, bbox[2] + pad)
+    cy2 = min(plate.height, bbox[3] + pad)
+    crop = plate.crop((cx1, cy1, cx2, cy2))
+    screen = (243 - cx1, 465 - cy1, 1658 - cx1, 848 - cy1)
+    target_width = 1890
+    scale = target_width / crop.width
+    target_height = round(crop.height * scale)
+    x = (W - target_width) // 2
+    y = H - target_height - 8
+    device = crop.resize((target_width, target_height), Image.Resampling.LANCZOS)
+    sx1, sy1, sx2, sy2 = [round(value * scale) for value in screen]
+    return device, x, y, (sx1, sy1, sx2, sy2)
 
 
-def prep_ui(path: Path, size):
-    ui=Image.open(path).convert("RGBA").resize(size,Image.Resampling.LANCZOS)
-    ui=ImageEnhance.Contrast(ui).enhance(1.055); ui=ImageEnhance.Sharpness(ui).enhance(1.32)
-    return ui.filter(ImageFilter.UnsharpMask(radius=.75,percent=115,threshold=2))
+def prep_ui(path: Path, size: tuple[int, int]) -> Image.Image:
+    ui = Image.open(path).convert("RGBA").resize(size, Image.Resampling.LANCZOS)
+    ui = ImageEnhance.Contrast(ui).enhance(1.055)
+    ui = ImageEnhance.Sharpness(ui).enhance(1.32)
+    return ui.filter(ImageFilter.UnsharpMask(radius=0.75, percent=115, threshold=2))
 
 
-def render_one(slug: str, shot: Path, out: Path):
-    if slug not in PRODUCTS: fail(f"unknown XENEON slug: {slug}")
-    if not shot.is_file(): fail(f"missing real XL_H capture: {shot}")
-    if not BASE.is_file() or not PLATE.is_file() or not LOGO.is_file(): fail("approved environment assets missing")
-    name,l1,l2=PRODUCTS[slug]; img=Image.open(BASE).convert("RGBA"); monitor(img,l1,l2)
-    dev,x,y,s=device_geometry(); sx1,sy1,sx2,sy2=s; ui=prep_ui(shot,(sx2-sx1,sy2-sy1))
-    shadow=Image.new("RGBA",img.size,(0,0,0,0)); a=dev.getchannel("A").filter(ImageFilter.GaussianBlur(15)); ss=Image.new("RGBA",dev.size,(0,0,0,84)); ss.putalpha(a); shadow.alpha_composite(ss,(x+4,y+10)); img.alpha_composite(shadow)
-    layer=Image.new("RGBA",img.size,(0,0,0,0)); layer.alpha_composite(ui,(x+sx1,y+sy1)); layer.alpha_composite(dev,(x,y)); img.alpha_composite(layer)
-    lg=safe_logo(); img.alpha_composite(lg,(W-58-lg.width,24))
-    out.parent.mkdir(parents=True,exist_ok=True); img.convert("RGB").save(out,"PNG",optimize=True)
-    meta=out.with_suffix(".json"); meta.write_text(json.dumps({"slug":slug,"name":name,"title":[l1,l2],"source_capture":str(shot)},indent=2),encoding="utf-8")
+def render_one(slug: str, shot: Path, out: Path) -> None:
+    product = PRODUCTS.get(slug)
+    if product is None:
+        fail(f"unknown XENEON slug: {slug}")
+    if not shot.is_file():
+        fail(f"missing real XL_H capture: {shot}")
+    if not BASE.is_file() or not PLATE.is_file() or not LOGO.is_file():
+        fail("approved environment assets missing")
+
+    line1, line2 = product["title"]
+    img = Image.open(BASE).convert("RGBA")
+    if img.size != (W, H):
+        fail(f"approved environment must be {W}x{H}: {BASE}")
+    monitor(img, line1, line2)
+
+    device, x, y, screen = device_geometry()
+    sx1, sy1, sx2, sy2 = screen
+    ui = prep_ui(shot, (sx2 - sx1, sy2 - sy1))
+
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    alpha = device.getchannel("A").filter(ImageFilter.GaussianBlur(15))
+    shadow_surface = Image.new("RGBA", device.size, (0, 0, 0, 84))
+    shadow_surface.putalpha(alpha)
+    shadow.alpha_composite(shadow_surface, (x + 4, y + 10))
+    img.alpha_composite(shadow)
+
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    layer.alpha_composite(ui, (x + sx1, y + sy1))
+    layer.alpha_composite(device, (x, y))
+    img.alpha_composite(layer)
+
+    logo = safe_logo()
+    img.alpha_composite(logo, (W - 58 - logo.width, 24))
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.convert("RGB").save(out, "PNG", optimize=True)
+    out.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "slug": slug,
+                "name": product["name"],
+                "title": product["title"],
+                "scene": SCENE_NAME,
+                "catalog_version": CATALOG["version"],
+                "source_capture": str(shot),
+                "generated_image_dependency": False,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"PASS {slug}: {out}")
 
 
-def bundle(inp: Path, outdir: Path):
-    outdir.mkdir(parents=True,exist_ok=True); heroes=outdir/"heroes"; heroes.mkdir(exist_ok=True)
-    rows=[]
-    for slug,(name,_,_) in PRODUCTS.items():
-        p=inp/f"{slug}.png"; m=inp/f"{slug}.json"
-        if p.is_file(): shutil.copy2(p,heroes/p.name); rows.append((slug,name,"RENDERED",p))
-        else: rows.append((slug,name,"MISSING",""))
-        if m.is_file(): shutil.copy2(m,heroes/m.name)
-    rendered=[r for r in rows if r[2]=="RENDERED"]
-    cols=4; tilew,tileh=480,280; nrows=math.ceil(len(rendered)/cols)
-    contact=Image.new("RGB",(cols*tilew,nrows*tileh),(12,12,14)); d=ImageDraw.Draw(contact); lf=F(20,True)
-    small=Image.new("RGB",(cols*288,nrows*144),(12,12,14))
-    for i,(slug,name,_,p) in enumerate(rendered):
-        c,r=i%cols,i//cols; im=Image.open(p).convert("RGB"); contact.paste(im.resize((480,240),Image.Resampling.LANCZOS),(c*tilew,r*tileh)); d.rectangle((c*tilew,r*tileh+240,c*tilew+tilew,r*tileh+tileh),fill=(16,17,20)); d.text((c*tilew+12,r*tileh+249),name,font=lf,fill=(245,246,248)); small.paste(im.resize((288,144),Image.Resampling.LANCZOS),(c*288,r*144))
-    contact.save(outdir/"contact-sheet.jpg",quality=94); small.save(outdir/"15-percent-sheet.jpg",quality=96)
-    with (outdir/"manifest.csv").open("w",newline="",encoding="utf-8") as f:
-        w=csv.writer(f); w.writerow(["slug","product","status"]); [w.writerow(r[:3]) for r in rows]
-    (outdir/"README.md").write_text(f"# PackRat XENEON all-hero batch\n\nRendered {len(rendered)}/{len(PRODUCTS)} current XENEON source products with real XL_H captures and the approved warm-studio hero system.\n",encoding="utf-8")
-    zip_path=outdir.parent/"packrat-xeneon-all-heroes.zip"
-    if zip_path.exists(): zip_path.unlink()
-    with zipfile.ZipFile(zip_path,"w",zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-        for p in sorted(outdir.rglob("*")):
-            if p.is_file(): z.write(p,p.relative_to(outdir))
+def bundle(inp: Path, outdir: Path) -> None:
+    outdir.mkdir(parents=True, exist_ok=True)
+    heroes = outdir / "heroes"
+    heroes.mkdir(exist_ok=True)
+
+    rows = []
+    for slug, product in PRODUCTS.items():
+        png = inp / f"{slug}.png"
+        meta = inp / f"{slug}.json"
+        if png.is_file():
+            shutil.copy2(png, heroes / png.name)
+            rows.append((slug, product["name"], "RENDERED", png))
+        else:
+            rows.append((slug, product["name"], "MISSING", ""))
+        if meta.is_file():
+            shutil.copy2(meta, heroes / meta.name)
+
+    rendered = [row for row in rows if row[2] == "RENDERED"]
+    cols = 4
+    tile_width, tile_height = 480, 280
+    nrows = math.ceil(len(rendered) / cols)
+    contact = Image.new("RGB", (cols * tile_width, nrows * tile_height), (12, 12, 14))
+    draw = ImageDraw.Draw(contact)
+    label_font = F(20, True)
+    small = Image.new("RGB", (cols * 288, nrows * 144), (12, 12, 14))
+
+    for index, (slug, name, _, path) in enumerate(rendered):
+        col, row = index % cols, index // cols
+        image = Image.open(path).convert("RGB")
+        contact.paste(image.resize((480, 240), Image.Resampling.LANCZOS), (col * tile_width, row * tile_height))
+        draw.rectangle(
+            (col * tile_width, row * tile_height + 240, col * tile_width + tile_width, row * tile_height + tile_height),
+            fill=(16, 17, 20),
+        )
+        draw.text((col * tile_width + 12, row * tile_height + 249), name, font=label_font, fill=(245, 246, 248))
+        small.paste(image.resize((288, 144), Image.Resampling.LANCZOS), (col * 288, row * 144))
+
+    contact.save(outdir / "contact-sheet.jpg", quality=94)
+    small.save(outdir / "15-percent-sheet.jpg", quality=96)
+
+    with (outdir / "manifest.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["slug", "product", "status"])
+        for row in rows:
+            writer.writerow(row[:3])
+
+    (outdir / "README.md").write_text(
+        "# PackRat XENEON all-hero batch\n\n"
+        f"Rendered {len(rendered)}/{len(PRODUCTS)} configured XENEON products with real XL_H captures "
+        f"and the approved {SCENE_NAME} hero system.\n\n"
+        "No image-generation provider is used.\n",
+        encoding="utf-8",
+    )
+
+    zip_path = outdir.parent / "packrat-xeneon-all-heroes.zip"
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(outdir.rglob("*")):
+            if path.is_file():
+                archive.write(path, path.relative_to(outdir))
+
     print(f"BUNDLE {len(rendered)}/{len(PRODUCTS)}: {zip_path}")
-    if len(rendered)!=len(PRODUCTS): fail("batch incomplete; see manifest.csv")
+    if len(rendered) != len(PRODUCTS):
+        fail("batch incomplete; see manifest.csv")
 
 
-def main():
-    ap=argparse.ArgumentParser(); sub=ap.add_subparsers(dest="cmd",required=True)
-    r=sub.add_parser("render"); r.add_argument("--slug",required=True); r.add_argument("--shot",type=Path,required=True); r.add_argument("--out",type=Path,required=True)
-    b=sub.add_parser("bundle"); b.add_argument("--input",type=Path,required=True); b.add_argument("--out-dir",type=Path,required=True)
-    a=ap.parse_args(); render_one(a.slug,a.shot,a.out) if a.cmd=="render" else bundle(a.input,a.out_dir)
+def list_products() -> None:
+    for slug in PRODUCTS:
+        print(slug)
 
-if __name__=="__main__": main()
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    render_parser = sub.add_parser("render")
+    render_parser.add_argument("--slug", required=True)
+    render_parser.add_argument("--shot", type=Path, required=True)
+    render_parser.add_argument("--out", type=Path, required=True)
+
+    bundle_parser = sub.add_parser("bundle")
+    bundle_parser.add_argument("--input", type=Path, required=True)
+    bundle_parser.add_argument("--out-dir", type=Path, required=True)
+
+    sub.add_parser("list")
+
+    args = parser.parse_args()
+    if args.cmd == "render":
+        render_one(args.slug, args.shot, args.out)
+    elif args.cmd == "bundle":
+        bundle(args.input, args.out_dir)
+    else:
+        list_products()
+
+
+if __name__ == "__main__":
+    main()
