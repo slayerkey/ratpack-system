@@ -1,0 +1,60 @@
+name: Performance Grapher 1.4.2 CI
+
+on:
+  push:
+    branches:
+      - fix/perf-grapher-1.4.2-preference-persistence
+
+permissions:
+  contents: read
+
+jobs:
+  persistence-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preference persistence regression
+        run: node widgets/_src/perf-grapher/preference-persistence-smoke.mjs
+      - name: Generate widget
+        run: |
+          python tools/xeneon/inline.py perf-grapher
+          python tools/xeneon/inline.py perf-grapher --check
+
+  official-package:
+    runs-on: windows-latest
+    needs: persistence-regression
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Preference persistence regression on Windows
+        shell: pwsh
+        run: node widgets/_src/perf-grapher/preference-persistence-smoke.mjs
+      - name: Generate shipping widget
+        shell: pwsh
+        run: |
+          python tools/xeneon/inline.py perf-grapher
+          python tools/xeneon/inline.py perf-grapher --check
+      - name: Official CORSAIR validation
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 validate widgets/perf-grapher
+      - name: Official CORSAIR package
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 package widgets/perf-grapher
+      - name: Collect exact package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $pkg = Get-ChildItem -Path widgets -Filter *.icuewidget -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $pkg) { throw 'No .icuewidget package produced' }
+          Copy-Item $pkg.FullName artifacts/perf-grapher-1.4.2.icuewidget
+          Get-FileHash artifacts/perf-grapher-1.4.2.icuewidget -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: performance-grapher-1.4.2-package
+          path: artifacts/perf-grapher-1.4.2.icuewidget
+          retention-days: 30
