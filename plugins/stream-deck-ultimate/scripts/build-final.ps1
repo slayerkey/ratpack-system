@@ -24,6 +24,8 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory($Reference, $OutputRoot)
 if (-not (Test-Path -LiteralPath $Plugin)) { throw "Reference package did not contain the expected .sdPlugin root" }
 
+python (Join-Path $ProductRoot "scripts\verify_hardware_fixes.py") $Plugin
+if ($LASTEXITCODE -ne 0) { throw "hardware acceptance F1-F7 regression contract failed" }
 python (Join-Path $ProductRoot "scripts\verify_white_icons.py") $Plugin
 if ($LASTEXITCODE -ne 0) { throw "Elgato white icon verification failed" }
 
@@ -49,6 +51,8 @@ if (-not $SkipOfficialValidate) {
   plugin = $Plugin
   version = $manifest.Version
   actions = @($manifest.Actions).Count
+  hardwareFixes = "F1-F7 PASS"
+  whiteIcons = "32 assets PASS"
   validated = (-not $SkipOfficialValidate)
   dist = $Dist
 } | ConvertTo-Json -Compress
