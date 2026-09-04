@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - product/voice-deck
+      - resubmit/voice-deck-elgato
   pull_request:
     branches:
       - main
