@@ -40,7 +40,11 @@
   const $ = (id) => document.getElementById(id);
 
   function send(message) {
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
   }
 
   function save() {
@@ -103,30 +107,44 @@
 
   function updateStatus() {
     const connection = snapshot?.connection || {};
+    const authStage = String(connection.authStage || "idle");
+    const handshake = String(connection.handshake || "idle");
+    const authBusy = ["authorizing", "exchanging", "authenticating"].includes(authStage);
+    const connectionBusy = ["connecting", "opening_pipe", "waiting_ready", "retrying"].includes(handshake);
     const dot = $("statusDot");
     dot.className = "dot";
     let title = "Discord closed";
     let detail = "Open Discord Desktop and Voice Deck will reconnect automatically.";
+
     if (connection.authenticated) {
       dot.classList.add("ready");
       title = snapshot?.channel?.name ? snapshot.channel.name : "Discord connected";
       detail = snapshot?.channel ? `${snapshot.members?.length || 0} in voice${snapshot.guild?.name ? ` · ${snapshot.guild.name}` : ""}` : "Join a voice channel and the keys will populate automatically.";
-    } else if (connection.ready && ["authorization_required", "failed"].includes(connection.authStage)) {
-      dot.classList.add(connection.authStage === "failed" ? "error" : "warn");
-      title = connection.authStage === "failed" ? "Authorization needs attention" : "Discord authorization needed";
-      detail = "Press Connect Discord once and approve the local Discord prompt.";
-    } else if (["connecting", "opening_pipe", "waiting_ready", "retrying"].includes(connection.handshake)) {
+    } else if (connection.ready && authStage === "authorizing") {
+      dot.classList.add("warn");
+      title = "Waiting for Discord approval";
+      detail = "Approve the Voice Deck authorization prompt in Discord Desktop.";
+    } else if (connection.ready && ["exchanging", "authenticating"].includes(authStage)) {
+      dot.classList.add("warn");
+      title = "Finishing Discord connection";
+      detail = "Authorization was received. Voice Deck is completing the local connection.";
+    } else if (connection.ready && ["authorization_required", "failed"].includes(authStage)) {
+      dot.classList.add(authStage === "failed" ? "error" : "warn");
+      title = authStage === "failed" ? "Authorization needs attention" : "Discord authorization needed";
+      detail = authStage === "failed" ? "Try Connect Discord again after checking the error below." : "Press Connect Discord once and approve the local Discord prompt.";
+    } else if (connectionBusy) {
       dot.classList.add("warn");
       title = "Connecting to Discord";
       detail = "Voice Deck is looking for the local Discord Desktop client.";
     }
+
     $("statusTitle").textContent = title;
     $("statusDetail").textContent = detail;
     const error = String(connection.error || "");
     $("errorText").hidden = !error;
     $("errorText").textContent = error;
-    $("authorize").textContent = connection.authenticated ? "Discord connected" : "Connect Discord";
-    $("authorize").disabled = Boolean(connection.authenticated);
+    $("authorize").textContent = connection.authenticated ? "Discord connected" : authBusy || connectionBusy ? "Connecting…" : "Connect Discord";
+    $("authorize").disabled = Boolean(connection.authenticated || authBusy || connectionBusy);
   }
 
   function filterFields() {
@@ -137,7 +155,23 @@
   }
 
   function command(name) {
-    send({ event: "sendToPlugin", action: actionUuid, context, payload: { type: "voiceDeck.command", command: name } });
+    return send({ event: "sendToPlugin", action: actionUuid, context, payload: { type: "voiceDeck.command", command: name } });
+  }
+
+  function startAuthorization() {
+    $("statusDot").className = "dot warn";
+    $("statusTitle").textContent = "Starting Discord connection";
+    $("statusDetail").textContent = "Voice Deck is contacting Discord Desktop. Approve the prompt there if one appears.";
+    $("errorText").hidden = true;
+    $("authorize").textContent = "Connecting…";
+    $("authorize").disabled = true;
+    if (!command("authorize")) {
+      $("statusDot").className = "dot error";
+      $("statusTitle").textContent = "Stream Deck connection unavailable";
+      $("statusDetail").textContent = "Close and reopen the Property Inspector, then try again.";
+      $("authorize").textContent = "Connect Discord";
+      $("authorize").disabled = false;
+    }
   }
 
   window.connectElgatoStreamDeckSocket = (port, uuid, registerEvent, info, rawActionInfo) => {
@@ -171,7 +205,7 @@
   for (const id of ["memberId", "slotIndex", "ordering", "displayMode", "showChannel", "showServer", "showAvatar", "showDisplayName", "fallbackInitials", "speakingAnimation", "combinedBehavior", "channelPressBehavior", "accent"]) {
     $(id).addEventListener(id === "accent" ? "input" : "change", save);
   }
-  $("authorize").addEventListener("click", () => command("authorize"));
+  $("authorize").addEventListener("click", startAuthorization);
   $("refresh").addEventListener("click", () => command("refresh"));
   $("reconnect").addEventListener("click", () => command("reconnect"));
 })();
