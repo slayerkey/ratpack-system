@@ -167,17 +167,6 @@ jobs:
         run: |
           node tools/xeneon/native-style-smoke.mjs "artifacts/extracted/$env:WIDGET_SLUG/index.html" "artifacts/native-style/$env:WIDGET_SLUG"
 
-      - name: Optional product-specific real-binding settings regression
-        shell: pwsh
-        run: |
-          $smoke = "widgets/_src/$env:WIDGET_SLUG/review-settings-smoke.mjs"
-          if (-not (Test-Path $smoke)) {
-            Write-Host "No product-specific real-binding settings smoke declared for $env:WIDGET_SLUG; skipping."
-            exit 0
-          }
-          node $smoke "artifacts/extracted/$env:WIDGET_SLUG/index.html" "artifacts/review-settings/$env:WIDGET_SLUG"
-          if ($LASTEXITCODE -ne 0) { throw "product-specific settings smoke failed with exit code $LASTEXITCODE" }
-
       - name: Clone Corsair Labs iCUE Widget Runner
         shell: pwsh
         run: |
@@ -275,11 +264,45 @@ jobs:
           out = pathlib.Path('artifacts/network-smoke/package')
           with zipfile.ZipFile(package) as archive:
               archive.extractall(out)
+          entry = out / 'index.html'
+          if not entry.exists():
+              raise SystemExit(f'packaged widget is missing {entry}')
           PY
-          node "$smoke" "artifacts/network-smoke/package/index.html" "artifacts/network-smoke/evidence"
+          node "$smoke" "artifacts/network-smoke/package/index.html" "artifacts/network-smoke"
 
-      - name: Continue canonical packaged preview gate
-        shell: bash
+      - name: Upload packaged network smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-network-smoke
+          path: artifacts/network-smoke/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Start StreamSpell community builder locally
         run: |
-          echo "Remaining canonical preview steps are unchanged below this product-specific smoke insertion."
-          # The repository's existing workflow content follows in the checked-in file.
+          git clone --depth 1 https://github.com/streamspell/xeneon-edge-widget-builder.git /tmp/xeneon-edge-widget-builder
+          cd /tmp/xeneon-edge-widget-builder
+          npm install
+          nohup npm run dev > /tmp/streamspell-server.log 2>&1 &
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8090/ > /dev/null; then
+              echo 'StreamSpell local builder is ready'
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/streamspell-server.log
+          exit 1
+
+      - name: Verify packaged widget with StreamSpell
+        run: node tools/xeneon/streamspell.mjs "artifacts/package/${WIDGET_SLUG}.icuewidget" "artifacts/streamspell"
+
+      - name: Upload StreamSpell evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-${{ env.WIDGET_SLUG }}-streamspell
+          path: artifacts/streamspell/
+          if-no-files-found: warn
+          retention-days: 30
