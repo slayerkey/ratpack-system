@@ -38,6 +38,35 @@ function ask(pluginName, bucket, method, args) {
   });
 }
 
+var SENSOR_SETTING_BY_ROLE = {
+  cpuTemp: "cpuTempSensor",
+  gpuTemp: "gpuTempSensor",
+  cpuLoad: "cpuLoadSensor",
+  gpuLoad: "gpuLoadSensor"
+};
+
+function configuredSensorForRole(cfg, role) {
+  var key = SENSOR_SETTING_BY_ROLE[role];
+  var selected = key && cfg ? String(cfg[key] || "").trim() : "";
+  if (!selected) return "";
+  var catalogReady = state.sensorCatalog && Object.keys(state.sensorCatalog).length > 0;
+  if (catalogReady && !state.sensorCatalog[selected]) return "";
+  return selected;
+}
+
+function applySensorOverrides(nextSettings) {
+  if (state.preview) return;
+  var cfg = nextSettings || settings();
+  Object.keys(SENSOR_SETTING_BY_ROLE).forEach(function (role) {
+    var next = configuredSensorForRole(cfg, role) || state.autoSensorRoles[role] || null;
+    if (state.sensorRoles[role] === next) return;
+    state.sensorRoles[role] = next;
+    state.metrics[role] = null;
+    if (Array.isArray(state.history[role])) state.history[role] = [];
+  });
+  renderHealth();
+}
+
 async function discoverSensors() {
   var ids = await ask("Sensorsdataprovider", "sensors", "getAllSensorIds", []);
   if (!Array.isArray(ids)) {
@@ -64,10 +93,11 @@ async function discoverSensors() {
   }));
   state.sensorCatalog = {};
   inspected.forEach(function (s) { state.sensorCatalog[s.id] = s; });
-  state.sensorRoles.cpuTemp = bestSensor(inspected, "cpu", "temp");
-  state.sensorRoles.gpuTemp = bestSensor(inspected, "gpu", "temp");
-  state.sensorRoles.cpuLoad = bestSensor(inspected, "cpu", "load");
-  state.sensorRoles.gpuLoad = bestSensor(inspected, "gpu", "load");
+  state.autoSensorRoles.cpuTemp = bestSensor(inspected, "cpu", "temp");
+  state.autoSensorRoles.gpuTemp = bestSensor(inspected, "gpu", "temp");
+  state.autoSensorRoles.cpuLoad = bestSensor(inspected, "cpu", "load");
+  state.autoSensorRoles.gpuLoad = bestSensor(inspected, "gpu", "load");
+  applySensorOverrides(settings());
   renderHealth();
 }
 
@@ -105,7 +135,8 @@ function bestSensor(list, target, kind) {
 }
 
 function installPreviewSensors() {
-  state.sensorRoles = { cpuTemp: "preview-cpu-temp", gpuTemp: "preview-gpu-temp", cpuLoad: "preview-cpu-load", gpuLoad: "preview-gpu-load" };
+  state.autoSensorRoles = { cpuTemp: "preview-cpu-temp", gpuTemp: "preview-gpu-temp", cpuLoad: "preview-cpu-load", gpuLoad: "preview-gpu-load" };
+  state.sensorRoles = Object.assign({}, state.autoSensorRoles);
 }
 
 async function pollSensors() {

@@ -22,6 +22,7 @@ var state = {
   manualHoldUntil: 0,
   preview: false,
   sensorCatalog: {},
+  autoSensorRoles: { cpuTemp: null, gpuTemp: null, cpuLoad: null, gpuLoad: null },
   sensorRoles: { cpuTemp: null, gpuTemp: null, cpuLoad: null, gpuLoad: null },
   metrics: { cpuTemp: null, gpuTemp: null, cpuLoad: null, gpuLoad: null },
   history: { fps: [], cpuTemp: [], gpuTemp: [], cpuLoad: [], gpuLoad: [], network: [] },
@@ -81,6 +82,10 @@ function settings() {
     focusMinutes: clamp(Number(getIcueProperty("focusMinutes", 25)) || 25, 10, 90),
     pinnedNote: String(getIcueProperty("pinnedNote", "") || "").trim(),
     graphWindow: graph,
+    cpuTempSensor: String(getIcueProperty("cpuTempSensor", "") || "").trim(),
+    gpuTempSensor: String(getIcueProperty("gpuTempSensor", "") || "").trim(),
+    cpuLoadSensor: String(getIcueProperty("cpuLoadSensor", "") || "").trim(),
+    gpuLoadSensor: String(getIcueProperty("gpuLoadSensor", "") || "").trim(),
     text: String(getIcueProperty("textColor", "#F5F7FA") || "#F5F7FA"),
     accent: String(getIcueProperty("accentColor", "#2BE86A") || "#2BE86A"),
     background: String(getIcueProperty("backgroundColor", "#07090D") || "#07090D")
@@ -91,7 +96,9 @@ function settingsFingerprint(cfg) {
   return JSON.stringify([
     cfg.preset, cfg.startMode, cfg.smartMode, cfg.use24, cfg.tempUnit,
     cfg.weatherEnabled, cfg.weatherLatitude, cfg.weatherLongitude, cfg.calendarUrl,
-    cfg.focusMinutes, cfg.pinnedNote, cfg.graphWindow, cfg.text, cfg.accent, cfg.background
+    cfg.focusMinutes, cfg.pinnedNote, cfg.graphWindow,
+    cfg.cpuTempSensor, cfg.gpuTempSensor, cfg.cpuLoadSensor, cfg.gpuLoadSensor,
+    cfg.text, cfg.accent, cfg.background
   ]);
 }
 

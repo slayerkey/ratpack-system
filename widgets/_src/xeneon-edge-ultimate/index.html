@@ -6,8 +6,8 @@
 <link rel="icon" type="image/svg+xml" href="resources/icon.svg" />
 <title>tr('XENEON EDGE Ultimate')</title>
 
-<meta name="x-icue-property" content="preset" data-label="tr('Preset')" data-type="tab-buttons" data-default="'everyday'" data-values="[{'key':'everyday','value':tr('Everyday')},{'key':'gaming','value':tr('Gaming')},{'key':'work','value':tr('Work')},{'key':'minimal','value':tr('Minimal')},{'key':'enthusiast','value':tr('Enthusiast')}]" />
-<meta name="x-icue-property" content="startMode" data-label="tr('Start Mode')" data-type="tab-buttons" data-default="'auto'" data-values="[{'key':'auto','value':tr('Auto')},{'key':'home','value':tr('Home')},{'key':'performance','value':tr('Performance')},{'key':'today','value':tr('Today')},{'key':'ambient','value':tr('Ambient')}]" />
+<meta name="x-icue-property" content="preset" data-label="tr('Preset')" data-type="combobox" data-default="'everyday'" data-values="[{'key':'everyday','value':tr('Everyday')},{'key':'gaming','value':tr('Gaming')},{'key':'work','value':tr('Work')},{'key':'minimal','value':tr('Minimal')},{'key':'enthusiast','value':tr('Enthusiast')}]" />
+<meta name="x-icue-property" content="startMode" data-label="tr('Layout')" data-type="combobox" data-default="'auto'" data-values="[{'key':'auto','value':tr('Auto')},{'key':'home','value':tr('Home')},{'key':'performance','value':tr('Performance')},{'key':'today','value':tr('Today')},{'key':'ambient','value':tr('Ambient')}]" />
 <meta name="x-icue-property" content="smartMode" data-label="tr('Smart Mode')" data-type="switch" data-default="true" />
 <meta name="x-icue-property" content="use24Hour" data-label="tr('24 Hour Time')" data-type="switch" data-default="false" />
 <meta name="x-icue-property" content="temperatureUnit" data-label="tr('Temperature Unit')" data-type="tab-buttons" data-default="'f'" data-values="[{'key':'f','value':'°F'},{'key':'c','value':'°C'}]" />
@@ -18,6 +18,10 @@
 <meta name="x-icue-property" content="focusMinutes" data-label="tr('Focus Minutes')" data-type="slider" data-default="25" data-min="10" data-max="90" data-step="5" />
 <meta name="x-icue-property" content="pinnedNote" data-label="tr('Pinned Note')" data-type="textfield" data-default="''" data-placeholder="tr('Optional short note')" />
 <meta name="x-icue-property" content="graphWindow" data-label="tr('Graph Window')" data-type="tab-buttons" data-default="'5m'" data-values="[{'key':'60s','value':tr('60 sec')},{'key':'5m','value':tr('5 min')},{'key':'15m','value':tr('15 min')}]" />
+<meta name="x-icue-property" content="cpuTempSensor" data-label="tr('CPU Temperature Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('temperature','cpu-temp')" />
+<meta name="x-icue-property" content="gpuTempSensor" data-label="tr('GPU Temperature Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('temperature','gpu-temp')" />
+<meta name="x-icue-property" content="cpuLoadSensor" data-label="tr('CPU Load Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('load','default')" />
+<meta name="x-icue-property" content="gpuLoadSensor" data-label="tr('GPU Load Sensor')" data-type="sensors-combobox" data-default="plugins.Sensorsdataprovider.getDefaultSensorIdBlock('load','gpu-load')" />
 
 <meta name="x-icue-property" content="textColor" data-label="tr('Text Color')" data-type="color" data-default="'#F5F7FA'" />
 <meta name="x-icue-property" content="accentColor" data-label="tr('Accent Color')" data-type="color" data-default="'#2BE86A'" />
@@ -28,7 +32,7 @@
   {
     "title": "tr('Experience')",
     "properties": ["preset", "startMode", "smartMode", "use24Hour", "temperatureUnit"],
-    "info": "tr('Smart Mode can enter Performance automatically when iCUE reports an active FPS session. Manual screen changes are respected before Auto resumes.')"
+    "info": "tr('Choose the active layout from the dropdown. Smart Mode can enter Performance automatically when iCUE reports an active FPS session; manual screen changes are respected before Auto resumes.')"
   },
   {
     "title": "tr('Daily Data')",
@@ -37,8 +41,8 @@
   },
   {
     "title": "tr('Performance')",
-    "properties": ["graphWindow"],
-    "info": "tr('Hardware sensors are auto-selected from iCUE by device and sensor names. FPS comes from the native iCUE FPS provider.')"
+    "properties": ["graphWindow", "cpuTempSensor", "gpuTempSensor", "cpuLoadSensor", "gpuLoadSensor"],
+    "info": "tr('Choose the exact CPU/GPU sensors iCUE should use if its automatic defaults are not correct. FPS comes from the native iCUE FPS provider.')"
   },
   {
     "title": "tr('Appearance')",
@@ -233,5 +237,6 @@
 <script src="ui-graphs.js"></script>
 <script src="ui-drawers.js"></script>
 <script src="ui-runtime.js"></script>
+<script src="icue-live-settings.js"></script>
 </body>
 </html>

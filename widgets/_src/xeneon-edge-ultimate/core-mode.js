@@ -5,15 +5,33 @@ function applySettings(initial, nextSettings) {
     cfg.weatherLatitude !== previous.weatherLatitude || cfg.weatherLongitude !== previous.weatherLongitude;
   var calendarChanged = !previous || cfg.calendarUrl !== previous.calendarUrl;
   var focusChanged = !!previous && cfg.focusMinutes !== previous.focusMinutes;
+  var sensorSettingsChanged = !previous ||
+    cfg.cpuTempSensor !== previous.cpuTempSensor || cfg.gpuTempSensor !== previous.gpuTempSensor ||
+    cfg.cpuLoadSensor !== previous.cpuLoadSensor || cfg.gpuLoadSensor !== previous.gpuLoadSensor;
   var modeSettingsChanged = !!previous && (
     cfg.startMode !== previous.startMode || cfg.smartMode !== previous.smartMode || cfg.preset !== previous.preset
   );
 
-  document.documentElement.style.setProperty("--text", cfg.text);
-  document.documentElement.style.setProperty("--accent", cfg.accent);
-  document.documentElement.style.setProperty("--bg", cfg.background);
+  var root = document.documentElement;
+  root.style.setProperty("--text", cfg.text);
+  root.style.setProperty("--accent", cfg.accent);
+  root.style.setProperty("--bg", cfg.background);
+  // Keep the secondary UI palette tied to the chosen text color. The previous
+  // fixed-white muted/panel tokens made Custom Style appear only partially applied
+  // on real XENEON hardware even when the three primary bindings had changed.
+  root.style.setProperty("--muted", "color-mix(in srgb, " + cfg.text + " 72%, transparent)");
+  root.style.setProperty("--faint", "color-mix(in srgb, " + cfg.text + " 25%, transparent)");
+  root.style.setProperty("--panel", "color-mix(in srgb, " + cfg.text + " 4.5%, transparent)");
+  root.style.setProperty("--panel-strong", "color-mix(in srgb, " + cfg.text + " 7.5%, transparent)");
+  root.style.backgroundColor = cfg.background;
+  document.body.style.backgroundColor = cfg.background;
+  document.body.style.color = cfg.text;
   document.body.setAttribute("data-preset", cfg.preset);
   setText("noteText", cfg.pinnedNote || "Add a short note in iCUE settings.");
+
+  if (typeof applySensorOverrides === "function" && sensorSettingsChanged) {
+    applySensorOverrides(cfg);
+  }
 
   var storedFocus = storeRead("focus", null);
   if (initial && storedFocus && typeof storedFocus === "object") {
