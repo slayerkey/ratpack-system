@@ -1,0 +1,123 @@
+name: XENEON All Heroes Batch
+
+on:
+  push:
+    branches:
+      - automation/xeneon-all-heroes-20260904
+    paths:
+      - '.github/workflows/xeneon-all-heroes-batch.yml'
+      - 'tools/art/xeneon_all_hero_batch.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-all:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
+      RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync current XENEON product source from main
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git checkout origin/main -- widgets/_src tools/xeneon tools/art/capture_xeneon.mjs products/index.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deterministic capture dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==12.3.0
+          npm install --no-save playwright@1.62.1
+          npx playwright install chromium
+
+      - name: Build, capture, and render every XENEON product
+        shell: pwsh
+        run: |
+          $slugs = @(
+            'agenda-panel',
+            'desk-notes',
+            'desk-notes-pro',
+            'discord-panel',
+            'helldivers',
+            'net-dashboard',
+            'now-playing',
+            'obs-dashboard',
+            'pc-power-meter',
+            'pc-power-meter-pro',
+            'rig-battery',
+            'snake',
+            'weather-timeline',
+            'weather-timeline-pro',
+            'work-session-tracker',
+            'work-session-tracker-pro',
+            'xeneon-edge-ultimate'
+          )
+          New-Item -ItemType Directory -Force artifacts/xeneon-all/rendered | Out-Null
+          New-Item -ItemType Directory -Force artifacts/xeneon-all/logs | Out-Null
+          $failed = @()
+          foreach ($slug in $slugs) {
+            Write-Host "=== $slug ==="
+            try {
+              python tools/xeneon/inline.py $slug *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-build.txt"
+              if ($LASTEXITCODE -ne 0) { throw "build failed: $slug" }
+
+              $shots = "artifacts/xeneon-all/shots/$slug"
+              node tools/art/capture_xeneon.mjs $slug $shots *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-capture.txt"
+              if ($LASTEXITCODE -ne 0) { throw "capture failed: $slug" }
+              if (-not (Test-Path "$shots/XL_H.png")) { throw "XL_H missing: $slug" }
+
+              python tools/art/xeneon_all_hero_batch.py render --slug $slug --shot "$shots/XL_H.png" --out "artifacts/xeneon-all/rendered/$slug.png" *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-render.txt"
+              if ($LASTEXITCODE -ne 0) { throw "render failed: $slug" }
+            }
+            catch {
+              Write-Host "FAILED $slug :: $_"
+              $failed += $slug
+              $_ | Out-File -Append "artifacts/xeneon-all/logs/failures.txt"
+            }
+          }
+          "failed=$($failed -join ',')" | Out-File artifacts/xeneon-all/logs/summary.txt
+          Write-Host "Failures: $($failed -join ', ')"
+
+      - name: Build complete ZIP and QA sheets
+        id: bundle
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python tools/art/xeneon_all_hero_batch.py bundle --input artifacts/xeneon-all/rendered --out-dir artifacts/xeneon-all/final
+
+      - name: Verify complete 17-product batch
+        shell: pwsh
+        run: |
+          $heroes = Get-ChildItem artifacts/xeneon-all/rendered -Filter *.png -File -ErrorAction SilentlyContinue
+          Write-Host "Rendered heroes: $($heroes.Count)"
+          if ($heroes.Count -ne 17) {
+            Get-Content artifacts/xeneon-all/logs/summary.txt -ErrorAction SilentlyContinue
+            throw "Expected 17 real XENEON heroes; got $($heroes.Count)"
+          }
+          if (-not (Test-Path artifacts/xeneon-all/packrat-xeneon-all-heroes.zip) -and -not (Test-Path artifacts/xeneon-all/final/../packrat-xeneon-all-heroes.zip)) {
+            throw 'Final ZIP missing'
+          }
+
+      - name: Upload complete XENEON hero batch
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packrat-xeneon-all-heroes
+          path: artifacts/xeneon-all/
+          if-no-files-found: error
+          retention-days: 30
