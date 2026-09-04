@@ -1,35 +1,77 @@
 name: Stream Deck Ultimate Recovered v1.0 CI
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - recovery/stream-deck-ultimate-v1-source
     paths:
       - 'plugins/stream-deck-ultimate/**'
       - '.github/workflows/stream-deck-ultimate-recovered-ci.yml'
   workflow_dispatch:
+
 jobs:
   reference-package-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
-        with: {python-version: '3.13'}
-      - name: Verify corrected reference package
+        with:
+          python-version: '3.13'
+
+      - name: Verify exact corrected reference package
         run: |
           python -m pip install pillow
           python - <<'PY'
-          import hashlib,json,zipfile,io
+          import hashlib, io, json, zipfile
           from pathlib import Path
           from PIL import Image
-          f=Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
-          assert hashlib.sha256(f.read_bytes()).hexdigest()=='5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb'
-          with zipfile.ZipFile(f) as z:
-            m=json.loads(z.read('manifest.json'))
-            assert m['Name']=='Stream Deck Ultimate' and m['Version']=='1.0.0.0' and m['SDKVersion']==3 and len(m['Actions'])==16
-            bases={m['CategoryIcon']}|{a['Icon'] for a in m['Actions'] if a.get('Icon')}
-            files=[x for b in bases for x in (f'{b}.png',f'{b}@2x.png')]
-            assert len(files)==32
-            for name in files:
-              im=Image.open(io.BytesIO(z.read(name))).convert('RGBA')
-              assert all((not a) or (r,g,b)==(255,255,255) for r,g,b,a in im.getdata()), name
-          print('reference v1.0.0 contract + white icon review fix passed')
+
+          package = Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
+          expected = '5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb'
+          assert package.is_file(), package
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == expected
+
+          root = 'com.packrat.stream-deck-ultimate-bundle.sdPlugin/'
+          with zipfile.ZipFile(package) as z:
+              manifest = json.loads(z.read(root + 'manifest.json'))
+              assert manifest['Name'] == 'Stream Deck Ultimate'
+              assert manifest['Version'] == '1.0.0.0'
+              assert manifest['SDKVersion'] == 3
+              assert len(manifest['Actions']) == 16
+
+              bases = {manifest['CategoryIcon']}
+              bases.update(a['Icon'] for a in manifest['Actions'] if a.get('Icon'))
+              icon_files = [root + f'{base}{suffix}.png' for base in bases for suffix in ('', '@2x')]
+              assert len(icon_files) == 32, len(icon_files)
+              for name in icon_files:
+                  image = Image.open(io.BytesIO(z.read(name))).convert('RGBA')
+                  assert all((not a) or (r, g, b) == (255, 255, 255) for r, g, b, a in image.getdata()), name
+
+          print('hardware-accepted v1.0.0 contract + 32 white app-list icons verified')
           PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Materialize exact reference package
+        run: |
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          package = Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
+          out = Path('.tmp-stream-deck-ultimate')
+          with zipfile.ZipFile(package) as z:
+              z.extractall(out)
+          plugin = out / 'com.packrat.stream-deck-ultimate-bundle.sdPlugin'
+          assert plugin.is_dir()
+          print(plugin)
+          PY
+
+      - name: Official Elgato validation of exact corrected runtime
+        run: |
+          npm install -g @elgato/cli@1.9.0
+          streamdeck validate .tmp-stream-deck-ultimate/com.packrat.stream-deck-ultimate-bundle.sdPlugin --force-update-check
