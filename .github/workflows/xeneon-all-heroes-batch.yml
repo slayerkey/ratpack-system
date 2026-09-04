@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/xeneon-all-heroes-batch.yml'
       - 'tools/art/xeneon_all_hero_batch.py'
+      - 'tools/art/patch_helldivers_rat_art.py'
   workflow_dispatch:
 
 permissions:
@@ -24,11 +25,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sync current XENEON product source from main
+      - name: Sync current XENEON product source and shipping shells from main
         shell: pwsh
         run: |
           git fetch origin main
-          git checkout origin/main -- widgets/_src tools/xeneon tools/art/capture_xeneon.mjs products/index.json
+          git checkout origin/main -- widgets tools/xeneon tools/art/capture_xeneon.mjs products/index.json
+          python tools/art/patch_helldivers_rat_art.py
 
       - uses: actions/setup-node@v4
         with:
@@ -92,6 +94,10 @@ jobs:
           }
           "failed=$($failed -join ',')" | Out-File artifacts/xeneon-all/logs/summary.txt
           Write-Host "Failures: $($failed -join ', ')"
+          # Do not stop before the deterministic bundle/manifest gate. The next
+          # step intentionally records partial output and the explicit 17-count
+          # verification decides whether the batch is complete.
+          exit 0
 
       - name: Build complete ZIP and QA sheets
         id: bundle
@@ -109,9 +115,10 @@ jobs:
             Get-Content artifacts/xeneon-all/logs/summary.txt -ErrorAction SilentlyContinue
             throw "Expected 17 real XENEON heroes; got $($heroes.Count)"
           }
-          if (-not (Test-Path artifacts/xeneon-all/packrat-xeneon-all-heroes.zip) -and -not (Test-Path artifacts/xeneon-all/final/../packrat-xeneon-all-heroes.zip)) {
+          if (-not (Test-Path artifacts/xeneon-all/packrat-xeneon-all-heroes.zip)) {
             throw 'Final ZIP missing'
           }
+          Write-Host 'XENEON ALL HEROES PASS: 17/17'
 
       - name: Upload complete XENEON hero batch
         if: always()
