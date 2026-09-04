@@ -1,0 +1,2 @@
+original-submitted  70a2e807fda53fc021297839b5e7d4f258ca68c3940fa2fb9d6f16d1b2462373  Stream-Deck-Ultimate-v1.0.0.streamDeckPlugin
+white-icons-fix    5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb  Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin

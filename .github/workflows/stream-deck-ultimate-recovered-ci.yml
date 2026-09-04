@@ -1,0 +1,35 @@
+name: Stream Deck Ultimate Recovered v1.0 CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/stream-deck-ultimate/**'
+      - '.github/workflows/stream-deck-ultimate-recovered-ci.yml'
+  workflow_dispatch:
+jobs:
+  reference-package-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.13'}
+      - name: Verify corrected reference package
+        run: |
+          python -m pip install pillow
+          python - <<'PY'
+          import hashlib,json,zipfile,io
+          from pathlib import Path
+          from PIL import Image
+          f=Path('plugins/stream-deck-ultimate/reference/Stream-Deck-Ultimate-v1.0.0-white-icons.streamDeckPlugin')
+          assert hashlib.sha256(f.read_bytes()).hexdigest()=='5f6d1c546c370113b0f02677934214d8af7ef958592409b2d991db555d8243bb'
+          with zipfile.ZipFile(f) as z:
+            m=json.loads(z.read('manifest.json'))
+            assert m['Name']=='Stream Deck Ultimate' and m['Version']=='1.0.0.0' and m['SDKVersion']==3 and len(m['Actions'])==16
+            bases={m['CategoryIcon']}|{a['Icon'] for a in m['Actions'] if a.get('Icon')}
+            files=[x for b in bases for x in (f'{b}.png',f'{b}@2x.png')]
+            assert len(files)==32
+            for name in files:
+              im=Image.open(io.BytesIO(z.read(name))).convert('RGBA')
+              assert all((not a) or (r,g,b)==(255,255,255) for r,g,b,a in im.getdata()), name
+          print('reference v1.0.0 contract + white icon review fix passed')
+          PY
