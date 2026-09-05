@@ -135,9 +135,24 @@ function setMode(mode, manual) {
   if (["home","performance","today","ambient"].indexOf(mode) < 0) mode = "home";
   state.mode = mode;
   document.body.setAttribute("data-mode", mode);
+
+  var activeScreen = null;
   document.querySelectorAll(".screen").forEach(function (screen) {
-    screen.classList.toggle("is-active", screen.getAttribute("data-screen") === mode);
+    var active = screen.getAttribute("data-screen") === mode;
+    screen.classList.toggle("is-active", active);
+
+    // Physical iCUE/XENEON recovery: opacity-only hiding can leave the previous
+    // dashboard layer retained by the host compositor. That presents as multiple
+    // modes drawn together and an apparent brightness increase after each switch.
+    // Hard-remove every inactive screen from layout/paint so exactly one dashboard
+    // can be composited at a time, independent of Custom Style being enabled.
+    screen.hidden = !active;
+    screen.style.display = active ? "" : "none";
+    screen.style.transition = "none";
+    screen.setAttribute("aria-hidden", active ? "false" : "true");
+    if (active) activeScreen = screen;
   });
+
   document.querySelectorAll(".navButton[data-mode-target]").forEach(function (button) {
     button.classList.toggle("is-active", button.getAttribute("data-mode-target") === mode);
   });
@@ -147,6 +162,10 @@ function setMode(mode, manual) {
     setText("autoLabel", "HOLD");
   }
   storeWrite("mode", mode);
+
+  // Force the selected screen into the current layout before graph canvases are
+  // measured/redrawn. This also gives the XENEON host a deterministic paint boundary.
+  if (activeScreen) void activeScreen.offsetWidth;
   requestAnimationFrame(function () {
     drawPerformanceGraph(); drawNetworkSpark(); drawWeatherSpark();
   });
