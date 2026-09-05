@@ -1,0 +1,128 @@
+name: XENEON All Heroes Batch
+
+on:
+  push:
+    branches:
+      - automation/xeneon-all-heroes-20260904
+    paths:
+      - '.github/workflows/xeneon-all-heroes-batch.yml'
+      - 'tools/art/xeneon_all_hero_batch.py'
+      - 'tools/art/xeneon_hero_catalog.json'
+      - 'tools/art/patch_helldivers_rat_art.py'
+      - 'standards/xeneon-marketplace-hero-v1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render-all:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      RATPACK_ART_FONT: C:\Windows\Fonts\segoeui.ttf
+      RATPACK_ART_FONT_BOLD: C:\Windows\Fonts\segoeuib.ttf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync current XENEON product source and shipping shells from main
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git checkout origin/main -- widgets tools/xeneon tools/art/capture_xeneon.mjs products/index.json
+          python tools/art/patch_helldivers_rat_art.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deterministic capture dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==12.3.0
+          npm install --no-save playwright@1.62.1
+          npx playwright install chromium
+
+      - name: Build, capture, and render every configured XENEON product
+        shell: pwsh
+        run: |
+          $slugs = @(python tools/art/xeneon_all_hero_batch.py list)
+          if ($LASTEXITCODE -ne 0 -or $slugs.Count -eq 0) {
+            throw 'Unable to load XENEON hero catalog'
+          }
+          Write-Host "Configured XENEON heroes: $($slugs.Count)"
+          New-Item -ItemType Directory -Force artifacts/xeneon-all/rendered | Out-Null
+          New-Item -ItemType Directory -Force artifacts/xeneon-all/logs | Out-Null
+          $failed = @()
+          foreach ($slug in $slugs) {
+            Write-Host "=== $slug ==="
+            try {
+              python tools/xeneon/inline.py $slug *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-build.txt"
+              if ($LASTEXITCODE -ne 0) { throw "build failed: $slug" }
+
+              $shots = "artifacts/xeneon-all/shots/$slug"
+              node tools/art/capture_xeneon.mjs $slug $shots *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-capture.txt"
+              if ($LASTEXITCODE -ne 0) { throw "capture failed: $slug" }
+              if (-not (Test-Path "$shots/XL_H.png")) { throw "XL_H missing: $slug" }
+
+              python tools/art/xeneon_all_hero_batch.py render --slug $slug --shot "$shots/XL_H.png" --out "artifacts/xeneon-all/rendered/$slug.png" *>&1 | Tee-Object -FilePath "artifacts/xeneon-all/logs/$slug-render.txt"
+              if ($LASTEXITCODE -ne 0) { throw "render failed: $slug" }
+            }
+            catch {
+              Write-Host "FAILED $slug :: $_"
+              $failed += $slug
+              $_ | Out-File -Append "artifacts/xeneon-all/logs/failures.txt"
+            }
+          }
+          "expected=$($slugs.Count)" | Out-File artifacts/xeneon-all/logs/expected.txt
+          "failed=$($failed -join ',')" | Out-File artifacts/xeneon-all/logs/summary.txt
+          Write-Host "Failures: $($failed -join ', ')"
+          # Preserve partial diagnostics; the explicit completeness gate below
+          # decides whether the configured family is shippable.
+          exit 0
+
+      - name: Build complete ZIP and QA sheets
+        id: bundle
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          python tools/art/xeneon_all_hero_batch.py bundle --input artifacts/xeneon-all/rendered --out-dir artifacts/xeneon-all/final
+
+      - name: Verify complete configured batch
+        shell: pwsh
+        run: |
+          $slugs = @(python tools/art/xeneon_all_hero_batch.py list)
+          if ($LASTEXITCODE -ne 0 -or $slugs.Count -eq 0) {
+            throw 'Unable to load XENEON hero catalog for verification'
+          }
+          $heroes = Get-ChildItem artifacts/xeneon-all/rendered -Filter *.png -File -ErrorAction SilentlyContinue
+          Write-Host "Rendered heroes: $($heroes.Count) / $($slugs.Count)"
+          if ($heroes.Count -ne $slugs.Count) {
+            Get-Content artifacts/xeneon-all/logs/summary.txt -ErrorAction SilentlyContinue
+            throw "Expected $($slugs.Count) real XENEON heroes; got $($heroes.Count)"
+          }
+          if (-not (Test-Path artifacts/xeneon-all/packrat-xeneon-all-heroes.zip)) {
+            throw 'Final ZIP missing'
+          }
+          if (-not (Test-Path artifacts/xeneon-all/final/contact-sheet.jpg)) {
+            throw 'Contact sheet missing'
+          }
+          if (-not (Test-Path artifacts/xeneon-all/final/15-percent-sheet.jpg)) {
+            throw 'Exact 15 percent QA sheet missing'
+          }
+          Write-Host "XENEON ALL HEROES PASS: $($heroes.Count)/$($slugs.Count)"
+
+      - name: Upload complete XENEON hero batch
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packrat-xeneon-all-heroes
+          path: artifacts/xeneon-all/
+          if-no-files-found: error
+          retention-days: 30

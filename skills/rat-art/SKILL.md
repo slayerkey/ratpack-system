@@ -11,11 +11,11 @@ Rat Art is a repository pipeline, not chat image generation.
 
 When the user invokes `/rat-art`, asks to use Rat Art, or asks to regenerate marketplace art through the Rat Art pipeline, **do not call ChatGPT image generation, ImageGen, DALL-E, an image API, or any other generative image provider**.
 
-Run the canonical deterministic repository tooling instead. For XENEON widgets the executable path is `tools/art/rat_art.py` plus `tools/art/capture_xeneon.mjs`, normally through the canonical Rat Ship or Rat Art workflow.
+Run the canonical deterministic repository tooling instead. For XENEON widgets, use the current product build, `tools/art/capture_xeneon.mjs`, and the approved XENEON hero tooling described in `standards/xeneon-marketplace-hero-v1.md`.
 
 If the deterministic pipeline is missing a required asset or capture, fail and fix or migrate that dependency. Never substitute generated artwork.
 
-Read the product, validation evidence, product metadata, `standards/marketplace-listing-v2.md`, brand standards, art reproducibility contract, and applicable platform reference.
+Read the product, validation evidence, product metadata, `standards/marketplace-listing-v2.md`, any product-family-specific standard, brand standards, art reproducibility contract, and applicable platform reference.
 
 ## Marketplace Listing V2
 
@@ -64,9 +64,9 @@ REAL PRODUCT CAPTURE
 
 → APPROVED DEVICE PLATE
 
-→ RESTRAINED BACKGROUND / LIGHTING
+→ APPROVED BACKGROUND / LIGHTING
 
-→ MINIMAL COPY / BRANDING
+→ DETERMINISTIC COPY / BRANDING
 
 Never alter layout, controls, metrics, modes, values, availability, or behavior in a way that misrepresents the product.
 
@@ -74,7 +74,7 @@ If a claim needs a state that is not available in canonical source/captures, blo
 
 ## Nonwidget products
 
-Use first party contextual screenshots where the current product style calls for context. Preserve source provenance and reject low resolution or unsuitable source images.
+Use first-party contextual screenshots where the current product style calls for context. Preserve source provenance and reject low-resolution or unsuitable source images.
 
 Keep PackRat text, device plates, icons, key faces, badges, and layouts deterministic.
 
@@ -86,46 +86,102 @@ For icon packs, the icons themselves are the product. Show meaningful variety at
 
 ## XENEON and iCUE widget products
 
-Do not substitute a contextual background for the real widget.
+`standards/xeneon-marketplace-hero-v1.md` is the current XENEON-specific hero standard and overrides older generic V2 XENEON hero defaults when they conflict.
 
-First build the widget and run deterministic browser captures at the required native sizes. Art preflight must fail if those captures are absent.
+Do not substitute a contextual background for the real widget. The environment may frame the product, but the UI shown on the XENEON device must come from a real deterministic capture.
 
-Composite the real capture into the approved XENEON device plate using the calibrated mapping.
+Required product-proof path:
 
-The capture gate must test glyph safety for clipped descenders and other text-bound failures before the marketplace art is rendered.
+1. Build the current widget source.
+2. Run deterministic browser captures at the required native sizes.
+3. Verify the Rat Art fixture reaches the intended state without runtime errors or overflow.
+4. Use the real `XL_H` capture for the marketplace hero.
+5. Composite that capture into the approved calibrated XENEON Edge device plate.
+6. Render the approved environment/title/brand treatment deterministically.
+7. Generate a full contact sheet and exact 15% marketplace review sheet.
 
-### V2 hero composition
+The capture gate must test glyph safety for clipped descenders and other text-bound failures before marketplace art is promoted.
 
-For schema-v2 XENEON art:
+### Approved XENEON hero composition
 
-1. Keep the PackRat rat/package mark restrained at top center.
-2. Use a short use-case label at top left only when it improves instant understanding.
-3. Keep edition/platform labeling small at top right.
-4. Make the front-facing device the dominant visual, normally about 78–92% of usable width when the form factor allows it.
-5. Do not repeat the PackRat mark in the hero footer.
-6. Keep the background a restrained studio gradient/ambient field; no random desks, props, particles, fake HUD elements, or decorative UI.
-7. Generate a thumbnail review sheet at 480×240, 320×160, and 240×120.
+For the current approved XENEON family:
 
-The marketplace title already names the product. Do not automatically render the full product name at poster scale.
+1. Product name is a primary hero element and is normally repeated prominently in the image.
+2. Use one or two large semantic title lines rather than shrinking a long title into a tiny header.
+3. Keep `Lite` / `Pro` in the visible product name when they are part of the actual listing name.
+4. Keep `for XENEON Edge` subordinate to the product name.
+5. Use the approved `warm-studio-v1` environment unless a new family scene has separately passed review.
+6. Make the calibrated front-facing XENEON device a large foreground subject.
+7. Show only the real widget capture inside that device.
+8. Keep the PackRat rat/package mark small and secondary; current approved placement is an upper-right signature.
+9. Do not add a second slogan that competes with the product name.
+10. Do not duplicate the PackRat mark in the hero footer.
 
-Use `hero.title_mode`:
+The older rule that discouraged poster-scale product names does **not** apply to the approved XENEON family. Browsing-scale testing showed that the larger title materially improves recognition.
 
-- `none` when real UI plus listing title is enough.
-- `use_case` for a short label such as `PC POWER`, `WEATHER`, `AI USAGE`, or `MUSIC CONTROL`.
-- `product` only when repeating the actual product name materially improves clarity.
+### XENEON background and contextual art
+
+A designed environment is allowed for XENEON when it is a fixed, versioned, rights-safe PackRat asset and the real product remains obvious.
+
+Allowed:
+
+- approved repository-owned studio scenes
+- deterministic monitor/display context behind the device
+- gradients, glows, shadows, texture, lines, dots, and geometric treatment
+- restrained desk/studio context when it is part of the approved scene
+- family-level accent treatment
+
+Not allowed:
+
+- generated room/product imagery
+- arbitrary copyrighted game art or cover art
+- unrelated stock photography
+- fake widget UI or fake floating HUDs
+- effects that make the real widget hard to read
+- invented XENEON hardware
+
+If a game/product-specific contextual image is ever used, it must be rights-cleared, versioned locally, and have provenance. External cover art is never an automatic fallback.
+
+### XENEON catalog tooling
+
+Current approved catalog/tooling:
+
+- `tools/art/xeneon_hero_catalog.json`
+- `tools/art/xeneon_all_hero_batch.py`
+- `tools/art/capture_xeneon.mjs`
+- `.github/workflows/xeneon-all-heroes-batch.yml`
+
+The catalog config is the naming/order source of truth for the approved XENEON hero batch. Do not maintain a separate hidden product-name table in the workflow.
+
+A new XENEON product is not part of the family until it is added to the catalog and the complete configured batch passes again.
+
+### XENEON browsing-scale gate
+
+The exact 15% sheet is mandatory for this family:
+
+- source hero: `1920 × 960`
+- exact 15% review: `288 × 144`
+
+At `288 × 144`:
+
+- product name must be immediately readable
+- XENEON device must remain recognizable
+- PackRat must remain secondary
+- no family member may look like a scale/title outlier
+
+The broader V2 480/320/240 thumbnail review may still be generated where useful, but it does not replace the XENEON exact 15% gate.
 
 ### Shared marketplace composition defaults
 
-1. Gallery footer center branding is the PackRat rat logo only. Do not render the `PACKRAT` wordmark beside it.
-2. Cover/gallery frames must teach progressively rather than repeat the cover.
-3. Gallery 01 should answer `What do I get and why would I want this?` at a glance unless a demo occupies that role.
-4. Lead feature space with practical outcomes. Prefer the core job, saved time/visibility, useful controls, history/persistence, meaningful customization, or a real Pro advantage.
-5. Search/app icons are utility assets, not gallery content. Never create or intentionally upload a logo-only or icon-only gallery frame.
-6. Cover and gallery frames must be distinct. V2 rendering fails on byte-identical marketplace images.
-7. Labels beneath screenshots need visible safety spacing.
-8. Compatibility/sizes normally comes last for XENEON after value and interaction are understood.
-9. Contact sheets follow actual marketplace viewing order.
-10. V2 hero candidates must also pass the generated thumbnail sheet.
+1. Cover/gallery frames must teach progressively rather than repeat the cover.
+2. Gallery 01 should answer `What do I get and why would I want this?` at a glance unless a demo occupies that role.
+3. Lead feature space with practical outcomes. Prefer the core job, saved time/visibility, useful controls, history/persistence, meaningful customization, or a real Pro advantage.
+4. Search/app icons are utility assets, not gallery content. Never create or intentionally upload a logo-only or icon-only gallery frame.
+5. Cover and gallery frames must be distinct. V2 rendering fails on byte-identical marketplace images.
+6. Labels beneath screenshots need visible safety spacing.
+7. Compatibility/sizes normally comes last for XENEON after value and interaction are understood.
+8. Contact sheets follow actual marketplace viewing order.
+9. XENEON hero candidates must pass the exact 15% family sheet.
 
 ### Feature copy test
 
@@ -172,7 +228,9 @@ Use actual Marketplace metadata fields/filters for discoverability wherever poss
 
 Related editions must look like one family without altering their real UI.
 
-Keep device framing, type system, logo position, background family, and use-case label treatment consistent. Use a restrained edition label plus real feature differences to separate editions.
+Keep device framing, type system, logo position, background family, title treatment, and platform treatment consistent. Use the actual edition name plus real feature differences to separate editions.
+
+Do not make Pro appear more premium by fabricating a brighter UI or unrelated environment.
 
 ## Required preflight
 
@@ -183,15 +241,25 @@ Missing brand typography is an error. Never silently fall back to Pillow's defau
 For V2 candidates also verify:
 
 - contact sheet exists
-- thumbnail sheet exists
-- hero remains product-dominant at 320×160
+- required thumbnail/browsing-scale sheet exists
 - marketplace images are distinct
 - any demo recommendation is intentional
 - customer-facing description contains no unexplained keyword dump
 
+For approved XENEON heroes additionally verify:
+
+- current product builds
+- Rat Art fixture reaches intended state
+- `XL_H` capture exists
+- hero is exactly `1920 × 960`
+- exact `288 × 144` sheet exists
+- product name and device pass that 15% review
+- provenance metadata records the source capture and approved scene
+- no image-generation dependency exists
+
 ## Review
 
-Run deterministic QA, inspect every candidate hero, contact sheet, and V2 thumbnail sheet, and record visual review results.
+Run deterministic QA, inspect every candidate hero, contact sheet, and required thumbnail/browsing-scale sheet, and record visual review results.
 
 Judge instant product clarity, hierarchy, device/product dominance, truthful UI, contextual recognition, crop quality, clutter, brand restraint, text bounds, gallery sequencing, feature usefulness, Lite/Pro relationships, and marketplace polish.
 
