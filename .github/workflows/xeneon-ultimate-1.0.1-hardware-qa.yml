@@ -1,0 +1,100 @@
+name: XENEON Ultimate 1.0.1 Hardware QA
+
+on:
+  push:
+    branches:
+      - 'fix/xeneon-ultimate-1.0.1-hardware-qa'
+
+permissions:
+  contents: read
+
+jobs:
+  build-package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout QA branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Generate canonical single-file widget
+        shell: pwsh
+        run: |
+          python tools/xeneon/inline.py xeneon-edge-ultimate
+          python tools/xeneon/inline.py xeneon-edge-ultimate --check
+
+      - name: Assert physical screen-isolation hotfix is present
+        shell: pwsh
+        run: |
+          $html = Get-Content 'widgets/xeneon-edge-ultimate/index.html' -Raw
+          if ($html -notmatch 'screen\.hidden\s*=\s*!active') { throw 'hard hidden screen isolation is missing' }
+          if ($html -notmatch 'screen\.style\.display\s*=\s*active') { throw 'display isolation is missing' }
+          $manifest = Get-Content 'widgets/xeneon-edge-ultimate/manifest.json' -Raw | ConvertFrom-Json
+          if ($manifest.version -ne '1.0.1') { throw "expected version 1.0.1, got $($manifest.version)" }
+
+      - name: Run authored verification
+        shell: pwsh
+        run: |
+          if (Test-Path 'widgets/_src/xeneon-edge-ultimate/verify.mjs') {
+            node 'widgets/_src/xeneon-edge-ultimate/verify.mjs'
+          }
+
+      - name: Official CORSAIR validate
+        shell: pwsh
+        run: npx --yes icuewidget-cli@0.4.47 validate 'widgets/xeneon-edge-ultimate'
+
+      - name: Official CORSAIR package
+        shell: pwsh
+        run: |
+          npx --yes icuewidget-cli@0.4.47 package 'widgets/xeneon-edge-ultimate'
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $pkg = Get-ChildItem -Path widgets -Filter *.icuewidget -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $pkg) { throw 'official package was not created' }
+          Copy-Item $pkg.FullName 'artifacts/XENEON-EDGE-Ultimate-1.0.1-hardware-QA.icuewidget'
+          @'
+          import pathlib, zipfile, json
+          package = pathlib.Path('artifacts/XENEON-EDGE-Ultimate-1.0.1-hardware-QA.icuewidget')
+          if not zipfile.is_zipfile(package):
+              raise SystemExit('package is not ZIP-compatible')
+          with zipfile.ZipFile(package) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f'corrupt ZIP member: {bad}')
+              manifest = json.loads(z.read('manifest.json').decode('utf-8-sig'))
+              html = z.read('index.html').decode('utf-8')
+          if manifest.get('version') != '1.0.1':
+              raise SystemExit(f"wrong packaged version: {manifest.get('version')}")
+          if 'screen.hidden = !active' not in html or 'screen.style.display = active ? "" : "none"' not in html:
+              raise SystemExit('packaged index is missing hard screen isolation')
+          print('OK: exact packaged 1.0.1 hardware-QA build contains the isolation fix')
+          '@ | python -
+
+      - name: Write tester notes
+        shell: pwsh
+        run: |
+          @'
+          XENEON EDGE Ultimate 1.0.1 — physical QA hotfix
+
+          Primary regression:
+          1. Disable Custom Style.
+          2. Cycle Home -> Performance -> Today -> Ambient -> Home repeatedly (20+ cycles).
+          3. Confirm exactly one layout is visible each time: no ghosted old screen, no accumulating brightness/washed-out look.
+          4. Repeat with Custom Style enabled.
+
+          Sanity checks already targeted by this review build:
+          - Text / Accent / Background colors update live.
+          - Layout remains a dropdown.
+          - CPU Temp / GPU Temp / CPU Load / GPU Load sensor dropdowns still follow the selected real sensor.
+          - Reload iCUE and confirm selected sensors persist.
+          '@ | Set-Content 'artifacts/TESTER-NOTES.txt' -Encoding UTF8
+
+      - name: Upload QA package
+        uses: actions/upload-artifact@v4
+        with:
+          name: xeneon-ultimate-1.0.1-hardware-qa
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
